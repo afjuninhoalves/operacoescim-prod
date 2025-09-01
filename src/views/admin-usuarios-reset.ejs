@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <title>Reset de senha gerado</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body{margin:0;font-family:Inter,system-ui,Arial;background:#0f172a;color:#e5e7eb}
+    .wrap{max-width:720px;margin:40px auto;padding:0 16px}
+    .card{background:#111827;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.35);padding:24px}
+    code{background:#0b1220;padding:4px 6px;border-radius:6px}
+    a.btn{padding:10px 16px;border-radius:8px;background:#2563eb;color:#fff;text-decoration:none}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h2>Reset para: <%= usuario.nome %> (CPF <%= usuario.cpf %>)</h2>
+      <p>Envie este link para o usuário (expira em 15 minutos):</p>
+      <p><code><%= link %></code></p>
+      <p>Em produção, este link será absoluto (com domínio/https) e enviado por e-mail.</p>
+      <p><a class="btn" href="/admin/usuarios">Voltar</a></p>
+    </div>
+  </div>
+</body>
+</html>

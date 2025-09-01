@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Mapa — <%= operacao.nome %></title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    :root{ --bg:#0b1220; --panel:#0f172a; --panel2:#111827; --border:#1f2937; --text:#e5e7eb; --muted:#9ca3af; --blue:#2563eb; }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial}
+    a{color:inherit;text-decoration:none}
+    .topbar{position:sticky;top:0;z-index:10;background:linear-gradient(to bottom,rgba(17,24,39,.92),rgba(17,24,39,.75));border-bottom:1px solid var(--border)}
+    .topbar-inner{max-width:1160px;margin:0 auto;padding:14px 20px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+    .btn{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:#111826;color:var(--text)}
+    .btn:hover{filter:brightness(1.08)}
+    .container{max-width:1160px;margin:0 auto;padding:20px}
+    .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--border);border-radius:14px;padding:14px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+    .muted{color:var(--muted)}
+    #map{width:100%;height:72vh;border-radius:12px;border:1px solid var(--border)}
+    .legend{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0 0}
+    .dot{width:12px;height:12px;border-radius:999px;display:inline-block;margin-right:6px}
+  </style>
+</head>
+<body>
+
+  <div class="topbar">
+    <div class="topbar-inner">
+      <div>
+        <div style="font-weight:700">Mapa — <%= operacao.nome %></div>
+        <div class="muted">Agendada: <%= new Date(operacao.inicio_agendado).toLocaleString('pt-BR') %> · ID #<%= operacao.id %></div>
+      </div>
+      <div style="display:flex;gap:10px">
+        <a class="btn" href="/operacoes/<%= operacao.id %>/monitor">Voltar ao monitor</a>
+        <a class="btn" href="/operacoes/<%= operacao.id %>">Voltar ao detalhe</a>
+        <a class="btn" href="/operacoes">Lista de operações</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="card" style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+        <div class="muted">Mostrando eventos com geolocalização capturada nas fotos.</div>
+        <div>
+          <label style="margin-right:10px"><input type="checkbox" id="chk-fis" checked> Fiscalizações</label>
+          <label style="margin-right:10px"><input type="checkbox" id="chk-pes" checked> Pessoas</label>
+          <label style="margin-right:10px"><input type="checkbox" id="chk-vei" checked> Veículos</label>
+          <label><input type="checkbox" id="chk-apr" checked> Apreensões</label>
+        </div>
+      </div>
+      <div class="legend">
+        <span><span class="dot" style="background:#60a5fa"></span> Fiscalização</span>
+        <span><span class="dot" style="background:#f87171"></span> Pessoa</span>
+        <span><span class="dot" style="background:#34d399"></span> Veículo</span>
+        <span><span class="dot" style="background:#fbbf24"></span> Apreensão</span>
+      </div>
+    </div>
+
+    <div id="map" class="card"></div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const markersData = <%- JSON.stringify(markers || []) %>;
+
+    // mapa base
+    const map = L.map('map', { zoomControl: true });
+    const tiles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap',
+      maxZoom: 19
+    }).addTo(map);
+
+    // grupos por tipo
+    const gFis = L.layerGroup().addTo(map);
+    const gPes = L.layerGroup().addTo(map);
+    const gVei = L.layerGroup().addTo(map);
+    const gApr = L.layerGroup().addTo(map);
+
+    function colorFor(tipo){
+      if (tipo === 'fiscalizacao') return '#60a5fa';
+      if (tipo === 'pessoa')       return '#f87171';
+      if (tipo === 'veiculo')      return '#34d399';
+      if (tipo === 'apreensao')    return '#fbbf24';
+      return '#a78bfa';
+    }
+
+    const allLatLng = [];
+    markersData.forEach(m => {
+      if (typeof m.lat !== 'number' || typeof m.lng !== 'number') return;
+      const circle = L.circleMarker([m.lat, m.lng], {
+        radius: 8, weight: 2, color: colorFor(m.tipo), fillOpacity: .7
+      }).bindPopup(m.popup);
+
+      if (m.tipo === 'fiscalizacao') circle.addTo(gFis);
+      else if (m.tipo === 'pessoa')  circle.addTo(gPes);
+      else if (m.tipo === 'veiculo') circle.addTo(gVei);
+      else if (m.tipo === 'apreensao') circle.addTo(gApr);
+      allLatLng.push([m.lat, m.lng]);
+
+      // raio de precisão (se houver)
+      if (typeof m.accuracy === 'number' && m.accuracy > 0) {
+        L.circle([m.lat, m.lng], { radius: m.accuracy, color: colorFor(m.tipo), weight:1, opacity:.3, fillOpacity:.05 })
+          .addTo(map);
+      }
+    });
+
+    if (allLatLng.length){
+      map.fitBounds(L.latLngBounds(allLatLng).pad(0.2));
+    } else {
+      map.setView([-22.90, -47.05], 11); // fallback
+    }
+
+    // toggles
+    document.getElementById('chk-fis').addEventListener('change', e => e.target.checked ? gFis.addTo(map) : map.removeLayer(gFis));
+    document.getElementById('chk-pes').addEventListener('change', e => e.target.checked ? gPes.addTo(map) : map.removeLayer(gPes));
+    document.getElementById('chk-vei').addEventListener('change', e => e.target.checked ? gVei.addTo(map) : map.removeLayer(gVei));
+    document.getElementById('chk-apr').addEventListener('change', e => e.target.checked ? gApr.addTo(map) : map.removeLayer(gApr));
+  </script>
+</body>
+</html>

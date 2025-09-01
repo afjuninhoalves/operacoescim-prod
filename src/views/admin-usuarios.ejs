@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <title>Admin • Usuários</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body{margin:0;font-family:Inter,system-ui,Arial;background:#0f172a;color:#e5e7eb}
+    .wrap{max-width:960px;margin:48px auto;padding:0 16px}
+    .card{background:#111827;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.35);padding:24px}
+    a.btn{padding:10px 16px;border-radius:8px;background:#2563eb;color:#fff;text-decoration:none}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h2 style="margin-top:0;">Admin &raquo; Usuários</h2>
+      <p>Bem-vindo, <strong><%= user.nome %></strong>. Esta página será o CRUD de usuários (criar, bloquear, redefinir senha, perfis).</p>
+      <p><a class="btn" href="/">Voltar</a></p>
+    </div>
+  </div>
+</body>
+</html>

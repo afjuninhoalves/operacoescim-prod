@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <title>Definir nova senha</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body{margin:0;background:#0f172a;color:#e5e7eb;font-family:system-ui,-apple-system,Segoe UI,Roboto}
+    .wrap{max-width:560px;margin:48px auto;padding:0 16px}
+    .card{background:#111827;border-radius:12px;box-shadow:0 8px 22px rgba(0,0,0,.35);padding:20px}
+    label{display:block;margin-bottom:6px;color:#cbd5e1}
+    input[type="password"]{width:100%;padding:10px 12px;border-radius:8px;border:1px solid #334155;background:#0b1220;color:#e5e7eb}
+    .btn{padding:10px 14px;border-radius:8px;background:#2563eb;color:#fff;border:none;cursor:pointer}
+    .err{background:#7f1d1d;color:#fecaca;padding:10px 12px;border-radius:8px;margin-bottom:12px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h2 style="margin-top:0">Definir nova senha</h2>
+
+      <% if (errors && errors.length) { %>
+        <div class="err">
+          <ul style="margin:0 0 0 18px">
+            <% errors.forEach(function(e){ %><li><%= e %></li><% }) %>
+          </ul>
+        </div>
+      <% } %>
+
+      <form method="post" action="/reset/<%= token %>">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <div>
+          <label>Nova senha</label>
+          <input type="password" name="senha" required minlength="10">
+        </div>
+        <div style="margin-top:10px">
+          <label>Confirmar senha</label>
+          <input type="password" name="confirm" required minlength="10">
+        </div>
+        <div style="margin-top:14px">
+          <button class="btn" type="submit">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</body>
+</html>

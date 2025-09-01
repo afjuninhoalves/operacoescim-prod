@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <title>Admin • Usuários</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body{margin:0;font-family:Inter,system-ui,Arial;background:#0f172a;color:#e5e7eb}
+    .wrap{max-width:1000px;margin:40px auto;padding:0 16px}
+    .card{background:#111827;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.35);padding:24px}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:10px;border-bottom:1px solid #1f2937;font-size:14px}
+    .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-bottom:12px}
+    a.btn,button.btn{padding:8px 12px;border-radius:8px;border:none;background:#2563eb;color:#fff;text-decoration:none;cursor:pointer}
+    .muted{color:#9ca3af}
+    .pill{padding:2px 8px;border-radius:999px;font-size:12px}
+    .ok{background:#065f46} .bad{background:#7f1d1d}
+    form{display:inline}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="row">
+      <h2 style="margin:0">Admin • Usuários</h2>
+      <div>
+        <a class="btn" href="/admin/usuarios/novo">Novo usuário</a>
+        <a class="btn" href="/">Home</a>
+      </div>
+    </div>
+    <div class="card">
+      <table>
+        <thead><tr>
+          <th>ID</th><th>Nome</th><th>CPF</th><th>Email</th><th>Perfil</th><th>Status</th><th>Últ. login</th><th>Ações</th>
+        </tr></thead>
+        <tbody>
+          <% if (usuarios.length === 0) { %>
+            <tr><td colspan="8" class="muted">Nenhum usuário</td></tr>
+          <% } %>
+          <% usuarios.forEach(u => { %>
+            <tr>
+              <td><%= u.id %></td>
+              <td><%= u.nome %></td>
+              <td><%= u.cpf %></td>
+              <td><%= u.email || '-' %></td>
+              <td><%= u.role %></td>
+              <td><span class="pill <%= u.ativo ? 'ok' : 'bad' %>"><%= u.ativo ? 'Ativo' : 'Bloqueado' %></span></td>
+              <td><%= u.ultimo_login_at ? new Date(u.ultimo_login_at).toLocaleString() : '-' %></td>
+              <td>
+                <a class="btn" href="/admin/usuarios/<%= u.id %>/editar">Editar</a>
+                <form method="post" action="/admin/usuarios/<%= u.id %>/toggle" style="display:inline">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <button class="btn" type="submit"><%= u.ativo ? 'Bloquear' : 'Desbloquear' %></button>
+                </form>
+                <form method="post" action="/admin/usuarios/<%= u.id %>/reset" style="display:inline">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <button class="btn" type="submit">Resetar senha</button>
+                </form>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</body>
+</html>

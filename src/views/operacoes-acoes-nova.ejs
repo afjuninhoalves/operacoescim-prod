@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Inserir ações — <%= operacao.nome %></title>
+
+  <!-- Leaflet (mapa para marcação manual) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+
+  <style>
+    :root{
+      --bg:#0b1220; --panel:#0f172a; --panel2:#111827; --border:#1f2937; --muted:#9ca3af; --text:#e5e7eb;
+      --blue:#2563eb; --green:#22c55e; --red:#ef4444; --radius:14px; --shadow:0 10px 30px rgba(0,0,0,.35);
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial}
+    a{color:inherit;text-decoration:none}
+    .topbar{position:sticky;top:0;z-index:10;background:linear-gradient(180deg,rgba(17,24,39,.9),rgba(17,24,39,.7));border-bottom:1px solid var(--border);backdrop-filter:saturate(140%) blur(8px)}
+    .topbar-inner{max-width:1160px;margin:0 auto;padding:12px 16px;display:flex;gap:8px;align-items:center;justify-content:space-between}
+    .brand{display:flex;gap:10px;align-items:center;font-weight:700}
+    .badge{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:10px;background:linear-gradient(135deg,var(--blue),#0ea5e9);color:#fff;font-weight:900;box-shadow:0 6px 16px rgba(37,99,235,.35)}
+    .btn{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:#111826;color:var(--text);cursor:pointer}
+    .btn:hover{filter:brightness(1.06)}
+    .btn-primary{background:var(--blue);color:#fff;border-color:rgba(37,99,235,.5)}
+    .container{max-width:1160px;margin:0 auto;padding:20px 16px 40px}
+    .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px}
+    .muted{color:var(--muted)}
+    .pill{display:inline-block;padding:4px 10px;border-radius:999px;border:1px solid var(--border);background:#0b1325;color:#93c5fd}
+    .actions{display:flex;gap:8px;flex-wrap:wrap}
+    .grid{display:grid;gap:18px}
+    @media (min-width:960px){ .grid.two{grid-template-columns:1fr 1fr} }
+    label{font-size:13px;color:var(--muted);display:block;margin-bottom:6px}
+    input[type="text"],input[type="number"],input[type="datetime-local"],textarea,select,input[type="file"]{
+      width:100%;padding:11px 12px;border-radius:10px;border:1px solid var(--border);background:#0b1325;color:var(--text);outline:none
+    }
+    textarea{min-height:90px;resize:vertical}
+    .section-title{font-weight:700;font-size:18px;margin:0 0 12px}
+    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+
+    /* GEO */
+    .geo-card { margin-top:16px; }
+    #pickMap { height: 300px; border-radius: 12px; }
+    .geo-row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    .geo-status { color: var(--muted); font-size: 12px; }
+    .hide { display:none; }
+    .geo-ok{color:#22c55e;font-weight:600}
+    .geo-err{color:#ef4444;font-weight:600}
+  </style>
+</head>
+<body>
+
+  <div class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <span class="badge">CIM</span>
+        <div>
+          Operações CIM
+          <div class="muted">Inserir ações — <%= operacao.nome %></div>
+        </div>
+      </div>
+      <div class="actions">
+        <a class="btn" href="/operacoes/<%= operacao.id %>">Voltar</a>
+        <a class="btn" href="/operacoes/<%= operacao.id %>/fotos">Fotos</a>
+        <a class="btn" href="/registros?opId=<%= operacao.id %>">Registros</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="container">
+
+    <!-- Cabeçalho da operação -->
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <div>
+          <h2 style="margin:0 0 6px">Operação <%= operacao.nome %></h2>
+          <div class="muted">
+            Agendada para:
+            <strong><%= operacao.inicio_fmt || operacao.inicio_agendado %></strong>
+            · Status: <span class="pill"><%= operacao.status %></span>
+          </div>
+          <div class="muted">Cidades: <%= operacao.cidades_str %></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ====== BLOCO DE LOCALIZAÇÃO (GPS + MAPA) ====== -->
+    <div class="card geo-card">
+      <h3 style="margin:0 0 10px">Localização (opcional)</h3>
+      <div class="geo-row" style="margin-bottom:10px">
+        <button type="button" class="btn" id="btnGPS">Usar GPS</button>
+        <button type="button" class="btn" id="btnManual">Marcar no mapa</button>
+        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+          <input type="checkbox" id="ckAttach" checked>
+          Anexar localização às fotos
+        </label>
+        <span class="geo-status" id="geoStatus">Anexar localização: ligado. Use GPS ou marque no mapa.</span>
+      </div>
+      <div id="mapWrap" class="hide">
+        <div id="pickMap"></div>
+      </div>
+    </div>
+
+    <!-- GRID responsivo 2 colunas no desktop -->
+    <div class="grid two" style="margin-top:16px">
+
+      <!-- ========== FISCALIZAÇÃO ========== -->
+      <div class="card">
+        <div class="section-title">Fiscalização</div>
+        <form method="post" action="/operacoes/<%= operacao.id %>/fiscalizacoes" enctype="multipart/form-data">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>"/>
+          <!-- geolocalização preenchida via JS -->
+          <input type="hidden" name="lat" class="geo-lat">
+          <input type="hidden" name="lng" class="geo-lng">
+          <input type="hidden" name="acc" class="geo-acc">
+
+          <label>Tipo de local</label>
+          <input type="text" name="tipo_local" placeholder="ex: bar, ferro-velho, baile" required>
+
+          <label style="margin-top:8px">Observações</label>
+          <textarea name="obs" placeholder=""></textarea>
+
+          <label style="margin-top:8px">Fotos (câmera ou galeria)</label>
+          <input type="file" name="fotos" accept="image/*" capture="environment" multiple>
+
+          <div class="row" style="justify-content:space-between;margin-top:10px">
+            <div class="muted geo-status">Localização: aguardando…</div>
+            <button class="btn btn-primary" type="submit">Salvar</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- ========== PESSOA ========== -->
+      <div class="card">
+        <div class="section-title">Pessoa abordada</div>
+        <form method="post" action="/operacoes/<%= operacao.id %>/pessoas" enctype="multipart/form-data">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>"/>
+          <input type="hidden" name="lat" class="geo-lat">
+          <input type="hidden" name="lng" class="geo-lng">
+          <input type="hidden" name="acc" class="geo-acc">
+
+          <label>Nome</label>
+          <input type="text" name="nome">
+
+          <label style="margin-top:8px">CPF</label>
+          <input type="text" name="cpf" inputmode="numeric" placeholder="somente números">
+
+          <label style="margin-top:8px">Fiscalização relacionada (opcional)</label>
+          <select name="fiscalizacao_id">
+            <option value="">—</option>
+            <% fiscalizacoes.forEach(function(f){ %>
+              <option value="<%= f.id %>"><%= f.tipo_local %></option>
+            <% }) %>
+          </select>
+
+          <label style="margin-top:8px">Fotos (câmera ou galeria)</label>
+          <input type="file" name="fotos" accept="image/*" capture="environment" multiple>
+
+          <label style="margin-top:8px">Observações</label>
+          <textarea name="obs"></textarea>
+
+          <div class="row" style="justify-content:space-between;margin-top:10px">
+            <div class="muted geo-status">Localização: aguardando…</div>
+            <button class="btn btn-primary" type="submit">Salvar</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- ========== VEÍCULO ========== -->
+      <div class="card">
+        <div class="section-title">Veículo abordado</div>
+        <form method="post" action="/operacoes/<%= operacao.id %>/veiculos" enctype="multipart/form-data">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>"/>
+          <input type="hidden" name="lat" class="geo-lat">
+          <input type="hidden" name="lng" class="geo-lng">
+          <input type="hidden" name="acc" class="geo-acc">
+
+          <label>Tipo de veículo</label>
+          <input type="text" name="tipo_veiculo" placeholder="ex: carro, moto, caminhão">
+
+          <label style="margin-top:8px">Marca/Modelo</label>
+          <input type="text" name="marca_modelo">
+
+          <label style="margin-top:8px">Placa</label>
+          <input type="text" name="placa">
+
+          <label style="margin-top:8px">Fiscalização relacionada (opcional)</label>
+          <select name="fiscalizacao_id">
+            <option value="">—</option>
+            <% fiscalizacoes.forEach(function(f){ %>
+              <option value="<%= f.id %>"><%= f.tipo_local %></option>
+            <% }) %>
+          </select>
+
+          <label style="margin-top:8px">Fotos (câmera ou galeria)</label>
+          <input type="file" name="fotos" accept="image/*" capture="environment" multiple>
+
+          <label style="margin-top:8px">Observações</label>
+          <textarea name="obs"></textarea>
+
+          <div class="row" style="justify-content:space-between;margin-top:10px">
+            <div class="muted geo-status">Localização: aguardando…</div>
+            <button class="btn btn-primary" type="submit">Salvar</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- ========== APREENSÃO ========== -->
+      <div class="card">
+        <div class="section-title">Apreensão</div>
+        <form method="post" action="/operacoes/<%= operacao.id %>/apreensoes" enctype="multipart/form-data">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>"/>
+          <input type="hidden" name="lat" class="geo-lat">
+          <input type="hidden" name="lng" class="geo-lng">
+          <input type="hidden" name="acc" class="geo-acc">
+
+          <label>Tipo</label>
+          <input type="text" name="tipo" placeholder="ex: drogas, arma, mercadoria">
+
+          <div class="grid" style="grid-template-columns:1fr 1fr;gap:10px;margin-top:8px">
+            <div>
+              <label>Quantidade</label>
+              <input type="number" step="any" min="0" name="quantidade" placeholder="0">
+            </div>
+            <div>
+              <label>Unidade (opcional)</label>
+              <input type="text" name="unidade" placeholder="ex: kg, un, L">
+            </div>
+          </div>
+
+          <label style="margin-top:8px">Fiscalização relacionada (opcional)</label>
+          <select name="fiscalizacao_id">
+            <option value="">—</option>
+            <% fiscalizacoes.forEach(function(f){ %>
+              <option value="<%= f.id %>"><%= f.tipo_local %></option>
+            <% }) %>
+          </select>
+
+          <label style="margin-top:8px">Fotos (câmera ou galeria)</label>
+          <input type="file" name="fotos" accept="image/*" capture="environment" multiple>
+
+          <label style="margin-top:8px">Observações</label>
+          <input type="text" name="obs" placeholder="">
+
+          <div class="row" style="justify-content:space-between;margin-top:10px">
+            <div class="muted geo-status">Localização: aguardando…</div>
+            <button class="btn btn-primary" type="submit">Salvar</button>
+          </div>
+        </form>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Leaflet + lógica de geolocalização (GPS + marcação manual) -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script>
+  (() => {
+    const $ = (s, r=document) => r.querySelector(s);
+    const $$ = (s, r=document) => Array.from(r.querySelectorAll(s));
+
+    const statusEl = $('#geoStatus');
+    const ckAttach = $('#ckAttach');
+    const btnGPS   = $('#btnGPS');
+    const btnManual= $('#btnManual');
+    const mapWrap  = $('#mapWrap');
+
+    // sincroniza lat/lng/acc em TODOS os formulários desta página
+    function syncHidden(lat, lng, acc) {
+      $$('.geo-lat').forEach(i => i.value = (ckAttach.checked ? (lat ?? '') : ''));
+      $$('.geo-lng').forEach(i => i.value = (ckAttach.checked ? (lng ?? '') : ''));
+      $$('.geo-acc').forEach(i => i.value = (ckAttach.checked ? (acc ?? '') : ''));
+      // mostra status por formulário
+      $$('.geo-status').forEach(s => {
+        if (!s) return;
+        if (ckAttach.checked && lat && lng){
+          s.textContent = 'Localização capturada';
+          s.classList.add('geo-ok'); s.classList.remove('geo-err');
+        } else if (!ckAttach.checked) {
+          s.textContent = 'Localização NÃO será anexada';
+          s.classList.remove('geo-ok'); s.classList.add('geo-err');
+        } else {
+          s.textContent = 'Aguardando localização…';
+          s.classList.remove('geo-ok','geo-err');
+        }
+      });
+    }
+
+    function setStatus(msg) { statusEl.textContent = msg; }
+
+    // Leaflet
+    let map, marker, accuracyCircle;
+    const DEFAULT_VIEW = [-14.235004, -51.92528]; // Brasil
+    const DEFAULT_ZOOM = 4;
+
+    function ensureMap() {
+      if (map) return;
+      mapWrap.classList.remove('hide');
+      map = L.map('pickMap');
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19, attribution: '&copy; OpenStreetMap'
+      }).addTo(map);
+      map.setView(DEFAULT_VIEW, DEFAULT_ZOOM);
+
+      map.on('click', (e) => {
+        if (!ckAttach.checked) return;
+        placeMarker(e.latlng.lat, e.latlng.lng, null, 'manual');
+      });
+    }
+
+    function placeMarker(lat, lng, acc, source) {
+      if (!map) ensureMap();
+
+      const ll = L.latLng(lat, lng);
+
+      if (!marker) {
+        marker = L.marker(ll, { draggable: true }).addTo(map);
+        marker.on('dragend', (ev) => {
+          const p = ev.target.getLatLng();
+          syncHidden(p.lat.toFixed(6), p.lng.toFixed(6), acc ?? '');
+          setStatus(`Local definido manualmente: ${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}`);
+        });
+      } else {
+        marker.setLatLng(ll);
+      }
+
+      if (accuracyCircle) { map.removeLayer(accuracyCircle); accuracyCircle = null; }
+      if (acc && acc > 0) { accuracyCircle = L.circle(ll, { radius: acc }).addTo(map); }
+
+      map.setView(ll, Math.max(map.getZoom(), 15));
+      syncHidden(lat.toFixed(6), lng.toFixed(6), acc ? Math.round(acc) : '');
+      setStatus(source === 'gps'
+        ? `GPS: ${lat.toFixed(6)}, ${lng.toFixed(6)} (±${acc ? Math.round(acc) : '?'}m)`
+        : `Local definido manualmente: ${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+
+      try { localStorage.setItem('ocim_last_geo', JSON.stringify({lat, lng})); } catch {}
+    }
+
+    // GPS
+    function useGPS() {
+      if (!('geolocation' in navigator)) {
+        setStatus('GPS não suportado neste dispositivo/navegador.');
+        return;
+      }
+      ensureMap();
+      setStatus('Solicitando GPS…');
+
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const { latitude, longitude, accuracy } = pos.coords || {};
+          if (!latitude || !longitude) {
+            setStatus('Falha ao obter coordenadas.');
+            return;
+          }
+          placeMarker(latitude, longitude, accuracy, 'gps');
+        },
+        (err) => {
+          let msg = 'Não foi possível obter o GPS.';
+          if (err && err.code === 1) msg = 'Permissão de localização negada.';
+          if (err && err.code === 2) msg = 'Posição indisponível.';
+          if (err && err.code === 3) msg = 'Tempo excedido na obtenção do GPS.';
+          setStatus(msg + ' Você pode marcar no mapa.');
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+      );
+    }
+
+    // UI
+    btnGPS.addEventListener('click', useGPS);
+    btnManual.addEventListener('click', () => {
+      ensureMap();
+      setStatus('Clique no mapa para definir a localização.');
+      try {
+        const last = JSON.parse(localStorage.getItem('ocim_last_geo') || 'null');
+        if (last && typeof last.lat === 'number' && typeof last.lng === 'number') {
+          map.setView([last.lat, last.lng], 15);
+        }
+      } catch {}
+    });
+
+    ckAttach.addEventListener('change', () => {
+      if (!ckAttach.checked) {
+        syncHidden('', '', '');
+        setStatus('Localização NÃO será anexada.');
+      } else {
+        setStatus('Anexar localização: ligado. Use GPS ou marque no mapa.');
+      }
+    });
+
+    // Inicialização — tenta GPS automaticamente no mobile (opcional)
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    if (isMobile) {
+      useGPS(); // com HTTP não seguro, o navegador pode bloquear — utilizar HTTPS em produção
+    } else {
+      setStatus('Anexar localização: ligado. Use GPS ou marque no mapa.');
+    }
+  })();
+  </script>
+</body>
+</html>

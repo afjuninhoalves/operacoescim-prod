@@ -1,0 +1,11 @@
+node_modules/
+dist/
+
+# manter estrutura sem dados
+data/*
+!data/.gitkeep
+uploads/*
+!uploads/.gitkeep
+
+.env
+npm-debug.log*

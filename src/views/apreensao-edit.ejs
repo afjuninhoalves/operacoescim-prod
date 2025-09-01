@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Editar Apreensão — <%= operacao ? operacao.nome : '' %></title>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#0b1220;color:#e5e7eb;margin:0;padding:24px}
+    .wrap{max-width:960px;margin:0 auto}
+    .card{background:#0f172a;border:1px solid #1f2937;border-radius:12px;padding:16px;margin-bottom:16px}
+    label{display:block;font-size:13px;color:#9ca3af;margin-bottom:6px}
+    input[type="text"], input[type="number"], textarea, select{width:100%;padding:10px;border-radius:10px;border:1px solid #1f2937;background:#0b1325;color:#e5e7eb;outline:none}
+    textarea{min-height:90px}
+    .actions{display:flex;gap:10px;justify-content:flex-end;margin-top:10px}
+    .btn{padding:10px 14px;border-radius:10px;border:1px solid #1f2937;background:#111826;color:#e5e7eb;text-decoration:none;display:inline-block;cursor:pointer}
+    .btn-blue{background:#2563eb;border-color:rgba(37,99,235,.6);color:#fff}
+    .btn-danger{background:#ef4444;border-color:rgba(239,68,68,.5);color:#fff}
+    .grid{display:grid;gap:16px;grid-template-columns:1fr}
+    .grid.two{grid-template-columns:1fr 1fr}
+    .photos{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
+    .ph{border:1px solid #1f2937;border-radius:10px;overflow:hidden;background:#0b1325}
+    .ph img{display:block;width:100%;height:140px;object-fit:cover}
+    .ph form{padding:8px;display:flex;justify-content:center}
+    .muted{color:#9ca3af}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <a class="btn" href="/operacoes/<%= operacaoId %>">← Voltar</a>
+    <h2 style="margin:10px 0 0">Editar apreensão</h2>
+    <div class="muted">Operação: <strong><%= operacao ? operacao.nome : '' %></strong></div>
+  </div>
+
+  <div class="card">
+    <form method="post" action="/operacoes/<%= operacaoId %>/apreensoes/<%= eventoId %>/editar">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <div class="grid two">
+        <div>
+          <label>Tipo</label>
+          <input type="text" name="tipo" value="<%= values.tipo %>">
+        </div>
+        <div>
+          <label>Quantidade</label>
+          <input type="number" step="any" min="0" name="quantidade" value="<%= values.quantidade %>">
+        </div>
+        <div>
+          <label>Unidade</label>
+          <input type="text" name="unidade" value="<%= values.unidade %>">
+        </div>
+        <div>
+          <label>Fiscalização relacionada</label>
+          <select name="fiscalizacao_id">
+            <option value="">—</option>
+            <% (fiscList || []).forEach(f => { %>
+              <option value="<%= f.id %>" <%= String(values.fiscalizacao_id)===String(f.id)?'selected':'' %>>
+                <%= f.tipo_local || ('#'+f.id) %>
+              </option>
+            <% }) %>
+          </select>
+        </div>
+        <div style="grid-column:1/-1">
+          <label>Observações</label>
+          <textarea name="obs"><%= values.obs || '' %></textarea>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn btn-blue" type="submit">Salvar alterações</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="card">
+    <h3 style="margin:0 0 10px">Anexar fotos</h3>
+    <form method="post" action="/operacoes/<%= operacaoId %>/apreensoes/<%= eventoId %>/fotos" enctype="multipart/form-data">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <label>Fotos (pode selecionar várias)</label>
+      <input type="file" name="fotos" accept="image/*" multiple>
+      <div class="actions"><button class="btn btn-blue" type="submit">Adicionar fotos</button></div>
+    </form>
+  </div>
+
+  <div class="card">
+    <h3 style="margin:0 0 10px">Fotos já anexadas</h3>
+    <% if (fotos && fotos.length) { %>
+      <div class="photos">
+        <% fotos.forEach(f => { %>
+          <div class="ph">
+            <img src="<%= f.path %>" alt="foto">
+            <form method="post" action="/operacoes/<%= operacaoId %>/apreensoes/<%= eventoId %>/fotos/<%= f.id %>/delete">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <button class="btn btn-danger" type="submit">Remover</button>
+            </form>
+          </div>
+        <% }) %>
+      </div>
+    <% } else { %>
+      <div class="muted">Nenhuma foto ainda.</div>
+    <% } %>
+  </div>
+</div>
+</body>
+</html>

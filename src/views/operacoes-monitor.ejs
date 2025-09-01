@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+  <meta charset="utf-8" />
+  <title>Monitor — <%= operacao.nome %>
+  </title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg: #0b1220;
+      --panel: #0f172a;
+      --panel2: #111827;
+      --border: #1f2937;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --brand: #60a5fa;
+      --accent: #22c55e;
+      --red: #ef4444;
+    }
+
+    * {
+      box-sizing: border-box
+    }
+
+    html,
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto
+    }
+
+    .top {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      background: linear-gradient(to bottom, rgba(17, 24, 39, .9), rgba(17, 24, 39, .7));
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(6px)
+    }
+
+    .wrap {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 16px 20px
+    }
+
+    .row {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: #111826;
+      color: var(--text);
+      text-decoration: none
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px
+    }
+
+    .card {
+      background: linear-gradient(180deg, var(--panel), var(--panel2));
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px
+    }
+
+    .card h3 {
+      margin: 0 0 6px;
+      font-size: 14px;
+      color: var(--muted)
+    }
+
+    .big {
+      font-size: 28px;
+      font-weight: 800
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1.2fr .8fr;
+      gap: 16px;
+      margin-top: 16px
+    }
+
+    @media(max-width:1000px) {
+      .grid {
+        grid-template-columns: 1fr
+      }
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: linear-gradient(180deg, var(--panel), var(--panel2));
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden
+    }
+
+    th,
+    td {
+      padding: 10px;
+      border-bottom: 1px solid var(--border);
+      text-align: left
+    }
+
+    th {
+      font-size: 13px;
+      color: var(--muted);
+      background: #0d1528
+    }
+
+    tr:last-child td {
+      border-bottom: none
+    }
+
+    .feed {
+      display: grid;
+      gap: 10px
+    }
+
+    .item {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px;
+      background: #0d1528
+    }
+
+    .muted {
+      color: var(--muted)
+    }
+  </style>
+</head>
+
+<body>
+  <div class="top">
+    <div class="wrap row" style="justify-content:space-between">
+      <div>
+        <div style="font-weight:700">Monitor — <%= operacao.nome %>
+        </div>
+        <div class="muted">Agendada: <%= operacao.inicio_fmt || '-' %> · ID #<%= operacao.id %>
+        </div>
+      </div>
+      <div class="row" style="gap:10px">
+        <a class="btn" href="/operacoes/<%= operacao.id %>">Voltar ao detalhe</a>
+
+        <!-- NOVO: botão para o mapa -->
+        <a class="btn" href="/operacoes/<%= operacao.id %>/mapa">Mapa das fiscalizações</a>
+
+        <a class="btn" href="/operacoes">Lista de operações</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="wrap" id="app">
+    <!-- CARDS -->
+    <div class="cards">
+      <div class="card">
+        <h3>Locais fiscalizados</h3>
+        <div class="big" id="kpi-fiscal">0</div>
+      </div>
+      <div class="card">
+        <h3>Pessoas</h3>
+        <div class="big" id="kpi-pessoas">0</div>
+      </div>
+      <div class="card">
+        <h3>Veículos</h3>
+        <div class="big" id="kpi-veiculos">0</div>
+      </div>
+      <div class="card">
+        <h3>Apreensões</h3>
+        <div class="big" id="kpi-apreensoes">0</div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div>
+        <div class="card" style="margin-bottom:16px">
+          <h3 style="margin:0 0 8px">Distribuição por cidade</h3>
+          <canvas id="barCities" height="170"></canvas>
+        </div>
+
+        <table id="tbl">
+          <thead>
+            <tr>
+              <th>Cidade</th>
+              <th>Fiscalizações</th>
+              <th>Pessoas</th>
+              <th>Veículos</th>
+              <th>Apreensões</th>
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <div class="muted" id="updated" style="margin-top:8px">—</div>
+      </div>
+
+      <div>
+        <div class="card">
+          <h3 style="margin:0 0 8px">Feed (últimos 20)</h3>
+          <div class="feed" id="feed"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const opId = <%= operacao.id %>;
+      const kFiscal = document.getElementById('kpi-fiscal');
+      const kPessoas = document.getElementById('kpi-pessoas');
+      const kVeiculos = document.getElementById('kpi-veiculos');
+      const kApre = document.getElementById('kpi-apreensoes');
+      const tblBody = document.querySelector('#tbl tbody');
+      const updatedEl = document.getElementById('updated');
+      const feedEl = document.getElementById('feed');
+
+      // Chart
+      let chart;
+      function ensureChart(labels, fiscal, pessoas, veiculos, apre) {
+        const ctx = document.getElementById('barCities').getContext('2d');
+        const ds = [
+          { label: 'Fiscalizações', data: fiscal },
+          { label: 'Pessoas', data: pessoas },
+          { label: 'Veículos', data: veiculos },
+          { label: 'Apreensões', data: apre }
+        ];
+        if (!chart) {
+          chart = new Chart(ctx, {
+            type: 'bar',
+            data: { labels, datasets: ds },
+            options: {
+              responsive: true,
+              plugins: { legend: { labels: { color: '#e5e7eb' } } },
+              scales: {
+                x: { ticks: { color: '#cbd5e1' }, grid: { color: '#1f2937' } },
+                y: { ticks: { color: '#cbd5e1' }, grid: { color: '#1f2937' }, beginAtZero: true, precision: 0 }
+              }
+            }
+          });
+        } else {
+          chart.data.labels = labels;
+          chart.data.datasets[0].data = fiscal;
+          chart.data.datasets[1].data = pessoas;
+          chart.data.datasets[2].data = veiculos;
+          chart.data.datasets[3].data = apre;
+          chart.update();
+        }
+      }
+
+      function renderTable(rows) {
+        tblBody.innerHTML = '';
+        rows.forEach(r => {
+          const total = (r.fiscalizacoes | 0) + (r.pessoas | 0) + (r.veiculos | 0) + (r.apreensoes | 0);
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+        <td>${r.cidade}</td>
+        <td>${r.fiscalizacoes || 0}</td>
+        <td>${r.pessoas || 0}</td>
+        <td>${r.veiculos || 0}</td>
+        <td>${r.apreensoes || 0}</td>
+        <td><strong>${total}</strong></td>
+      `;
+          tblBody.appendChild(tr);
+        });
+      }
+
+      function renderFeed(list) {
+        feedEl.innerHTML = '';
+        list.forEach(ev => {
+          const d = new Date(ev.ts);
+          const it = document.createElement('div');
+          it.className = 'item';
+          it.innerHTML = `
+        <div class="row" style="justify-content:space-between">
+          <div><strong>${ev.tipo}</strong> · <span class="muted">${ev.cidade || '—'}</span></div>
+          <div class="muted">${d.toLocaleString('pt-BR')}</div>
+        </div>
+        ${ev.usuario ? `<div class="muted">Por: ${ev.usuario}</div>` : ''}
+        ${ev.obs ? `<div style="margin-top:6px">${ev.obs}</div>` : ''}
+      `;
+          feedEl.appendChild(it);
+        });
+      }
+
+      async function load() {
+        const res = await fetch(`/operacoes/${opId}/metrics`);
+        if (!res.ok) return;
+        const j = await res.json();
+
+        // KPIs
+        kFiscal.textContent = j.totals.fiscalizacoes || 0;
+        kPessoas.textContent = j.totals.pessoas || 0;
+        kVeiculos.textContent = j.totals.veiculos || 0;
+        kApre.textContent = j.totals.apreensoes || 0;
+
+        // Tabela + gráfico
+        renderTable(j.perCity);
+        ensureChart(
+          j.perCity.map(x => x.cidade),
+          j.perCity.map(x => x.fiscalizacoes || 0),
+          j.perCity.map(x => x.pessoas || 0),
+          j.perCity.map(x => x.veiculos || 0),
+          j.perCity.map(x => x.apreensoes || 0)
+        );
+
+        // Feed
+        renderFeed(j.latest);
+
+        // Rodapé de atualização
+        updatedEl.textContent = `Atualizado: ${new Date(j.serverTime).toLocaleString('pt-BR')} · Status: ${j.op.status}`;
+      }
+
+      load();
+      setInterval(load, 5000); // 5s
+    })();
+  </script>
+</body>
+
+</html>

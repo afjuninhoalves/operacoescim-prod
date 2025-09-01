@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <title>Operação — <%= operacao?.nome || 'Operação' %></title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{
+      --bg:#0b1220; --panel:#0f172a; --panel-2:#111827; --border:#1f2937;
+      --muted:#9ca3af; --text:#e5e7eb; --blue:#2563eb; --accent:#22c55e; --red:#ef4444;
+      --shadow:0 10px 30px rgba(0,0,0,.35); --radius:14px; --gap:22px; --field:#0b1325;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,'Helvetica Neue',Arial}
+    a{color:inherit;text-decoration:none}
+    button{font:inherit;cursor:pointer}
+    .topbar{position:sticky;top:0;z-index:10;backdrop-filter:saturate(140%) blur(8px);
+      background:linear-gradient(to bottom,rgba(17,24,39,.86),rgba(17,24,39,.70));
+      border-bottom:1px solid var(--border)}
+    .topbar-inner{max-width:1160px;margin:0 auto;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+    .brand{display:flex;align-items:center;gap:10px;font-weight:700}
+    .brand-badge{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:10px;
+      background:linear-gradient(135deg,var(--blue),#0ea5e9);color:#fff;font-weight:900;
+      box-shadow:0 6px 16px rgba(37,99,235,.35)}
+    .container{max-width:1160px;margin:0 auto;padding:28px 20px 56px}
+    .muted{color:var(--muted)}
+    .btn{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:10px;
+      border:1px solid var(--border);background:#111826;color:var(--text)}
+    .btn:hover{filter:brightness(1.08)}
+    .btn-blue{background:var(--blue);border-color:rgba(37,99,235,.6);color:#fff}
+    .btn-green{background:var(--accent);border-color:rgba(34,197,94,.5);color:#06260f}
+    .btn-danger{background:var(--red);border-color:rgba(239,68,68,.5);color:#fff}
+    .pill{display:inline-flex;align-items:center;padding:4px 10px;border-radius:999px;background:#0b1325;border:1px solid var(--border);color:#93c5fd}
+    .card{background:linear-gradient(180deg,var(--panel),var(--panel-2));border:1px solid var(--border);
+      border-radius:14px;box-shadow:var(--shadow);padding:20px}
+    .card h2{margin:0 0 4px}
+    .card h3{margin:0 0 12px;font-size:18px}
+    .row{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+    .hr{height:1px;background:var(--border);margin:14px 0}
+    .grid-2{display:grid;gap:22px;grid-template-columns:1fr}
+    @media(min-width:1080px){.grid-2{grid-template-columns:1.1fr .9fr}}
+    .feed{display:grid;gap:12px}
+    .feed-item{display:grid;grid-template-columns:72px 1fr;gap:12px;border:1px solid var(--border);border-radius:12px;padding:10px;background:#0b1325}
+    .feed-item img{width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid var(--border)}
+    .tag{display:inline-block;font-size:12px;padding:2px 8px;border-radius:999px;background:#0b1325;border:1px solid var(--border);color:#c7d2fe}
+    .kv{display:grid;gap:10px}
+    .kv-row{display:grid;grid-template-columns:160px 1fr;gap:10px}
+    .kv-label{color:var(--muted)}
+    .stat-row{display:flex;gap:10px;flex-wrap:wrap}
+    .badge{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border-radius:999px;border:1px solid var(--border);background:#0b1325;font-weight:600;color:#c7d2fe}
+  </style>
+</head>
+<body>
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <span class="brand-badge">C</span>
+        <div>
+          Operações CIM
+          <div class="muted"><%= operacao?.nome || 'Operação' %></div>
+        </div>
+      </div>
+      <div class="row">
+        <a class="btn" href="/operacoes">Voltar</a>
+        <% if (user && ['admin','gestor'].includes(user.role)) { %>
+          <a class="btn" href="/operacoes/<%= operacao.id %>/monitor">Monitorar</a>
+        <% } %>
+        <a class="btn" href="/operacoes/<%= operacao.id %>/fotos">Fotos</a>
+        <a class="btn" href="/registros?opId=<%= operacao.id %>">Registros</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="container">
+
+    <!-- CARD 1 (mantido): Cabeçalho + botões de status -->
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <div>
+          <h2><%= operacao?.nome || 'Operação' %></h2>
+          <div class="muted">
+            Agendada para:
+            <strong><%= operacao?.inicio_fmt || operacao?.inicio_agendado || '-' %></strong>
+            · Status:
+            <span class="pill"><%= operacao?.status || '—' %></span>
+          </div>
+          <div class="muted">
+            Cidades: <%= operacao?.cidades_str || (cidades?.length ? cidades.map(c=>c.nome).join(', ') : '—') %>
+          </div>
+        </div>
+
+        <% if (user && ['admin','gestor'].includes(user.role)) { %>
+          <div class="row">
+            <% if (operacao && operacao.status==='agendada') { %>
+              <form method="post" action="/operacoes/<%= operacao.id %>/status">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <input type="hidden" name="action" value="iniciar">
+                <button class="btn btn-green" type="submit">Iniciar operação</button>
+              </form>
+            <% } %>
+            <% if (operacao && operacao.status==='em_andamento') { %>
+              <form method="post" action="/operacoes/<%= operacao.id %>/status">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <input type="hidden" name="action" value="encerrar">
+                <button class="btn btn-danger" type="submit">Encerrar operação</button>
+              </form>
+            <% } %>
+          </div>
+        <% } %>
+      </div>
+    </div>
+
+    <!-- CARD 2: Informações da operação + novo botão "Inserir ações" -->
+    <div class="card" style="margin-top:16px">
+      <div class="row" style="justify-content:space-between;align-items:flex-start">
+        <div style="flex:1 1 auto; min-width:280px">
+          <h3>Informações da operação</h3>
+          <div class="kv">
+            <div class="kv-row">
+              <div class="kv-label">Nome</div>
+              <div><strong><%= operacao?.nome || '—' %></strong></div>
+            </div>
+            <div class="kv-row">
+              <div class="kv-label">Descrição</div>
+              <div><%= operacao?.descricao || '<span class="muted">—</span>' %></div>
+            </div>
+            <div class="kv-row">
+              <div class="kv-label">Início agendado</div>
+              <div><%= operacao?.inicio_fmt || operacao?.inicio_agendado || '—' %></div>
+            </div>
+            <div class="kv-row">
+              <div class="kv-label">Cidades participantes</div>
+              <div><%= operacao?.cidades_str || (cidades?.length ? cidades.map(c=>c.nome).join(', ') : '—') %></div>
+            </div>
+          </div>
+        </div>
+        <div class="row" style="align-self:center">
+          <!-- link para a nova tela de inserção -->
+          <a class="btn btn-blue" href="/operacoes/<%= operacao.id %>/acoes/nova">Inserir ações</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- GRID com os “feeds” existentes: Feed de eventos + Resumo -->
+    <div class="grid-2" style="margin-top:16px">
+      <!-- Feed de eventos -->
+      <div class="card">
+        <h3>Feed de eventos</h3>
+        <div class="muted" style="margin-bottom:8px">Últimos lançamentos desta operação.</div>
+        <div class="feed">
+          <% if (!eventos || !eventos.length) { %>
+            <div class="muted">Nenhum evento lançado ainda.</div>
+          <% } %>
+          <% (eventos||[]).forEach(function(e){ %>
+            <div class="feed-item">
+              <div>
+                <% if (e.foto_path) { %>
+                  <img src="<%= e.foto_path %>" alt="">
+                <% } else { %>
+                  <div style="width:72px;height:72px;border-radius:8px;border:1px solid var(--border);display:grid;place-items:center;color:#94a3b8;">—</div>
+                <% } %>
+              </div>
+              <div>
+                <div class="row" style="justify-content:space-between">
+                  <div>
+                    <span class="tag"><%= e.tipo %></span>
+                    <span class="muted" style="margin-left:8px"><%= new Date(e.ts).toLocaleString('pt-BR') %></span>
+                  </div>
+                </div>
+                <div class="muted" style="margin-top:4px">
+                  <strong><%= e.cidade_nome || '' %></strong>
+                  <% if (e.user_nome) { %> · <%= e.user_nome %><% } %>
+                </div>
+                <div style="margin-top:6px">
+                  <% if (e.tipo==='fiscalizacao') { %>
+                    <div><strong>Local:</strong> <%= e.tipo_local || '—' %></div>
+                    <div class="muted"><%= e.obs || '' %></div>
+                  <% } else if (e.tipo==='pessoa') { %>
+                    <div><strong>Nome:</strong> <%= e.pessoa_nome || '—' %></div>
+                    <div class="muted"><strong>CPF:</strong> <%= e.pessoa_cpf || '—' %></div>
+                    <div class="muted"><%= e.obs || '' %></div>
+                  <% } else if (e.tipo==='veiculo') { %>
+                    <div><strong>Tipo:</strong> <%= e.tipo_veiculo || '—' %></div>
+                    <div class="muted"><strong>Modelo:</strong> <%= e.marca_modelo || '—' %></div>
+                    <div class="muted"><strong>Placa:</strong> <%= e.placa || '—' %></div>
+                    <div class="muted"><%= e.obs || '' %></div>
+                  <% } else if (e.tipo==='apreensao') { %>
+                    <div><strong>Tipo:</strong> <%= e.apreensao_tipo || '—' %></div>
+                    <div class="muted"><strong>Qtd:</strong> <%= e.quantidade ?? '—' %> <%= e.unidade || '' %></div>
+                    <div class="muted"><%= e.obs || '' %></div>
+                  <% } %>
+                </div>
+              </div>
+            </div>
+          <% }) %>
+        </div>
+      </div>
+
+      <!-- Resumo / contagens -->
+      <div class="card">
+        <h3>Resumo (parcial)</h3>
+        <div class="muted">Atualizado conforme os lançamentos.</div>
+        <div class="hr"></div>
+        <div class="stat-row">
+          <span class="badge">Fiscalizações: <strong><%= resumo?.fiscalizacoes || 0 %></strong></span>
+          <span class="badge">Pessoas: <strong><%= resumo?.pessoas || 0 %></strong></span>
+          <span class="badge">Veículos: <strong><%= resumo?.veiculos || 0 %></strong></span>
+          <span class="badge">Apreensões: <strong><%= resumo?.apreensoes || 0 %></strong></span>
+        </div>
+
+        <div class="hr"></div>
+        <div class="row" style="gap:8px;flex-wrap:wrap">
+          <a class="btn" href="/operacoes/<%= operacao.id %>/fotos">Ver fotos</a>
+          <a class="btn" href="/registros?opId=<%= operacao.id %>">Ver registros</a>
+          <a class="btn btn-blue" href="/operacoes/<%= operacao.id %>/acoes/nova">Inserir ações</a>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</body>
+</html>

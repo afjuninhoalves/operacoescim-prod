@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <title>Login - Operações CIM</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body{margin:0;font-family:'Roboto',sans-serif;background:#111827;color:#fff;display:flex;flex-direction:column;justify-content:center;align-items:center;min-height:100vh}
+    .login-container{display:flex;justify-content:center;align-items:center;flex:1;width:100%}
+    .login-box{background:#1f2937;padding:40px;border-radius:12px;box-shadow:0 8px 20px rgba(0,0,0,0.5);text-align:center;width:320px}
+    .logo{max-width:150px;margin-bottom:20px}
+    .login-form{display:flex;flex-direction:column;gap:15px}
+    .input-group{display:flex;align-items:center;background:#374151;border-radius:8px;padding:10px}
+    .icon{margin-right:8px;font-size:18px}
+    .input-group input{background:transparent;border:none;outline:none;color:#fff;width:100%;font-size:14px}
+    .btn{padding:12px;border:none;border-radius:8px;font-weight:bold;cursor:pointer;transition:.2s;text-decoration:none;display:block}
+    .btn-green{background:#10b981;color:#fff}.btn-green:hover{background:#059669}
+    .btn-blue{background:#2563eb;color:#fff}.btn-blue:hover{background:#1d4ed8}
+    .error{background:#7f1d1d;color:#fecaca;border:1px solid #991b1b;padding:10px;border-radius:8px;font-size:13px}
+    footer{margin-top:20px;text-align:center;font-size:12px;color:#9ca3af}
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <div class="login-box">
+      <!-- se preferir, troque por <div class="logo-box"></div> com background-image -->
+      <img src="/public/images/operaco.jpg" alt="operacoescim" class="logo">
+
+      <% if (typeof error === 'string' && error) { %>
+        <div class="error"><%= error %></div>
+      <% } %>
+
+      <form method="post" action="/login" class="login-form">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <div class="input-group">
+          <span class="icon">👤</span>
+          <input type="text" name="cpf" placeholder="CPF" required>
+        </div>
+        <div class="input-group">
+          <span class="icon">🔒</span>
+          <input type="password" name="senha" placeholder="Senha" required>
+        </div>
+        <button type="submit" class="btn btn-green">Entrar</button>
+        <a href="/externo/login" class="btn btn-blue">Acesso A Imprensa</a>
+      </form>
+    </div>
+  </div>
+
+  <footer>
+    <small>
+      Desenvolvido por <br>
+      Antonio Francisco Alves Junior <br>
+      afjuninhoalves@gmail.com <br>
+      19-992906436
+    </small>
+  </footer>
+</body>
+</html>

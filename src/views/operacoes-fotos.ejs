@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8" />
+  <title>Fotos — <%= operacao?.nome || ('Operação #' + operacao?.id) %></title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{
+      --bg:#0b1220; --panel:#0f172a; --panel-2:#111827; --border:#1f2937; --muted:#9ca3af; --text:#e5e7eb;
+      --blue:#2563eb; --green:#22c55e; --shadow:0 10px 28px rgba(0,0,0,.35); --radius:14px;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,'Helvetica Neue',Arial}
+    a{color:inherit;text-decoration:none}
+    button{font:inherit;cursor:pointer}
+
+    .topbar{
+      position:sticky;top:0;z-index:10;
+      backdrop-filter:saturate(140%) blur(8px);
+      background:linear-gradient(to bottom, rgba(17,24,39,.86), rgba(17,24,39,.70));
+      border-bottom:1px solid var(--border);
+    }
+    .topbar-inner{
+      max-width:1160px;margin:0 auto;padding:14px 20px;
+      display:flex;align-items:center;justify-content:space-between;gap:16px;
+    }
+    .brand{display:flex;align-items:center;gap:12px;font-weight:700}
+    .badge{
+      display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border-radius:999px;
+      background:#0b1325;border:1px solid var(--border);color:#c7d2fe;font-weight:600
+    }
+    .muted{color:var(--muted)}
+
+    .wrap{max-width:1160px;margin:0 auto;padding:22px 20px 46px}
+    .panel{
+      background:linear-gradient(180deg, var(--panel), var(--panel-2));
+      border:1px solid var(--border);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      padding:16px;
+    }
+
+    .toolbar{
+      display:grid;gap:12px;grid-template-columns:1fr;
+    }
+    @media(min-width:820px){
+      .toolbar{grid-template-columns:1.2fr 1fr auto auto}
+    }
+    select, .btn{
+      padding:10px 12px;border-radius:10px;border:1px solid var(--border);
+      background:#0b1325;color:var(--text);
+    }
+    .btn{display:inline-flex;align-items:center;gap:8px}
+    .btn-primary{background:var(--blue);border-color:rgba(37,99,235,.6);color:#fff}
+    .btn-ghost{background:transparent}
+
+    .stats{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}
+    .chip{background:#0b1325;border:1px solid var(--border);border-radius:999px;padding:6px 10px}
+
+    .gallery{
+      margin-top:18px;
+      display:grid;
+      gap:12px;
+      grid-template-columns:1fr 1fr;
+    }
+    @media(min-width:720px){ .gallery{grid-template-columns:1fr 1fr 1fr} }
+    @media(min-width:1040px){ .gallery{grid-template-columns:1fr 1fr 1fr 1fr} }
+
+    .card{
+      background:#0f172a;border:1px solid var(--border);border-radius:12px;overflow:hidden;
+      display:flex;flex-direction:column;
+    }
+    .card img{
+      width:100%;height:210px;object-fit:cover;display:block;
+      background:#0b1325;
+      cursor:zoom-in;
+    }
+    .meta{
+      padding:10px 12px;display:grid;gap:6px;border-top:1px solid var(--border);
+    }
+    .row{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+    .pill{
+      display:inline-flex;align-items:center;padding:4px 10px;border-radius:999px;
+      background:#0b1325;border:1px solid var(--border);color:#93c5fd;font-size:12px
+    }
+
+    /* viewer modal */
+    .viewer{
+      position:fixed;inset:0;background:rgba(0,0,0,.75);
+      display:none;align-items:center;justify-content:center;padding:16px;
+    }
+    .viewer.open{display:flex}
+    .viewer-inner{
+      max-width:92vw;max-height:88vh;background:#0b1325;border:1px solid var(--border);border-radius:12px;
+      box-shadow:var(--shadow);padding:10px;display:grid;gap:10px;
+    }
+    .viewer img{max-width:86vw;max-height:72vh;object-fit:contain;background:#000}
+    .viewer .top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .close{background:#111827;border:1px solid var(--border);color:#fff;border-radius:8px;padding:6px 10px}
+  </style>
+</head>
+<body>
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <span class="badge">CIM</span>
+        <div>
+          Fotos — <strong><%= operacao?.nome || ('Operação #' + operacao?.id) %></strong>
+          <div class="muted">ID <%= operacao?.id %></div>
+        </div>
+      </div>
+      <div style="display:flex; gap:10px;">
+        <a class="btn" href="/operacoes/<%= operacao.id %>">Voltar</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="wrap">
+
+    <!-- FILTROS -->
+    <div class="panel">
+      <form class="toolbar" method="get" action="/operacoes/<%= operacao.id %>/fotos">
+        <div>
+          <label class="muted" for="cidade_id">Cidade</label><br/>
+          <select id="cidade_id" name="cidade_id">
+            <option value="" <%= !filtro?.cidade_id ? 'selected':'' %>>Todas</option>
+            <% cidades.forEach(c => { %>
+              <option value="<%= c.id %>" <%= (filtro?.cidade_id===c.id)?'selected':'' %>><%= c.nome %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div>
+          <label class="muted" for="tipo">Tipo</label><br/>
+          <select id="tipo" name="tipo">
+            <option value="" <%= !filtro?.tipo ? 'selected':'' %>>Todos</option>
+            <option value="fiscalizacao" <%= filtro?.tipo==='fiscalizacao'?'selected':'' %>>Fiscalização</option>
+            <option value="pessoa"       <%= filtro?.tipo==='pessoa'?'selected':'' %>>Pessoa</option>
+            <option value="veiculo"      <%= filtro?.tipo==='veiculo'?'selected':'' %>>Veículo</option>
+            <option value="apreensao"    <%= filtro?.tipo==='apreensao'?'selected':'' %>>Apreensão</option>
+          </select>
+        </div>
+        <div style="align-self:end">
+          <button class="btn btn-primary" type="submit">Aplicar</button>
+        </div>
+        <div style="align-self:end">
+          <a class="btn btn-ghost" href="/operacoes/<%= operacao.id %>/fotos">Limpar</a>
+        </div>
+      </form>
+
+      <!-- CONTADORES -->
+      <%
+        const tot = { fiscalizacao:0, pessoa:0, veiculo:0, apreensao:0 };
+        (fotos||[]).forEach(f => { if (typeof tot[f.tipo] === 'number') tot[f.tipo]++; });
+      %>
+      <div class="stats">
+        <span class="chip">Fiscalizações: <strong> <%= tot.fiscalizacao %> </strong></span>
+        <span class="chip">Pessoas: <strong> <%= tot.pessoa %> </strong></span>
+        <span class="chip">Veículos: <strong> <%= tot.veiculo %> </strong></span>
+        <span class="chip">Apreensões: <strong> <%= tot.apreensao %> </strong></span>
+        <span class="chip">Total fotos: <strong> <%= (fotos||[]).length %> </strong></span>
+      </div>
+    </div>
+
+    <!-- GALERIA -->
+    <% if (fotos && fotos.length) { %>
+      <div class="gallery">
+        <% fotos.forEach(f => { %>
+          <div class="card">
+            <img src="<%= f.path %>" alt="<%= f.tipo %> - <%= f.cidade_nome %>" 
+                 data-src="<%= f.path %>"
+                 data-meta="<%= (f.tipo||'') %> — <%= (f.cidade_nome||'') %> — <%= new Date(f.ts).toLocaleString('pt-BR') %>">
+            <div class="meta">
+              <div class="row">
+                <span class="pill"><%= f.tipo %></span>
+                <span class="muted"><%= new Date(f.ts).toLocaleString('pt-BR') %></span>
+              </div>
+              <div class="muted">Cidade: <strong><%= f.cidade_nome %></strong></div>
+            </div>
+          </div>
+        <% }) %>
+      </div>
+    <% } else { %>
+      <div class="panel" style="margin-top:12px">
+        <div class="muted">Nenhuma foto encontrada para os filtros selecionados.</div>
+      </div>
+    <% } %>
+
+  </div>
+
+  <!-- VIEWER -->
+  <div class="viewer" id="viewer">
+    <div class="viewer-inner">
+      <div class="top">
+        <div id="vMeta" class="muted"></div>
+        <button class="close" id="vClose">Fechar</button>
+      </div>
+      <img id="vImg" src="" alt="">
+    </div>
+  </div>
+
+  <script>
+    (function(){
+      const viewer = document.getElementById('viewer');
+      const vImg = document.getElementById('vImg');
+      const vMeta = document.getElementById('vMeta');
+      const vClose = document.getElementById('vClose');
+
+      document.addEventListener('click', (ev) => {
+        const img = ev.target.closest('.card img');
+        if (!img) return;
+        vImg.src = img.dataset.src || img.src;
+        vMeta.textContent = img.dataset.meta || '';
+        viewer.classList.add('open');
+      });
+
+      vClose.addEventListener('click', () => viewer.classList.remove('open'));
+      viewer.addEventListener('click', (ev) => {
+        if (ev.target === viewer) viewer.classList.remove('open');
+      });
+      document.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Escape') viewer.classList.remove('open');
+      });
+    })();
+  </script>
+</body>
+</html>
