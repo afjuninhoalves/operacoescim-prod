@@ -135,7 +135,7 @@ app.use(cors({ origin: false, credentials: true }));
 
 app.use(compression());
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(express.static(path.join(process.cwd(), 'public')));
@@ -364,6 +364,35 @@ async function createOperacao(args: {
   }
 }
 
+function parseDateTime(input?: string | Date | null): Date {
+  if (!input) throw new Error('inicio_agendado ausente');
+  if (input instanceof Date) {
+    if (isNaN(input.getTime())) throw new Error('Data inválida');
+    return input;
+  }
+  const s = String(input).trim();
+
+  // 1) <input type="datetime-local"> → 2025-09-01T18:30
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})$/);
+  if (m) {
+    const d = new Date(+m[1], +m[2]-1, +m[3], +m[4], +m[5], 0);
+    if (isNaN(d.getTime())) throw new Error('Data inválida (datetime-local)');
+    return d;
+  }
+
+  // 2) BR: 01/09/2025 18:30
+  m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})[ T](\d{2}):(\d{2})$/);
+  if (m) {
+    const d = new Date(+m[3], +m[2]-1, +m[1], +m[4], +m[5], 0);
+    if (isNaN(d.getTime())) throw new Error('Data inválida (BR)');
+    return d;
+  }
+
+  // 3) fallback
+  const d = new Date(s);
+  if (isNaN(d.getTime())) throw new Error('Data/hora inválida');
+  return d;
+}
 
 
 //-----  Rota de health check----- 
@@ -413,26 +442,53 @@ app.post('/logout', csrfProtection, (req, res) => {
 
 app.post('/operacoes', async (req, res) => {
   try {
-    const { nome, descricao, inicio_agendado } = req.body;
+    const { nome, descricao } = req.body;
 
-    // pegue o id do usuário logado conforme sua sessão/autenticação
-    const created_by = req.session?.user?.id ?? null;
+    // aceita vários formatos/nomes vindos do form:
+    const inicioRaw =
+      req.body.inicio_agendado ||
+      (req.body.data && req.body.hora && `${req.body.data} ${req.body.hora}`) ||
+      (req.body.data_inicio && req.body.hora_inicio && `${req.body.data_inicio} ${req.body.hora_inicio}`);
 
-    const opId = await createOperacao({
-      nome,
-      descricao: descricao || null,
-      inicio_agendado,  // pode vir como '2025-09-01T10:30' do <input type="datetime-local">
-      created_by
-    });
+    const inicio_agendado = parseDateTime(inicioRaw);
 
-    // redirecione/retorne já usando o ID criado
+    // pode ficar null se não houver login; a coluna aceita NULL
+    const created_by = (req.session as any)?.user?.id ?? null;
+
+    const isPg = !!process.env.DATABASE_URL;
+    let opId: number;
+
+    if (isPg) {
+      const [{ id }] = await db('operacoes')
+        .insert({
+          nome,
+          descricao: descricao || null,
+          inicio_agendado,
+          status: 'agendada',
+          created_by
+        })
+        .returning('id');
+      opId = Number(id);
+    } else {
+      const [id] = await db('operacoes').insert({
+        nome,
+        descricao: descricao || null,
+        inicio_agendado,
+        status: 'agendada',
+        created_by
+      });
+      opId = Number(id);
+    }
+
+    // redireciona para a página da operação criada
     return res.redirect(`/operacoes/${opId}`);
-    // ou: res.status(201).json({ id: opId });
+    // se preferir JSON: res.status(201).json({ id: opId });
   } catch (err: any) {
-    console.error('Erro ao criar operação:', err);
-    return res.status(500).send('Falha ao criar operação: ' + err.message);
+    console.error('[POST /operacoes] body=', req.body, 'erro=', err);
+    res.status(500).send('Erro ao criar operação: ' + err.message);
   }
 });
+
 
 
 // =============================================================================
