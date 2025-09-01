@@ -4,7 +4,6 @@ import session from 'express-session';
 import compression from 'compression';
 import morgan from 'morgan';
 import path from 'path';
-import dotenv from 'dotenv';
 import helmet from 'helmet';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
@@ -15,260 +14,28 @@ import csurf from 'csurf';
 import cookieParser from 'cookie-parser';
 import multer from 'multer';
 import crypto from 'crypto';
-
-dotenv.config();
+import 'dotenv/config';
+import { db, ensureSchemaAndAdmin } from './db/conn'; 
 
 const app = express();
+
+// rota de teste para confirmar conexão com Neon
+app.get('/debug/db-version', async (req, res) => {
+  try {
+    const r: any = await db.raw('SELECT version()'); // PG -> r.rows[0].version
+    const version = r?.rows?.[0]?.version || r?.[0]?.version || 'ok';
+    res.type('text').send(version);
+  } catch (err: any) {
+    console.error(err);
+    res.status(500).send('Erro na conexão com o banco: ' + err.message);
+  }
+});
+
+
+
 const PORT = Number(process.env.PORT || 3000);
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const IN_PROD = NODE_ENV === 'production';
-
-// =============================================================================
-// BANCO (SQLite local em disco OU Postgres via DATABASE_URL)
-// =============================================================================
-const DATA_DIR = process.env.DATA_DIR || path.resolve(process.cwd(), 'data');
-if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-
-type DbClient = 'sqlite3' | 'pg';
-const DB_CLIENT: DbClient = process.env.DATABASE_URL ? 'pg' : 'sqlite3';
-
-const db: Knex = knex(
-  DB_CLIENT === 'sqlite3'
-    ? {
-        client: 'sqlite3',
-        connection: { filename: path.join(DATA_DIR, 'operacoescim.sqlite') },
-        useNullAsDefault: true,
-        pool: { min: 0, max: 1 }
-      }
-    : {
-        client: 'pg',
-        connection: {
-          // no Render/Heroku, a URL já vem com usuário/senha/host/DB
-          connectionString: process.env.DATABASE_URL as string,
-          // SSL costuma ser obrigatório no Render/Heroku
-          ssl: process.env.DB_SSL === 'false' ? false : { rejectUnauthorized: false }
-        },
-        pool: { min: 0, max: 10 }
-      }
-);
-
-// Helper para adicionar coluna, se ainda não existir
-async function ensureColumn(
-  table: string,
-  name: string,
-  add: (t: Knex.CreateTableBuilder | Knex.AlterTableBuilder) => void
-) {
-  const has = await db.schema.hasColumn(table, name);
-  if (!has) await db.schema.alterTable(table, (t) => add(t));
-}
-
-async function ensureSchemaAndAdmin() {
-  // Habilita FKs no SQLite
-  if (DB_CLIENT === 'sqlite3') {
-    try { await db.raw('PRAGMA foreign_keys = ON'); } catch {}
-  }
-
-  // --- CIDADES
-  if (!(await db.schema.hasTable('cidades'))) {
-    await db.schema.createTable('cidades', (t) => {
-      t.increments('id').primary();
-      t.string('nome', 160).notNullable().unique();
-      t.string('corporacao', 180);
-      t.string('comandante', 160);
-      t.string('contato', 60);
-      t.string('logo_path', 255);
-      t.timestamps(true, true); // created_at/updated_at com default now
-    });
-  } else {
-    await ensureColumn('cidades', 'corporacao', (t) => (t as Knex.AlterTableBuilder).string('corporacao', 180));
-    await ensureColumn('cidades', 'comandante', (t) => (t as Knex.AlterTableBuilder).string('comandante', 160));
-    await ensureColumn('cidades', 'contato', (t) => (t as Knex.AlterTableBuilder).string('contato', 60));
-    await ensureColumn('cidades', 'logo_path', (t) => (t as Knex.AlterTableBuilder).string('logo_path', 255));
-  }
-
-  // --- USUÁRIOS
-  if (!(await db.schema.hasTable('usuarios'))) {
-    await db.schema.createTable('usuarios', (t) => {
-      t.increments('id').primary();
-      t.string('cpf', 14).notNullable().unique();
-      t.string('email', 160).unique();
-      t.string('nome', 160).notNullable();
-      t.string('senha_hash', 255).notNullable();
-      t.string('role', 32).notNullable().defaultTo('admin'); // admin|gestor|operador|auditor
-      t.boolean('ativo').notNullable().defaultTo(true);
-      t.integer('cidade_id').references('id').inTable('cidades').onDelete('SET NULL');
-      t.timestamp('ultimo_login_at');
-      t.timestamps(true, true);
-    });
-  } else {
-    await ensureColumn('usuarios', 'cidade_id', (t) =>
-      (t as Knex.AlterTableBuilder).integer('cidade_id').references('id').inTable('cidades').onDelete('SET NULL')
-    );
-    await ensureColumn('usuarios', 'role', (t) =>
-      (t as Knex.AlterTableBuilder).string('role', 32).notNullable().defaultTo('operador')
-    );
-  }
-
-  // --- OPERAÇÕES
-  if (!(await db.schema.hasTable('operacoes'))) {
-    await db.schema.createTable('operacoes', (t) => {
-      t.increments('id').primary();
-      t.string('nome', 200).notNullable();
-      t.text('descricao');
-      // timestamp funciona bem nos dois bancos; useTz true adiciona TZ no Postgres
-      t.timestamp('inicio_agendado', { useTz: DB_CLIENT === 'pg' }).notNullable();
-      t.string('status', 32).notNullable().defaultTo('agendada'); // agendada|em_andamento|encerrada|cancelada
-      t.integer('created_by').references('id').inTable('usuarios').onDelete('SET NULL');
-      t.timestamps(true, true);
-    });
-  }
-
-  if (!(await db.schema.hasTable('operacao_cidades'))) {
-    await db.schema.createTable('operacao_cidades', (t) => {
-      t.increments('id').primary();
-      t.integer('operacao_id').notNullable().references('id').inTable('operacoes').onDelete('CASCADE');
-      t.integer('cidade_id').notNullable().references('id').inTable('cidades').onDelete('CASCADE');
-      t.unique(['operacao_id', 'cidade_id']);
-    });
-  }
-
-  if (!(await db.schema.hasTable('operacao_eventos'))) {
-    await db.schema.createTable('operacao_eventos', (t) => {
-      t.increments('id').primary();
-      t.integer('operacao_id').notNullable().references('id').inTable('operacoes').onDelete('CASCADE');
-      t.integer('cidade_id').notNullable().references('id').inTable('cidades').onDelete('CASCADE');
-      t.integer('user_id').notNullable().references('id').inTable('usuarios').onDelete('SET NULL');
-      t.string('tipo', 32).notNullable(); // fiscalizacao|pessoa|veiculo|apreensao
-      t.timestamp('ts', { useTz: DB_CLIENT === 'pg' }).notNullable().defaultTo(db.fn.now());
-      t.text('obs');
-    });
-  }
-
-  // --- DETALHES DE EVENTO
-  if (!(await db.schema.hasTable('evento_fiscalizacao'))) {
-    await db.schema.createTable('evento_fiscalizacao', (t) => {
-      t.integer('evento_id').primary().references('id').inTable('operacao_eventos').onDelete('CASCADE');
-      t.string('tipo_local', 160).notNullable();
-      t.string('foto_path', 255);
-    });
-  } else {
-    await ensureColumn('evento_fiscalizacao', 'foto_path', (t) => (t as Knex.AlterTableBuilder).string('foto_path', 255));
-  }
-
-  if (!(await db.schema.hasTable('evento_pessoa'))) {
-    await db.schema.createTable('evento_pessoa', (t) => {
-      t.integer('evento_id').primary().references('id').inTable('operacao_eventos').onDelete('CASCADE');
-      t.string('nome', 160).notNullable();
-      t.string('cpf', 14);
-      t.string('foto_path', 255);
-      t.integer('fiscalizacao_evento_id').references('evento_id').inTable('evento_fiscalizacao').onDelete('SET NULL');
-    });
-  } else {
-    await ensureColumn('evento_pessoa', 'foto_path', (t) => (t as Knex.AlterTableBuilder).string('foto_path', 255));
-    await ensureColumn('evento_pessoa', 'fiscalizacao_evento_id', (t) =>
-      (t as Knex.AlterTableBuilder).integer('fiscalizacao_evento_id')
-        .references('evento_id').inTable('evento_fiscalizacao').onDelete('SET NULL')
-    );
-  }
-
-  if (!(await db.schema.hasTable('evento_veiculo'))) {
-    await db.schema.createTable('evento_veiculo', (t) => {
-      t.integer('evento_id').primary().references('id').inTable('operacao_eventos').onDelete('CASCADE');
-      t.string('tipo_veiculo', 80).notNullable();
-      t.string('marca_modelo', 160);
-      t.string('placa', 20);
-      t.integer('fiscalizacao_evento_id').references('evento_id').inTable('evento_fiscalizacao').onDelete('SET NULL');
-      t.string('foto_path', 255);
-    });
-  } else {
-    await ensureColumn('evento_veiculo', 'foto_path', (t) => (t as Knex.AlterTableBuilder).string('foto_path', 255));
-    await ensureColumn('evento_veiculo', 'fiscalizacao_evento_id', (t) =>
-      (t as Knex.AlterTableBuilder).integer('fiscalizacao_evento_id')
-        .references('evento_id').inTable('evento_fiscalizacao').onDelete('SET NULL')
-    );
-  }
-
-  if (!(await db.schema.hasTable('evento_apreensao'))) {
-    await db.schema.createTable('evento_apreensao', (t) => {
-      t.integer('evento_id').primary().references('id').inTable('operacao_eventos').onDelete('CASCADE');
-      t.string('tipo', 120).notNullable();
-      t.decimal('quantidade', 12, 2).notNullable(); // em PG vira NUMERIC(12,2)
-      t.string('unidade', 40);
-      t.integer('fiscalizacao_evento_id').references('evento_id').inTable('evento_fiscalizacao').onDelete('SET NULL');
-      t.string('foto_path', 255);
-    });
-  } else {
-    await ensureColumn('evento_apreensao', 'foto_path', (t) => (t as Knex.AlterTableBuilder).string('foto_path', 255));
-    await ensureColumn('evento_apreensao', 'fiscalizacao_evento_id', (t) =>
-      (t as Knex.AlterTableBuilder).integer('fiscalizacao_evento_id')
-        .references('evento_id').inTable('evento_fiscalizacao').onDelete('SET NULL')
-    );
-  }
-
-  // --- FOTOS (canônico) + GEO
-  if (!(await db.schema.hasTable('evento_fotos'))) {
-    await db.schema.createTable('evento_fotos', (t) => {
-      t.increments('id').primary();
-      t.integer('evento_id').notNullable().references('id').inTable('operacao_eventos').onDelete('CASCADE');
-      t.string('path', 255).notNullable();
-      t.float('lat');      // latitude
-      t.float('lng');      // longitude
-      t.float('accuracy'); // precisão (m)
-      t.timestamp('created_at', { useTz: DB_CLIENT === 'pg' }).defaultTo(db.fn.now());
-      t.index(['evento_id']);
-    });
-  } else {
-    await ensureColumn('evento_fotos', 'lat',      (t) => (t as Knex.AlterTableBuilder).float('lat'));
-    await ensureColumn('evento_fotos', 'lng',      (t) => (t as Knex.AlterTableBuilder).float('lng'));
-    await ensureColumn('evento_fotos', 'accuracy', (t) => (t as Knex.AlterTableBuilder).float('accuracy'));
-  }
-
-  // Normaliza 0,0 → NULL (idempotente)
-  try {
-    await db('evento_fotos')
-      .whereNotNull('lat')
-      .whereNotNull('lng')
-      .andWhere((qb) => {
-        qb.where({ lat: 0, lng: 0 })
-          .orWhereRaw('ABS(lat) < 0.0001 AND ABS(lng) < 0.0001');
-      })
-      .update({ lat: null, lng: null, accuracy: null });
-  } catch (e) {
-    console.warn('Aviso: normalização de coordenadas falhou:', e);
-  }
-
-  // --- PASSWORD RESETS
-  if (!(await db.schema.hasTable('password_resets'))) {
-    await db.schema.createTable('password_resets', (t) => {
-      t.increments('id').primary();
-      t.integer('user_id').notNullable().references('id').inTable('usuarios').onDelete('CASCADE');
-      t.string('token', 128).notNullable().unique();
-      t.timestamp('expires_at', { useTz: DB_CLIENT === 'pg' }).notNullable();
-      t.timestamps(true, true);
-    });
-  }
-
-  // --- Seed admin
-  const ADMIN_CPF = process.env.ADMIN_CPF || '00000000000';
-  const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@operacoescim';
-  const ADMIN_NOME = process.env.ADMIN_NOME || 'Administrador';
-  const ADMIN_SENHA = process.env.ADMIN_SENHA || 'Admin@123';
-
-  const exists = await db('usuarios').where({ cpf: ADMIN_CPF }).first();
-  if (!exists) {
-    const hash = await bcrypt.hash(ADMIN_SENHA, 12);
-    await db('usuarios').insert({
-      cpf: ADMIN_CPF,
-      email: ADMIN_EMAIL,
-      nome: ADMIN_NOME,
-      senha_hash: hash,
-      role: 'admin',
-      ativo: 1,
-      cidade_id: null
-    });
-    console.log(`Usuário admin criado (cpf=${ADMIN_CPF}, email=${ADMIN_EMAIL}).`);
-  }
-}
 
 
 
@@ -367,10 +134,11 @@ app.use(helmet({
 app.use(cors({ origin: false, credentials: true }));
 
 app.use(compression());
-app.use(morgan('combined'));
-app.use(express.json({ limit: '1mb' }));
-app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
+app.use(express.static(path.join(process.cwd(), 'public')));
 
 // Sessão
 app.use(session({
@@ -526,15 +294,76 @@ async function canUserPostOnOperation(opId: number, user: any) {
 async function createEventoBase(args: {
   operacao_id: number; cidade_id: number; user_id: number; tipo: string; obs: string | null;
 }): Promise<number> {
-  const [eventoId] = await db('operacao_eventos').insert({
-    operacao_id: args.operacao_id,
-    cidade_id: args.cidade_id,
-    user_id: args.user_id,
-    tipo: args.tipo,
-    obs: args.obs || null
-  });
-  return Number(eventoId);
+  const isPg = !!process.env.DATABASE_URL;
+
+  if (isPg) {
+    const [row] = await db('operacao_eventos')
+      .insert({
+        operacao_id: args.operacao_id,
+        cidade_id: args.cidade_id,
+        user_id: args.user_id,
+        tipo: args.tipo,
+        obs: args.obs || null
+      })
+      .returning('id');
+    return Number((row as any).id ?? row);
+  } else {
+    const [id] = await db('operacao_eventos').insert({
+      operacao_id: args.operacao_id,
+      cidade_id: args.cidade_id,
+      user_id: args.user_id,
+      tipo: args.tipo,
+      obs: args.obs || null
+    });
+    return Number(id);
+  }
 }
+
+async function createOperacao(args: {
+  nome: string;
+  descricao?: string | null;
+  inicio_agendado: string | Date;
+  created_by: number | null; // id do usuário logado
+}): Promise<number> {
+  const isPg = !!process.env.DATABASE_URL;
+
+  // normaliza a data/hora
+  const ts = (args.inicio_agendado instanceof Date)
+    ? args.inicio_agendado
+    : new Date(args.inicio_agendado);
+
+  if (Number.isNaN(ts.getTime())) {
+    throw new Error('Data/hora inválida para inicio_agendado');
+  }
+
+  if (isPg) {
+    // Postgres: precisa do .returning('id')
+    const [row] = await db('operacoes')
+      .insert({
+        nome: args.nome,
+        descricao: args.descricao || null,
+        inicio_agendado: ts,
+        status: 'agendada',
+        created_by: args.created_by
+      })
+      .returning('id'); // <-- ESSENCIAL NO PG
+
+    // row pode ser { id: number } ou um número, dependendo da versão do driver
+    const opId = typeof row === 'object' ? (row as any).id : row;
+    return Number(opId);
+  } else {
+    // SQLite: o insert retorna [id]
+    const [id] = await db('operacoes').insert({
+      nome: args.nome,
+      descricao: args.descricao || null,
+      inicio_agendado: ts,
+      status: 'agendada',
+      created_by: args.created_by
+    });
+    return Number(id);
+  }
+}
+
 
 
 //-----  Rota de health check----- 
@@ -581,6 +410,30 @@ app.post('/login', csrfProtection, async (req, res) => {
 app.post('/logout', csrfProtection, (req, res) => {
   req.session.destroy(() => res.redirect('/login'));
 });
+
+app.post('/operacoes', async (req, res) => {
+  try {
+    const { nome, descricao, inicio_agendado } = req.body;
+
+    // pegue o id do usuário logado conforme sua sessão/autenticação
+    const created_by = req.session?.user?.id ?? null;
+
+    const opId = await createOperacao({
+      nome,
+      descricao: descricao || null,
+      inicio_agendado,  // pode vir como '2025-09-01T10:30' do <input type="datetime-local">
+      created_by
+    });
+
+    // redirecione/retorne já usando o ID criado
+    return res.redirect(`/operacoes/${opId}`);
+    // ou: res.status(201).json({ id: opId });
+  } catch (err: any) {
+    console.error('Erro ao criar operação:', err);
+    return res.status(500).send('Falha ao criar operação: ' + err.message);
+  }
+});
+
 
 // =============================================================================
 // HOME
@@ -2013,13 +1866,33 @@ app.get('/operacoes/:id/mapa', requireAuth, async (req, res) => {
 // =============================================================================
 // 404
 // =============================================================================
-app.use((_req, res) => res.status(404).send('Não encontrado'));
+app.use((req, res) => {
+  res.status(404).send('404 - Not Found');
+});
 
 // =============================================================================
 // BOOT
 // =============================================================================
-ensureSchemaAndAdmin().then(() => {
-  app.listen(PORT, () => {
-    console.log(`operacoescim rodando na porta ${PORT} (${NODE_ENV})`);
-  });
+// Handler de erro
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error('[error handler]', err);
+  res.status(500).send('Internal Server Error');
 });
+
+const PORT = Number(process.env.PORT) || 3000;
+
+// Sobe o servidor **depois** de garantir schema + seed
+(async () => {
+  try {
+    await ensureSchemaAndAdmin();
+    app.listen(PORT, () => {
+      console.log(`Server running on port ${PORT} (env: ${process.env.NODE_ENV || 'dev'})`);
+    });
+  } catch (e) {
+    console.error('Erro ao preparar schema:', e);
+    process.exit(1);
+  }
+})();
+
+export default app;

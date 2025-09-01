@@ -1,11 +1,28 @@
+# Node/TS
 node_modules/
 dist/
-
-# manter estrutura sem dados
-data/*
-!data/.gitkeep
-uploads/*
-!uploads/.gitkeep
-
-.env
+*.log
 npm-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Env/segredos
+.env
+*.env
+.env.*
+
+# Build/IDE
+.DS_Store
+.vscode/
+.idea/
+coverage/
+
+# Dados locais (não versionar)
+data/
+uploads/
+tmp/
+*.sqlite
+*.db
+
+# Evita tentar adicionar o arquivo especial do Windows se aparecer de novo
+NUL
