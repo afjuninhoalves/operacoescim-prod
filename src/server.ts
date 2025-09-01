@@ -1860,6 +1860,66 @@ app.get('/operacoes/:id/mapa', requireAuth, async (req, res) => {
 });
 
 
+// Saúde básica do serviço
+app.get('/healthz', (_req, res) => res.type('text').send('ok'));
+
+// Ver se o Postgres está acessível
+app.get('/debug/db-version', async (_req, res) => {
+  try {
+    const r: any = await db.raw('SELECT version()');
+    res.type('text').send(r?.rows?.[0]?.version || r?.[0]?.version || 'ok');
+  } catch (e:any) {
+    console.error('[db-version]', e);
+    res.status(500).send('db-version: ' + e.message);
+  }
+});
+
+// Lista tabelas (confirma se o schema existe)
+app.get('/debug/tables', async (_req, res) => {
+  try {
+    const r = await db.raw(`
+      SELECT table_name
+      FROM information_schema.tables
+      WHERE table_schema='public'
+      ORDER BY 1
+    `);
+    res.json(r.rows || r);
+  } catch (e:any) {
+    console.error('[tables]', e);
+    res.status(500).send('tables: ' + e.message);
+  }
+});
+
+// Tenta criar uma operação de teste (sem passar pelo formulário)
+app.get('/debug/op-check', async (_req, res) => {
+  try {
+    const isPg = !!process.env.DATABASE_URL;
+    const now = new Date();
+
+    if (isPg) {
+      const [{ id }] = await db('operacoes').insert({
+        nome: 'TESTE DEBUG',
+        descricao: null,
+        inicio_agendado: now,
+        status: 'agendada',
+        created_by: null
+      }).returning('id');
+      return res.type('text').send('ok id=' + id);
+    } else {
+      const [id] = await db('operacoes').insert({
+        nome: 'TESTE DEBUG',
+        descricao: null,
+        inicio_agendado: now,
+        status: 'agendada',
+        created_by: null
+      });
+      return res.type('text').send('ok id=' + id);
+    }
+  } catch (e:any) {
+    console.error('[op-check]', e);
+    res.status(500).send('op-check: ' + e.message);
+  }
+});
 
 
 
