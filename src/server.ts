@@ -33,7 +33,7 @@ app.get('/debug/db-version', async (req, res) => {
 
 
 
-const PORT = Number(process.env.PORT || 3000);
+
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const IN_PROD = NODE_ENV === 'production';
 
