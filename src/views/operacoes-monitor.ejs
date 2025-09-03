@@ -279,7 +279,7 @@
         </div>
       </div>
 
-      <div style="position:relative;height:340px">
+      <div id="chartWrap" style="position:relative;height:340px">
         <canvas id="byCityChart"></canvas>
       </div>
 
@@ -287,6 +287,76 @@
         Sem dados suficientes para o gráfico.
       </div>
     </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    <script>
+      const series = <% - JSON.stringify(seriesPorCidade || []) %>;
+
+      function hasAnyValue(rows) {
+        return rows.some(r =>
+          (Number(r.fiscalizacao) || 0) +
+          (Number(r.pessoa) || 0) +
+          (Number(r.veiculo) || 0) +
+          (Number(r.apreensao) || 0) > 0
+        );
+      }
+
+      function renderChart() {
+        const wrap = document.getElementById('chartWrap');
+        const canvas = document.getElementById('byCityChart');
+        const noData = document.getElementById('noChartData');
+
+        if (!series.length || !hasAnyValue(series)) {
+          noData.style.display = 'block';
+          return;
+        }
+
+        // garante dimensões
+        canvas.style.width = '100%';
+        canvas.style.height = '100%';
+
+        const labels = series.map(r => r.cidade);
+        const mk = (key, label, color) => ({
+          label,
+          data: series.map(r => Number(r[key] || 0)),
+          backgroundColor: color,
+          borderColor: color,
+          borderWidth: 1,
+          borderRadius: 6,
+          maxBarThickness: 36
+        });
+
+        const data = {
+          labels,
+          datasets: [
+            mk('fiscalizacao', 'Fiscalizações', '#60a5fa'),
+            mk('pessoa', 'Pessoas', '#f87171'),
+            mk('veiculo', 'Veículos', '#34d399'),
+            mk('apreensao', 'Apreensões', '#fbbf24'),
+          ]
+        };
+
+        const ctx = canvas.getContext('2d');
+        new Chart(ctx, {
+          type: 'bar',
+          data,
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            scales: {
+              x: { ticks: { color: '#e5e7eb' }, grid: { display: false } },
+              y: { beginAtZero: true, ticks: { precision: 0, color: '#e5e7eb' }, grid: { color: 'rgba(229,231,235,0.1)' } }
+            },
+            plugins: { legend: { position: 'top', labels: { color: '#e5e7eb' } } }
+          }
+        });
+      }
+
+      // espera layout concluir
+      window.addEventListener('load', renderChart);
+    </script>
+
 
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
@@ -422,45 +492,96 @@
         </table>
       </div>
 
-      <div class="card" style="margin-top:12px">
+      <div class="card">
         <div style="font-weight:700;margin-bottom:8px">Efetivo por cidade</div>
-        <table>
-          <thead>
-            <tr>
-              <th>Cidade</th>
-              <th>Agentes</th>
-              <th>Viaturas</th>
-            </tr>
-          </thead>
-          <tbody>
-            <% const totAg=(efetivoByCity||[]).reduce((a,c)=>a + Number(c.agentes || 0), 0);
-              const totVt = (efetivoByCity||[]).reduce((a,c)=>a + Number(c.viaturas || 0), 0);
-              (efetivoByCity||[]).forEach(row => {
-              %>
+        <% const efRows=Array.isArray(efetivoByCity) ? efetivoByCity : []; const t=efRows.reduce((a, r)=> ({
+          ag: a.ag + (Number(r.agentes)||0),
+          vt: a.vt + (Number(r.viaturas)||0),
+          pc_ag: a.pc_ag + (Number(r.pc_agentes)||0),
+          pc_vt: a.pc_vt + (Number(r.pc_viaturas)||0),
+          pm_ag: a.pm_ag + (Number(r.pm_agentes)||0),
+          pm_vt: a.pm_vt + (Number(r.pm_viaturas)||0),
+          ou_ag: a.ou_ag + (Number(r.outros_agentes)||0),
+          ou_vt: a.ou_vt + (Number(r.outros_viaturas)||0),
+          }), {ag:0,vt:0,pc_ag:0,pc_vt:0,pm_ag:0,pm_vt:0,ou_ag:0,ou_vt:0});
+          %>
+          <table>
+            <thead>
               <tr>
-                <td>
-                  <%= row.cidade %>
-                </td>
-                <td>
-                  <%= Number(row.agentes || 0) %>
-                </td>
-                <td>
-                  <%= Number(row.viaturas || 0) %>
-                </td>
+                <th>Cidade</th>
+                <th>Agentes</th>
+                <th>Viaturas</th>
+                <th>PC (ag.)</th>
+                <th>PC (viat.)</th>
+                <th>PM (ag.)</th>
+                <th>PM (viat.)</th>
+                <th>Outros (ag.)</th>
+                <th>Outros (viat.)</th>
               </tr>
-              <% }) %>
+            </thead>
+            <tbody>
+              <% efRows.forEach(r=> { %>
                 <tr>
-                  <td style="font-weight:700">Total</td>
-                  <td style="font-weight:700">
-                    <%= totAg %>
+                  <td>
+                    <%= r.cidade %>
                   </td>
-                  <td style="font-weight:700">
-                    <%= totVt %>
+                  <td>
+                    <%= r.agentes || 0 %>
+                  </td>
+                  <td>
+                    <%= r.viaturas || 0 %>
+                  </td>
+                  <td>
+                    <%= r.pc_agentes || 0 %>
+                  </td>
+                  <td>
+                    <%= r.pc_viaturas || 0 %>
+                  </td>
+                  <td>
+                    <%= r.pm_agentes || 0 %>
+                  </td>
+                  <td>
+                    <%= r.pm_viaturas || 0 %>
+                  </td>
+                  <td>
+                    <%= r.outros_agentes || 0 %>
+                  </td>
+                  <td>
+                    <%= r.outros_viaturas || 0 %>
                   </td>
                 </tr>
-          </tbody>
-        </table>
+                <% }) %>
+                  <tr>
+                    <th>Total</th>
+                    <th>
+                      <%= t.ag %>
+                    </th>
+                    <th>
+                      <%= t.vt %>
+                    </th>
+                    <th>
+                      <%= t.pc_ag %>
+                    </th>
+                    <th>
+                      <%= t.pc_vt %>
+                    </th>
+                    <th>
+                      <%= t.pm_ag %>
+                    </th>
+                    <th>
+                      <%= t.pm_vt %>
+                    </th>
+                    <th>
+                      <%= t.ou_ag %>
+                    </th>
+                    <th>
+                      <%= t.ou_vt %>
+                    </th>
+                  </tr>
+            </tbody>
+          </table>
       </div>
+
 
 
 

@@ -1994,13 +1994,19 @@ app.get('/operacoes/:id/monitor', requireAdminOrGestor, async (req, res) => {
     inicio_fmt: op.inicio_agendado ? new Date(op.inicio_agendado).toLocaleString('pt-BR') : null
   };
 
-  // ---- Efetivo por cidade (agentes/viaturas) — **APENAS UMA VEZ**
+  // ---- Efetivo por cidade (agentes/viaturas + quebras PC/PM/Outros)
   const subEfCidades = db('operacao_efetivo')
     .where('operacao_id', id)
     .whereNotNull('cidade_id')
     .select('cidade_id')
     .sum({ agentes: 'total_agentes' })
     .sum({ viaturas: 'total_viaturas' })
+    .sum({ pc_agentes: 'pc_agentes' })
+    .sum({ pc_viaturas: 'pc_viaturas' })
+    .sum({ pm_agentes: 'pm_agentes' })
+    .sum({ pm_viaturas: 'pm_viaturas' })
+    .sum({ outros_agentes: 'outros_agentes' })
+    .sum({ outros_viaturas: 'outros_viaturas' })
     .groupBy('cidade_id')
     .as('ef');
 
@@ -2011,10 +2017,17 @@ app.get('/operacoes/:id/monitor', requireAdminOrGestor, async (req, res) => {
     .select(
       'c.id as cidade_id',
       'c.nome as cidade',
-      db.raw('COALESCE(ef.agentes, 0)  as agentes'),
-      db.raw('COALESCE(ef.viaturas, 0) as viaturas')
+      db.raw('COALESCE(ef.agentes, 0)           as agentes'),
+      db.raw('COALESCE(ef.viaturas, 0)          as viaturas'),
+      db.raw('COALESCE(ef.pc_agentes, 0)        as pc_agentes'),
+      db.raw('COALESCE(ef.pc_viaturas, 0)       as pc_viaturas'),
+      db.raw('COALESCE(ef.pm_agentes, 0)        as pm_agentes'),
+      db.raw('COALESCE(ef.pm_viaturas, 0)       as pm_viaturas'),
+      db.raw('COALESCE(ef.outros_agentes, 0)    as outros_agentes'),
+      db.raw('COALESCE(ef.outros_viaturas, 0)   as outros_viaturas')
     )
     .orderBy('c.nome');
+
 
   res.render('operacoes-monitor', {
     operacao,
@@ -2022,7 +2035,7 @@ app.get('/operacoes/:id/monitor', requireAdminOrGestor, async (req, res) => {
     efetivo,
     seriesPorCidade,
     feed,
-    efetivoByCity, // tabela de efetivo por cidade no EJS
+    efetivoByCity,
   });
 });
 
