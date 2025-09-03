@@ -336,7 +336,11 @@
             <div class="kv-row">
               <div class="kv-label">Descrição</div>
               <div>
-                <%= operacao?.descricao || '<span class="muted">—</span>' %>
+                <% if (operacao?.descricao && operacao.descricao.trim()) { %>
+                  <%= operacao.descricao %>
+                    <% } else { %>
+                      <span class="muted">—</span>
+                      <% } %>
               </div>
             </div>
             <div class="kv-row">
