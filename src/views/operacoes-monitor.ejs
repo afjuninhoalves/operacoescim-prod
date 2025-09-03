@@ -1,38 +1,167 @@
 <!doctype html>
 <html lang="pt-br">
+
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Monitor — <%= operacao.nome %></title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Monitor — <%= operacao.nome %>
+  </title>
   <style>
-    :root{ --bg:#0b1220; --panel:#0f172a; --panel2:#111827; --border:#1f2937; --text:#e5e7eb; --muted:#9ca3af; --chip:#1f2937; }
-    *{box-sizing:border-box}
-    body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial}
-    a{color:inherit;text-decoration:none}
-    .topbar{position:sticky;top:0;z-index:10;background:linear-gradient(to bottom,rgba(17,24,39,.92),rgba(17,24,39,.75));border-bottom:1px solid var(--border)}
-    .topbar-inner{max-width:1160px;margin:0 auto;padding:14px 20px;display:flex;justify-content:space-between;align-items:center;gap:12px}
-    .btn{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:#111826}
-    .btn:hover{filter:brightness(1.08)}
-    .container{max-width:1160px;margin:0 auto;padding:20px}
-    .muted{color:var(--muted)}
-    .cards{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
-    .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--border);border-radius:14px;padding:14px}
-    .kpi-title{font-size:13px;color:var(--muted)}
-    .kpi-value{font-size:28px;font-weight:700}
-    .grid{display:grid;grid-template-columns:1.2fr .8fr;gap:12px;margin-top:14px}
-    table{width:100%;border-collapse:collapse}
-    th,td{padding:10px;border-bottom:1px solid var(--border);text-align:center}
-    th:first-child, td:first-child{text-align:left}
-    .chip{display:inline-block;padding:3px 8px;border-radius:999px;background:var(--chip);font-size:12px}
-    @media (max-width:1100px){ .cards{grid-template-columns:repeat(2,1fr)} .grid{grid-template-columns:1fr} }
+    :root {
+      --bg: #0b1220;
+      --panel: #0f172a;
+      --panel2: #111827;
+      --border: #1f2937;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --chip: #1f2937;
+    }
+
+    * {
+      box-sizing: border-box
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Arial
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: linear-gradient(to bottom, rgba(17, 24, 39, .92), rgba(17, 24, 39, .75));
+      border-bottom: 1px solid var(--border)
+    }
+
+    .topbar-inner {
+      max-width: 1160px;
+      margin: 0 auto;
+      padding: 14px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: #111826
+    }
+
+    .btn:hover {
+      filter: brightness(1.08)
+    }
+
+    .container {
+      max-width: 1160px;
+      margin: 0 auto;
+      padding: 20px
+    }
+
+    .muted {
+      color: var(--muted)
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 12px
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 12px
+    }
+
+    .card {
+      background: linear-gradient(180deg, var(--panel), var(--panel2));
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px
+    }
+
+    .kpi-title {
+      font-size: 13px;
+      color: var(--muted)
+    }
+
+    .kpi-value {
+      font-size: 28px;
+      font-weight: 700
+    }
+
+    .kpi-sub {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 4px
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1.2fr .8fr;
+      gap: 12px;
+      margin-top: 14px
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse
+    }
+
+    th,
+    td {
+      padding: 10px;
+      border-bottom: 1px solid var(--border);
+      text-align: center
+    }
+
+    th:first-child,
+    td:first-child {
+      text-align: left
+    }
+
+    .chip {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: var(--chip);
+      font-size: 12px
+    }
+
+    @media (max-width:1100px) {
+      .cards {
+        grid-template-columns: repeat(2, 1fr)
+      }
+
+      .grid {
+        grid-template-columns: 1fr
+      }
+    }
   </style>
 </head>
+
 <body>
   <div class="topbar">
     <div class="topbar-inner">
       <div>
-        <div style="font-weight:700">Monitor — <%= operacao.nome %></div>
-        <div class="muted">Agendada: <%= operacao.inicio_fmt %> · ID #<%= operacao.id %></div>
+        <div style="font-weight:700">Monitor — <%= operacao.nome %>
+        </div>
+        <div class="muted">Agendada: <%= operacao.inicio_fmt %> · ID #<%= operacao.id %>
+        </div>
       </div>
       <div style="display:flex;gap:10px">
         <a class="btn" href="/operacoes/<%= operacao.id %>">Voltar ao detalhe</a>
@@ -47,182 +176,252 @@
     <div class="cards">
       <div class="card">
         <div class="kpi-title">Locais fiscalizados</div>
-        <div class="kpi-value"><%= (cards && cards.locais) || 0 %></div>
+        <div class="kpi-value">
+          <%= (cards && cards.locais) || 0 %>
+        </div>
       </div>
       <div class="card">
         <div class="kpi-title">Pessoas</div>
-        <div class="kpi-value"><%= (cards && cards.pessoas) || 0 %></div>
+        <div class="kpi-value">
+          <%= (cards && cards.pessoas) || 0 %>
+        </div>
       </div>
       <div class="card">
         <div class="kpi-title">Veículos</div>
-        <div class="kpi-value"><%= (cards && cards.veiculos) || 0 %></div>
+        <div class="kpi-value">
+          <%= (cards && cards.veiculos) || 0 %>
+        </div>
       </div>
       <div class="card">
         <div class="kpi-title">Apreensões</div>
-        <div class="kpi-value"><%= (cards && cards.apreensoes) || 0 %></div>
+        <div class="kpi-value">
+          <%= (cards && cards.apreensoes) || 0 %>
+        </div>
       </div>
       <div class="card">
+        <div class="kpi-title">Multados</div>
+        <div class="kpi-value">
+          <%= (cards && cards.multados) || 0 %>
+        </div>
+      </div>
+      <div class="card">
+        <div class="kpi-title">Fechados</div>
+        <div class="kpi-value">
+          <%= (cards && cards.fechados) || 0 %>
+        </div>
+      </div>
+      <div class="card">
+        <div class="kpi-title">Lacrados</div>
+        <div class="kpi-value">
+          <%= (cards && cards.lacrados) || 0 %>
+        </div>
+      </div>
+
+
+      <!-- Efetivo total -->
+      <div class="card">
         <div class="kpi-title">Efetivo total</div>
-        <% 
-          const _efTotAg = (efetivoTotal && Number(efetivoTotal.total_agentes)) || (Array.isArray(efetivoByCity) ? efetivoByCity.reduce((a,c)=>a+(Number(c.total_agentes)||0),0) : 0);
-          const _efTotVt = (efetivoTotal && Number(efetivoTotal.total_viaturas)) || (Array.isArray(efetivoByCity) ? efetivoByCity.reduce((a,c)=>a+(Number(c.total_viaturas)||0),0) : 0);
-        %>
-        <div class="kpi-value"><%= _efTotAg %> ag.</div>
-        <div class="muted" style="font-size:12px;margin-top:4px"><%= _efTotVt %> viaturas</div>
+        <div class="kpi-value">
+          <%= (efetivo && Number(efetivo.total_agentes)) || 0 %> ag.
+        </div>
+        <div class="kpi-sub">
+          <%= (efetivo && Number(efetivo.total_viaturas)) || 0 %> viaturas
+        </div>
+      </div>
+
+      <!-- PC -->
+      <div class="card">
+        <div class="kpi-title">Polícia Civil</div>
+        <div class="kpi-value">
+          <%= (efetivo && Number(efetivo.pc_agentes)) || 0 %> ag.
+        </div>
+        <div class="kpi-sub">
+          <%= (efetivo && Number(efetivo.pc_viaturas)) || 0 %> viaturas
+        </div>
+      </div>
+
+      <!-- PM -->
+      <div class="card">
+        <div class="kpi-title">Polícia Militar</div>
+        <div class="kpi-value">
+          <%= (efetivo && Number(efetivo.pm_agentes)) || 0 %> ag.
+        </div>
+        <div class="kpi-sub">
+          <%= (efetivo && Number(efetivo.pm_viaturas)) || 0 %> viaturas
+        </div>
+      </div>
+
+      <!-- Outros -->
+      <div class="card">
+        <div class="kpi-title">Outros órgãos</div>
+        <div class="kpi-value">
+          <%= (efetivo && Number(efetivo.outros_agentes)) || 0 %> ag.
+        </div>
+        <div class="kpi-sub">
+          <%= (efetivo && Number(efetivo.outros_viaturas)) || 0 %> viaturas
+        </div>
       </div>
     </div>
 
     <!-- Card do gráfico -->
-<div class="card" style="margin-top:16px">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-    <h3 style="margin:0">Distribuição por cidade</h3>
-    <div class="muted" style="font-size:13px">
-      <span style="display:inline-block;width:10px;height:10px;background:#60a5fa;border-radius:50%;margin-right:6px"></span>Fiscalizações
-      &nbsp;&nbsp;<span style="display:inline-block;width:10px;height:10px;background:#f87171;border-radius:50%;margin-right:6px"></span>Pessoas
-      &nbsp;&nbsp;<span style="display:inline-block;width:10px;height:10px;background:#34d399;border-radius:50%;margin-right:6px"></span>Veículos
-      &nbsp;&nbsp;<span style="display:inline-block;width:10px;height:10px;background:#fbbf24;border-radius:50%;margin-right:6px"></span>Apreensões
+    <div class="card" style="margin-top:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <h3 style="margin:0">Distribuição por cidade</h3>
+        <div class="muted" style="font-size:13px">
+          <span
+            style="display:inline-block;width:10px;height:10px;background:#60a5fa;border-radius:50%;margin-right:6px"></span>Fiscalizações
+          &nbsp;&nbsp;<span
+            style="display:inline-block;width:10px;height:10px;background:#f87171;border-radius:50%;margin-right:6px"></span>Pessoas
+          &nbsp;&nbsp;<span
+            style="display:inline-block;width:10px;height:10px;background:#34d399;border-radius:50%;margin-right:6px"></span>Veículos
+          &nbsp;&nbsp;<span
+            style="display:inline-block;width:10px;height:10px;background:#fbbf24;border-radius:50%;margin-right:6px"></span>Apreensões
+        </div>
+      </div>
+
+      <div style="position:relative;height:340px">
+        <canvas id="byCityChart"></canvas>
+      </div>
+
+      <div id="noChartData" class="muted" style="display:none;margin-top:8px">
+        Sem dados suficientes para o gráfico.
+      </div>
     </div>
-  </div>
 
-  <div style="position:relative;height:340px">
-    <canvas id="byCityChart"></canvas>
-  </div>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    <script>
+      const series = <% - JSON.stringify(seriesPorCidade || []) %>;
 
-  <!-- fallback se não houver dados -->
-  <div id="noChartData" class="muted" style="display:none;margin-top:8px">
-    Sem dados suficientes para o gráfico.
-  </div>
-</div>
+      if (!series.length) {
+        document.getElementById('noChartData').style.display = 'block';
+      } else {
+        const labels = series.map(r => r.cidade);
 
-<!-- Chart.js -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-<script>
-  // dados vindos do server
-  const series = <%- JSON.stringify(seriesPorCidade || []) %>;
+        const ds = (key, label, color) => ({
+          label,
+          data: series.map(r => Number(r[key] || 0)),
+          backgroundColor: color,
+          borderColor: color,
+          borderWidth: 1,
+          borderRadius: 6,
+          maxBarThickness: 36
+        });
 
-  if (!series.length) {
-    document.getElementById('noChartData').style.display = 'block';
-  } else {
-    const labels = series.map(r => r.cidade);
+        const data = {
+          labels,
+          datasets: [
+            ds('fiscalizacao', 'Fiscalizações', '#60a5fa'),
+            ds('pessoa', 'Pessoas', '#f87171'),
+            ds('veiculo', 'Veículos', '#34d399'),
+            ds('apreensao', 'Apreensões', '#fbbf24'),
+          ]
+        };
 
-    // helper p/ datasets com cores do app
-    const ds = (key, label, color) => ({
-      label,
-      data: series.map(r => Number(r[key] || 0)),
-      backgroundColor: color,
-      borderColor: color,
-      borderWidth: 1,
-      borderRadius: 6,
-      maxBarThickness: 36
-    });
-
-    const data = {
-      labels,
-      datasets: [
-        ds('fiscalizacao', 'Fiscalizações', '#60a5fa'),
-        ds('pessoa',       'Pessoas',       '#f87171'),
-        ds('veiculo',      'Veículos',      '#34d399'),
-        ds('apreensao',    'Apreensões',    '#fbbf24'),
-      ]
-    };
-
-    const ctx = document.getElementById('byCityChart').getContext('2d');
-    new Chart(ctx, {
-      type: 'bar',
-      data,
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: {
-          x: {
-            stacked: false,
-            ticks: { color: '#e5e7eb' },
-            grid: { display: false }
-          },
-          y: {
-            beginAtZero: true,
-            ticks: { precision: 0, color: '#e5e7eb' },
-            grid: { color: 'rgba(229,231,235,0.1)' }
-          }
-        },
-        plugins: {
-          legend: {
-            position: 'top',
-            labels: { color: '#e5e7eb' }
-          },
-          tooltip: {
-            callbacks: {
-              label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y}`
+        const ctx = document.getElementById('byCityChart').getContext('2d');
+        new Chart(ctx, {
+          type: 'bar',
+          data,
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              x: { stacked: false, ticks: { color: '#e5e7eb' }, grid: { display: false } },
+              y: { beginAtZero: true, ticks: { precision: 0, color: '#e5e7eb' }, grid: { color: 'rgba(229,231,235,0.1)' } }
+            },
+            plugins: {
+              legend: { position: 'top', labels: { color: '#e5e7eb' } },
+              tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y}` } }
             }
           }
-        }
+        });
       }
-    });
-  }
-
-  // Se preferir barras empilhadas, troque "stacked: false" por true em x e y.
-</script>
-
+    </script>
 
     <div class="grid">
       <!-- Tabela por cidade -->
       <div class="card">
         <div style="font-weight:700;margin-bottom:8px">Distribuição por cidade</div>
-        <% const efMap = new Map((efetivoByCity||[]).map(e => [e.cidade_id, e])); %>
-        <table>
-          <thead>
-            <tr>
-              <th>Cidade</th>
-              <th>Fiscalizações</th>
-              <th>Pessoas</th>
-              <th>Veículos</th>
-              <th>Apreensões</th>
-              <th>Efetivo (ag.)</th>
-              <th>Viaturas</th>
-              <th>Total eventos</th>
-            </tr>
-          </thead>
-          <tbody>
-            <% (seriesPorCidade||[]).forEach(row => { 
-                 const ef = efMap.get(row.cidade_id) || { total_agentes:0, total_viaturas:0 };
-                 const totalEv = (row.fiscalizacao||0)+(row.pessoa||0)+(row.veiculo||0)+(row.apreensao||0);
-            %>
+        <% const efMap=new Map((efetivoByCity||[]).map(e=> [e.cidade_id, e])); %>
+          <table>
+            <thead>
               <tr>
-                <td><%= row.cidade %></td>
-                <td><%= row.fiscalizacao || 0 %></td>
-                <td><%= row.pessoa || 0 %></td>
-                <td><%= row.veiculo || 0 %></td>
-                <td><%= row.apreensao || 0 %></td>
-                <td><%= ef.total_agentes || 0 %></td>
-                <td><%= ef.total_viaturas || 0 %></td>
-                <td><%= totalEv %></td>
+                <th>Cidade</th>
+                <th>Fiscalizações</th>
+                <th>Pessoas</th>
+                <th>Veículos</th>
+                <th>Apreensões</th>
+                <th>Efetivo (ag.)</th>
+                <th>Viaturas</th>
+                <th>Total eventos</th>
               </tr>
-            <% }) %>
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              <% (seriesPorCidade||[]).forEach(row=> {
+                const ef = efMap.get(row.cidade_id) || { total_agentes:0, total_viaturas:0 };
+                const totalEv = (row.fiscalizacao||0)+(row.pessoa||0)+(row.veiculo||0)+(row.apreensao||0);
+                %>
+                <tr>
+                  <td>
+                    <%= row.cidade %>
+                  </td>
+                  <td>
+                    <%= row.fiscalizacao || 0 %>
+                  </td>
+                  <td>
+                    <%= row.pessoa || 0 %>
+                  </td>
+                  <td>
+                    <%= row.veiculo || 0 %>
+                  </td>
+                  <td>
+                    <%= row.apreensao || 0 %>
+                  </td>
+                  <td>
+                    <%= ef.total_agentes || 0 %>
+                  </td>
+                  <td>
+                    <%= ef.total_viaturas || 0 %>
+                  </td>
+                  <td>
+                    <%= totalEv %>
+                  </td>
+                </tr>
+                <% }) %>
+            </tbody>
+          </table>
       </div>
 
       <!-- Feed -->
       <div class="card">
         <div style="font-weight:700;margin-bottom:8px">Feed (últimos 20)</div>
         <div style="display:flex;flex-direction:column;gap:10px">
-          <% (feed||[]).forEach(f => { %>
+          <% (feed||[]).forEach(f=> { %>
             <div style="padding:10px;border:1px solid var(--border);border-radius:10px">
               <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
-                <span class="chip"><%= f.tipo %></span>
-                <span class="muted" style="font-size:12px"><%= new Date(f.ts).toLocaleString('pt-BR') %></span>
+                <span class="chip">
+                  <%= f.tipo %>
+                </span>
+                <span class="muted" style="font-size:12px">
+                  <%= new Date(f.ts).toLocaleString('pt-BR') %>
+                </span>
               </div>
               <div class="muted" style="margin-top:6px">
-                <%= f.cidade %><% if (f.cidade && f.user) { %> · <% } %><%= f.user %>
+                <%= f.cidade %>
+                  <% if (f.cidade && f.user) { %> · <% } %>
+                      <%= f.user %>
               </div>
               <% if (f.obs) { %>
-                <div style="margin-top:6px"><%= f.obs %></div>
-              <% } %>
+                <div style="margin-top:6px">
+                  <%= f.obs %>
+                </div>
+                <% } %>
             </div>
-          <% }) %>
+            <% }) %>
         </div>
       </div>
     </div>
   </div>
 </body>
+
 </html>

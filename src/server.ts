@@ -877,31 +877,31 @@ app.post(
 
     return res.redirect(`/operacoes/${operacao_id}`);
   }
-);app.post('/operacoes/:id/efetivo', requireAuth, csrfProtection, async (req: Request, res: Response) => {
+); app.post('/operacoes/:id/efetivo', requireAuth, csrfProtection, async (req: Request, res: Response) => {
   const user = (req.session as any).user;
   const operacao_id = Number(req.params.id);
   if (!Number.isFinite(operacao_id)) return res.status(400).send('ID inválido');
 
   if (!(await canUserPostOnOperation(operacao_id, user))) return res.status(403).send('Sem permissão.');
 
-  const num  = (v:any) => { const n = Number(v); return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0; };
-  const bool = (v:any) => v === 'on' || v === 'true' || v === '1';
+  const num = (v: any) => { const n = Number(v); return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0; };
+  const bool = (v: any) => v === 'on' || v === 'true' || v === '1';
 
   const cidade_id = req.body.cidade_id ? Number(req.body.cidade_id) : null;
 
-  const total_agentes  = num(req.body.total_agentes);
+  const total_agentes = num(req.body.total_agentes);
   const total_viaturas = num(req.body.total_viaturas);
 
-  const pc          = bool(req.body.pc);
-  const pc_agentes  = pc ? num(req.body.pc_agentes)  : 0;
+  const pc = bool(req.body.pc);
+  const pc_agentes = pc ? num(req.body.pc_agentes) : 0;
   const pc_viaturas = pc ? num(req.body.pc_viaturas) : 0;
 
-  const pm          = bool(req.body.pm);
-  const pm_agentes  = pm ? num(req.body.pm_agentes)  : 0;
+  const pm = bool(req.body.pm);
+  const pm_agentes = pm ? num(req.body.pm_agentes) : 0;
   const pm_viaturas = pm ? num(req.body.pm_viaturas) : 0;
 
-  const outros          = bool(req.body.outros);
-  const outros_agentes  = outros ? num(req.body.outros_agentes)  : 0;
+  const outros = bool(req.body.outros);
+  const outros_agentes = outros ? num(req.body.outros_agentes) : 0;
   const outros_viaturas = outros ? num(req.body.outros_viaturas) : 0;
 
   const payload = {
@@ -934,7 +934,7 @@ app.post(
     // ---- caso por CIDADE -> upsert pelo par (operacao_id, cidade_id)
     await db('operacao_efetivo')
       .insert(payload)
-      .onConflict(['operacao_id','cidade_id'])
+      .onConflict(['operacao_id', 'cidade_id'])
       .merge({
         user_id: payload.user_id,
         total_agentes, total_viaturas,
@@ -1411,16 +1411,16 @@ app.post('/operacoes/:id/fiscalizacoes',
     // Campos da fiscalização
     // ---------------------------
     const tipo_local = String(req.body.tipo_local || '').trim() || null;
-    const obs        = String(req.body.obs || '').trim() || null;
+    const obs = String(req.body.obs || '').trim() || null;
 
-    const toInt = (v:any) => {
+    const toInt = (v: any) => {
       if (v === '' || v == null) return 0;
       const n = Number(v);
       return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0;
     };
-    const toBool = (v:any) => v === 'on' || v === 'true' || v === '1';
+    const toBool = (v: any) => v === 'on' || v === 'true' || v === '1';
 
-    const pessoas_abordadas  = toInt(req.body.pessoas_abordadas);
+    const pessoas_abordadas = toInt(req.body.pessoas_abordadas);
     const veiculos_abordados = toInt(req.body.veiculos_abordados);
 
     const multado = toBool(req.body.multado);
@@ -1469,9 +1469,9 @@ app.post('/operacoes/:id/fiscalizacoes',
     // Apreensão opcional dentro do mesmo formulário
     // ---------------------------
     const apr_tipo = String(req.body.apr_tipo || '').trim();
-    const apr_qtd  = req.body.apr_quantidade === '' ? null : Number(req.body.apr_quantidade);
-    const apr_uni  = String(req.body.apr_unidade || '').trim() || null;
-    const apr_obs  = String(req.body.apr_obs || '').trim() || null;
+    const apr_qtd = req.body.apr_quantidade === '' ? null : Number(req.body.apr_quantidade);
+    const apr_uni = String(req.body.apr_unidade || '').trim() || null;
+    const apr_obs = String(req.body.apr_obs || '').trim() || null;
 
     if (apr_tipo) {
       if (apr_qtd != null && !Number.isFinite(apr_qtd)) {
@@ -1805,57 +1805,108 @@ async function buildOperationMetrics(opId: number) {
 }
 
 
-app.get('/operacoes/:id/monitor', requireAdminOrGestor, async (req: Request, res: Response) => {
+app.get('/operacoes/:id/monitor', requireAdminOrGestor, async (req, res) => {
   const id = Number(req.params.id);
   const op = await db('operacoes').where({ id }).first();
   if (!op) return res.status(404).send('Operação não encontrada.');
 
-  // ---- KPIs (totais por tipo)
-  type TotRow = { tipo: string; c: any };
-  const totRows = await db('operacao_eventos')
-    .where({ operacao_id: id })
-    .select('tipo')
-    .count<{ c: any }>('id as c')
-    .groupBy('tipo') as TotRow[];
-
-  const cards = { locais: 0, pessoas: 0, veiculos: 0, apreensoes: 0 };
-  for (const r of totRows) {
-    const n = Number(r.c) || 0;
-    if (r.tipo === 'fiscalizacao') cards.locais = n;
-    else if (r.tipo === 'pessoa') cards.pessoas = n;
-    else if (r.tipo === 'veiculo') cards.veiculos = n;
-    else if (r.tipo === 'apreensao') cards.apreensoes = n;
-  }
-
-  // ---- Séries por cidade (contagem de eventos por tipo)
-  type CntRow = { cidade_id: number; cidade: string; tipo: string; cnt: any };
-  const grouped = await db('operacao_eventos as e')
+  // ---- KPIs de fiscalizações/pessoas/veículos
+  const k = await db('operacao_eventos as e')
+    .leftJoin('evento_fiscalizacao as f', 'f.evento_id', 'e.id')
     .where('e.operacao_id', id)
-    .join('cidades as c', 'c.id', 'e.cidade_id')
-    .select('c.id as cidade_id', 'c.nome as cidade', 'e.tipo')
-    .count<{ cnt: any }>('e.id as cnt')
-    .groupBy('c.id', 'c.nome', 'e.tipo') as CntRow[];
+    .andWhere('e.tipo', 'fiscalizacao')
+    .count<{ locais: any }>({ locais: 'e.id' })
+    .sum<{ pessoas: any }>({ pessoas: db.raw('COALESCE(f.pessoas_abordadas,0)') })
+    .sum<{ veiculos: any }>({ veiculos: db.raw('COALESCE(f.veiculos_abordados,0)') })
+    .first();
 
-  const participantes = await db('operacao_cidades as oc')
+  const apr = await db('operacao_eventos')
+    .where({ operacao_id: id, tipo: 'apreensao' })
+    .count<{ c: any }>('id as c')
+    .first();
+
+
+  // ---- KPIs de flags (multado/fechado/lacrado)
+  const flagsRow = await db('evento_fiscalizacao as f')
+    .join('operacao_eventos as e', 'e.id', 'f.evento_id')
+    .where('e.operacao_id', id)
+    .select(
+      db.raw('SUM(CASE WHEN f.multado THEN 1 ELSE 0 END)  AS multados'),
+      db.raw('SUM(CASE WHEN f.fechado THEN 1 ELSE 0 END)  AS fechados'),
+      db.raw('SUM(CASE WHEN f.lacrado THEN 1 ELSE 0 END)  AS lacrados')
+    )
+    .first();
+
+  cards.multados = Number(flagsRow?.multados) || 0;
+  cards.fechados = Number(flagsRow?.fechados) || 0;
+  cards.lacrados = Number(flagsRow?.lacrados) || 0;
+
+
+  const cards = {
+    locais: Number(k?.locais) || 0,
+    pessoas: Number(k?.pessoas) || 0,
+    veiculos: Number(k?.veiculos) || 0,
+    apreensoes: Number(apr?.c) || 0,
+  };
+
+  // ---- Efetivo total e quebras (PC/PM/Outros)
+  const ef = await db('operacao_efetivo')
+    .where({ operacao_id: id })
+    .sum<{ agentes: any }>({ agentes: 'total_agentes' })
+    .sum<{ viaturas: any }>({ viaturas: 'total_viaturas' })
+    .sum<{ pc_agentes: any }>({ pc_agentes: 'pc_agentes' })
+    .sum<{ pc_viaturas: any }>({ pc_viaturas: 'pc_viaturas' })
+    .sum<{ pm_agentes: any }>({ pm_agentes: 'pm_agentes' })
+    .sum<{ pm_viaturas: any }>({ pm_viaturas: 'pm_viaturas' })
+    .sum<{ outros_agentes: any }>({ outros_agentes: 'outros_agentes' })
+    .sum<{ outros_viaturas: any }>({ outros_viaturas: 'outros_viaturas' })
+    .first();
+
+  const efetivo = {
+    total_agentes: Number(ef?.agentes) || 0,
+    total_viaturas: Number(ef?.viaturas) || 0,
+    pc_agentes: Number(ef?.pc_agentes) || 0,
+    pc_viaturas: Number(ef?.pc_viaturas) || 0,
+    pm_agentes: Number(ef?.pm_agentes) || 0,
+    pm_viaturas: Number(ef?.pm_viaturas) || 0,
+    outros_agentes: Number(ef?.outros_agentes) || 0,
+    outros_viaturas: Number(ef?.outros_viaturas) || 0,
+  };
+
+  // ---- Séries por cidade (contagem e somas)
+  const subF = db('operacao_eventos as e')
+    .join('evento_fiscalizacao as f', 'f.evento_id', 'e.id')
+    .where('e.operacao_id', id)
+    .andWhere('e.tipo', 'fiscalizacao')
+    .select('e.cidade_id')
+    .count({ fisc_cnt: 'e.id' })
+    .sum({ pes_sum: db.raw('COALESCE(f.pessoas_abordadas,0)') })
+    .sum({ vei_sum: db.raw('COALESCE(f.veiculos_abordados,0)') })
+    .groupBy('e.cidade_id')
+    .as('sf');
+
+  const subA = db('operacao_eventos as e')
+    .where('e.operacao_id', id)
+    .andWhere('e.tipo', 'apreensao')
+    .select('e.cidade_id')
+    .count({ apr_cnt: 'e.id' })
+    .groupBy('e.cidade_id')
+    .as('sa');
+
+  const seriesPorCidade = await db('operacao_cidades as oc')
     .join('cidades as c', 'c.id', 'oc.cidade_id')
+    .leftJoin(subF, 'sf.cidade_id', 'oc.cidade_id')
+    .leftJoin(subA, 'sa.cidade_id', 'oc.cidade_id')
     .where('oc.operacao_id', id)
-    .select('c.id', 'c.nome');
-
-  const byCity: Record<number, any> = {};
-  for (const p of participantes) {
-    byCity[p.id] = { cidade_id: p.id, cidade: p.nome, fiscalizacao: 0, pessoa: 0, veiculo: 0, apreensao: 0 };
-  }
-  for (const r of grouped) {
-    const row = byCity[r.cidade_id] || (byCity[r.cidade_id] = {
-      cidade_id: r.cidade_id, cidade: r.cidade, fiscalizacao: 0, pessoa: 0, veiculo: 0, apreensao: 0
-    });
-    const n = Number(r.cnt) || 0;
-    if (r.tipo === 'fiscalizacao') row.fiscalizacao = n;
-    else if (r.tipo === 'pessoa') row.pessoa = n;
-    else if (r.tipo === 'veiculo') row.veiculo = n;
-    else if (r.tipo === 'apreensao') row.apreensao = n;
-  }
-  const seriesPorCidade = Object.values(byCity).sort((a: any, b: any) => a.cidade.localeCompare(b.cidade));
+    .select(
+      'c.id as cidade_id',
+      'c.nome as cidade',
+      db.raw('COALESCE(sf.fisc_cnt,0)  as fiscalizacao'),
+      db.raw('COALESCE(sf.pes_sum,0)   as pessoa'),
+      db.raw('COALESCE(sf.vei_sum,0)   as veiculo'),
+      db.raw('COALESCE(sa.apr_cnt,0)   as apreensao')
+    )
+    .orderBy('c.nome');
 
   // ---- Feed (últimos 20)
   const feed = await db('operacao_eventos as e')
@@ -1866,51 +1917,6 @@ app.get('/operacoes/:id/monitor', requireAdminOrGestor, async (req: Request, res
     .orderBy('e.ts', 'desc')
     .limit(20);
 
-  // ---- Efetivo total (linha "geral": cidade_id NULL)
-  const efTotRow = await db('operacao_efetivo')
-    .where({ operacao_id: id })
-    .whereNull('cidade_id')
-    .sum({ agentes: 'total_agentes' })
-    .sum({ viaturas: 'total_viaturas' })
-    .first<{ agentes: string | number | null; viaturas: string | number | null }>();
-
-  const efetivoTotal = {
-    total_agentes: Number(efTotRow?.agentes ?? 0),
-    total_viaturas: Number(efTotRow?.viaturas ?? 0),
-  };
-
-
-  // ---- Efetivo por cidade (sempre array!)
-  type EfRow = { cidade_id: number; cidade: string; total_agentes: any; total_viaturas: any };
-
-  const subEf = db('operacao_efetivo')
-    .where('operacao_id', id)
-    .whereNotNull('cidade_id')
-    .select('cidade_id')
-    .sum({ agentes: 'total_agentes' })
-    .sum({ viaturas: 'total_viaturas' })
-    .groupBy('cidade_id')
-    .as('ef');
-
-  const efetivoPorCidadeRows = await db('operacao_cidades as oc')
-    .join('cidades as c', 'c.id', 'oc.cidade_id')
-    .leftJoin(subEf, 'ef.cidade_id', 'oc.cidade_id')
-    .where('oc.operacao_id', id)
-    .select(
-      'c.id as cidade_id',
-      'c.nome as cidade',
-      db.raw('COALESCE(ef.agentes, 0) as total_agentes'),
-      db.raw('COALESCE(ef.viaturas, 0) as total_viaturas')
-    )
-    .orderBy('c.nome') as EfRow[];
-
-  const efetivoByCity = efetivoPorCidadeRows.map(r => ({
-    cidade_id: r.cidade_id,
-    cidade: r.cidade,
-    total_agentes: Number(r.total_agentes) || 0,
-    total_viaturas: Number(r.total_viaturas) || 0
-  }));
-
   const operacao = {
     id: op.id,
     nome: op.nome,
@@ -1919,13 +1925,13 @@ app.get('/operacoes/:id/monitor', requireAdminOrGestor, async (req: Request, res
 
   res.render('operacoes-monitor', {
     operacao,
-    cards,
+    cards,          // {locais,pessoas,veiculos,apreensoes}
+    efetivo,        // detalhado: total + PC/PM/Outros
     seriesPorCidade,
-    feed,
-    efetivoByCity,
-    efetivoTotal
+    feed
   });
 });
+
 
 
 
