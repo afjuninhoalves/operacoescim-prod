@@ -54,6 +54,7 @@
                 <%= c.corporacao ? c.corporacao + ' · ' : '' %>
                 <%= c.comandante ? 'Cmd: ' + c.comandante + ' · ' : '' %>
                 <%= c.contato ? c.contato : '' %>
+                <a class="btn" href="/cidades/<%= c.id %>/editar">Editar</a>
               </div>
             </div>
           </div>

@@ -1,85 +1,86 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-br">
 <head>
-  <meta charset="UTF-8" />
-  <title>Nova cidade — Operações CIM</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title><%= (typeof mode !== 'undefined' && mode === 'edit') ? 'Editar cidade' : 'Nova cidade' %></title>
   <style>
-    :root{--bg:#0b1220;--panel:#0f172a;--panel2:#111827;--border:#1f2937;--muted:#9ca3af;--text:#e5e7eb;--blue:#2563eb;--shadow:0 10px 30px rgba(0,0,0,.35);--r:14px}
-    *{box-sizing:border-box}
-    html,body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto}
-    a{color:inherit;text-decoration:none}
-    .top{position:sticky;top:0;z-index:10;background:linear-gradient(to bottom,rgba(17,24,39,.86),rgba(17,24,39,.70));border-bottom:1px solid var(--border);backdrop-filter:saturate(140%) blur(8px)}
-    .top-in{max-width:1160px;margin:0 auto;padding:14px 20px;display:flex;align-items:center;justify-content:space-between}
-    .brand{display:flex;gap:10px;align-items:center}
-    .badge{display:grid;place-items:center;width:30px;height:30px;border-radius:10px;background:linear-gradient(135deg,var(--blue),#0ea5e9);color:#fff;font-weight:900;box-shadow:0 6px 16px rgba(37,99,235,.35)}
-    .container{max-width:820px;margin:0 auto;padding:28px 20px 56px}
-    .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow);padding:20px}
-    .muted{color:var(--muted)}
-    .btn{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:#111826;color:var(--text)}
-    .btn:hover{filter:brightness(1.08)} .btn-blue{background:var(--blue);border-color:rgba(37,99,235,.6);color:#fff}
-    .form{display:grid;gap:14px}
-    label{font-size:13px;color:var(--muted)}
-    input[type="text"],input[type="tel"]{width:100%;padding:11px 12px;border-radius:10px;border:1px solid var(--border);background:#0b1325;color:var(--text);outline:none}
-    input[type="file"]{color:var(--muted)}
-    .row{display:flex;gap:10px;flex-wrap:wrap}
-    .err{background:#3b0d0d;border:1px solid #7f1d1d;color:#fecaca;border-radius:10px;padding:10px 12px}
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial;margin:0;background:#0b1220;color:#e5e7eb}
+    .wrap{max-width:900px;margin:30px auto;padding:0 16px}
+    .card{background:#0f172a;border:1px solid #1f2937;border-radius:12px;padding:18px}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .row-1{display:grid;grid-template-columns:1fr;gap:12px}
+    label{display:block;margin:10px 0 6px}
+    input[type=text],input[type=datetime-local],input[type=email],input[type=file]{
+      width:100%;padding:10px;border-radius:10px;border:1px solid #1f2937;background:#111827;color:#e5e7eb
+    }
+    .btns{display:flex;gap:10px;margin-top:14px}
+    .btn{padding:10px 14px;border-radius:10px;border:1px solid #374151;background:#111827;color:#e5e7eb;text-decoration:none}
+    .btn:hover{filter:brightness(1.08)}
+    .muted{color:#9ca3af}
+    .errors{background:#1f2937;border:1px solid #ef4444;color:#fff;padding:12px;border-radius:10px;margin-bottom:12px}
+    img.logo{max-height:80px;border:1px solid #374151;border-radius:8px;background:#111827;padding:6px}
   </style>
 </head>
 <body>
-  <div class="top"><div class="top-in">
-    <div class="brand"><span class="badge">C</span><div>Operações CIM <div class="muted">Nova cidade</div></div></div>
-    <div class="row">
-      <a class="btn" href="/cidades">Voltar</a>
-    </div>
-  </div></div>
+  <div class="wrap">
+    <h2><%= (typeof mode !== 'undefined' && mode === 'edit') ? 'Editar cidade' : 'Nova cidade' %></h2>
 
-  <div class="container">
-    <div class="card">
-      <h2 style="margin:0 0 12px">Cadastrar cidade</h2>
+    <% if (errors && errors.length) { %>
+      <div class="errors">
+        <ul style="margin:0;padding-left:18px">
+          <% errors.forEach(e => { %><li><%= e %></li><% }) %>
+        </ul>
+      </div>
+    <% } %>
 
-      <% if (errors && errors.length) { %>
-        <div class="err" style="margin-bottom:12px">
-          <ul style="margin:0 0 0 18px">
-            <% errors.forEach(function(e){ %><li><%= e %></li><% }) %>
-          </ul>
-        </div>
-      <% } %>
+    <form method="post" enctype="multipart/form-data"
+      action="<%= (typeof mode !== 'undefined' && mode === 'edit') ? ('/cidades/' + values.id + '/editar') : '/cidades/nova' %>">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>"/>
 
-      <form class="form" method="post" action="/cidades/nova" enctype="multipart/form-data">
-        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-
-        <div>
-          <label>Nome da cidade</label>
-          <input type="text" name="nome" value="<%= (values && values.nome) ? values.nome : '' %>" required>
-        </div>
-
-        <div>
-          <label>Corporação/Secretaria (opcional)</label>
-          <input type="text" name="corporacao" value="<%= (values && values.corporacao) ? values.corporacao : '' %>">
+      <div class="card">
+        <div class="row">
+          <div>
+            <label>Nome da cidade</label>
+            <input type="text" name="nome" value="<%= (values && values.nome) || '' %>" required />
+          </div>
+          <div>
+            <label>Corporação</label>
+            <input type="text" name="corporacao" value="<%= (values && values.corporacao) || '' %>" />
+          </div>
         </div>
 
-        <div>
-          <label>Comandante/Responsável (opcional)</label>
-          <input type="text" name="comandante" value="<%= (values && values.comandante) ? values.comandante : '' %>">
+        <div class="row">
+          <div>
+            <label>Comandante</label>
+            <input type="text" name="comandante" value="<%= (values && values.comandante) || '' %>" />
+          </div>
+          <div>
+            <label>Contato</label>
+            <input type="text" name="contato" value="<%= (values && values.contato) || '' %>" />
+          </div>
         </div>
 
-        <div>
-          <label>Contato (opcional)</label>
-          <input type="text" name="contato" value="<%= (values && values.contato) ? values.contato : '' %>">
+        <div class="row-1" style="margin-top:8px">
+          <div>
+            <label>Logo (imagem)</label>
+            <input type="file" name="logo" accept="image/*" />
+            <% if (values && values.logo_path) { %>
+              <div class="muted" style="margin-top:6px">Logo atual:</div>
+              <img class="logo" src="<%= values.logo_path %>" alt="logo atual"/>
+              <div style="margin-top:8px">
+                <label><input type="checkbox" name="remover_logo" value="1" /> Remover logo</label>
+              </div>
+            <% } %>
+          </div>
         </div>
 
-        <div>
-          <label>Logo (opcional, PNG/JPG/WebP, até 2MB)</label>
-          <input type="file" name="logo" accept="image/*">
-        </div>
-
-        <div class="row" style="justify-content:flex-end">
+        <div class="btns">
           <a class="btn" href="/cidades">Cancelar</a>
-          <button class="btn btn-blue" type="submit">Salvar</button>
+          <button class="btn" type="submit">Salvar</button>
         </div>
-      </form>
-    </div>
+      </div>
+    </form>
   </div>
 </body>
 </html>

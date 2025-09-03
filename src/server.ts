@@ -731,6 +731,95 @@ app.post('/cidades/nova', requireAdmin, uploadLogo.single('logo'), csrfProtectio
 });
 
 
+// GET editar cidade
+app.get('/cidades/:id/editar', requireAdmin, csrfProtection, async (req: Request, res: Response) => {
+  const id = Number(req.params.id);
+  const cidade = await db('cidades').where({ id }).first();
+  if (!cidade) return res.status(404).send('Cidade não encontrada.');
+
+  res.render('cidades-form', {
+    mode: 'edit',
+    csrfToken: (req as any).csrfToken(),
+    errors: [],
+    values: {
+      id: cidade.id,
+      nome: cidade.nome || '',
+      corporacao: cidade.corporacao || '',
+      comandante: cidade.comandante || '',
+      contato: cidade.contato || '',
+      logo_path: cidade.logo_path || '' // usado para pré-visualização
+    }
+  });
+});
+
+// POST editar cidade (multer ANTES do CSRF)
+app.post('/cidades/:id/editar', requireAdmin, uploadLogo.single('logo'), csrfProtection, async (req: Request, res: Response) => {
+  const id = Number(req.params.id);
+  const cidade = await db('cidades').where({ id }).first();
+  if (!cidade) return res.status(404).send('Cidade não encontrada.');
+
+  const nome = String(req.body.nome || '').trim();
+  const corporacao = String(req.body.corporacao || '').trim();
+  const comandante = String(req.body.comandante || '').trim();
+  const contato = String(req.body.contato || '').trim();
+  const remover_logo = String(req.body.remover_logo || '') === '1';
+
+  const errors: string[] = [];
+  if (!nome) errors.push('Informe o nome da cidade.');
+
+  const dup = await db('cidades').where({ nome }).andWhereNot({ id }).first();
+  if (dup) errors.push('Já existe outra cidade com esse nome.');
+
+  if (errors.length) {
+    return res.status(400).render('cidades-form', {
+      mode: 'edit',
+      csrfToken: (req as any).csrfToken(),
+      errors,
+      values: { id, nome, corporacao, comandante, contato, logo_path: cidade.logo_path || '' }
+    });
+  }
+
+  // Monta patch base (campos de texto)
+  const patch: any = {
+    nome,
+    corporacao: corporacao || null,
+    comandante: comandante || null,
+    contato: contato || null
+  };
+
+  // ------ LOGO ------
+  // Dois modos: db (logo_data/logo_mime) ou disk (logo_path em /uploads)
+  if (remover_logo) {
+    // remover logo
+    if (STORAGE_LOGOS === 'db') {
+      patch.logo_data = null;
+      patch.logo_mime = null;
+      patch.logo_path = null;
+    } else {
+      // disk: apaga arquivo antigo (se houver) e zera path
+      tryUnlinkUpload(cidade.logo_path);
+      patch.logo_path = null;
+    }
+  } else if (req.file) {
+    // substituir logo
+    if (STORAGE_LOGOS === 'db') {
+      patch.logo_data = (req.file as any).buffer;
+      patch.logo_mime = req.file.mimetype || 'image/png';
+      // definimos logo_path para a rota pública estável
+      patch.logo_path = `/logo/cidade/${id}`;
+    } else {
+      // disk: opcionalmente remover antigo e gravar o novo path
+      tryUnlinkUpload(cidade.logo_path);
+      patch.logo_path = `/uploads/logos/${req.file.filename}`;
+    }
+  }
+  // ------------------
+
+  await db('cidades').where({ id }).update(patch);
+  return res.redirect('/cidades');
+});
+
+
 // =============================================================================
 // USUÁRIOS (ADMIN)
 // =============================================================================
