@@ -72,6 +72,98 @@
       </div>
     </div>
 
+    <!-- Card do gráfico -->
+<div class="card" style="margin-top:16px">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+    <h3 style="margin:0">Distribuição por cidade</h3>
+    <div class="muted" style="font-size:13px">
+      <span style="display:inline-block;width:10px;height:10px;background:#60a5fa;border-radius:50%;margin-right:6px"></span>Fiscalizações
+      &nbsp;&nbsp;<span style="display:inline-block;width:10px;height:10px;background:#f87171;border-radius:50%;margin-right:6px"></span>Pessoas
+      &nbsp;&nbsp;<span style="display:inline-block;width:10px;height:10px;background:#34d399;border-radius:50%;margin-right:6px"></span>Veículos
+      &nbsp;&nbsp;<span style="display:inline-block;width:10px;height:10px;background:#fbbf24;border-radius:50%;margin-right:6px"></span>Apreensões
+    </div>
+  </div>
+
+  <div style="position:relative;height:340px">
+    <canvas id="byCityChart"></canvas>
+  </div>
+
+  <!-- fallback se não houver dados -->
+  <div id="noChartData" class="muted" style="display:none;margin-top:8px">
+    Sem dados suficientes para o gráfico.
+  </div>
+</div>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script>
+  // dados vindos do server
+  const series = <%- JSON.stringify(seriesPorCidade || []) %>;
+
+  if (!series.length) {
+    document.getElementById('noChartData').style.display = 'block';
+  } else {
+    const labels = series.map(r => r.cidade);
+
+    // helper p/ datasets com cores do app
+    const ds = (key, label, color) => ({
+      label,
+      data: series.map(r => Number(r[key] || 0)),
+      backgroundColor: color,
+      borderColor: color,
+      borderWidth: 1,
+      borderRadius: 6,
+      maxBarThickness: 36
+    });
+
+    const data = {
+      labels,
+      datasets: [
+        ds('fiscalizacao', 'Fiscalizações', '#60a5fa'),
+        ds('pessoa',       'Pessoas',       '#f87171'),
+        ds('veiculo',      'Veículos',      '#34d399'),
+        ds('apreensao',    'Apreensões',    '#fbbf24'),
+      ]
+    };
+
+    const ctx = document.getElementById('byCityChart').getContext('2d');
+    new Chart(ctx, {
+      type: 'bar',
+      data,
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: {
+            stacked: false,
+            ticks: { color: '#e5e7eb' },
+            grid: { display: false }
+          },
+          y: {
+            beginAtZero: true,
+            ticks: { precision: 0, color: '#e5e7eb' },
+            grid: { color: 'rgba(229,231,235,0.1)' }
+          }
+        },
+        plugins: {
+          legend: {
+            position: 'top',
+            labels: { color: '#e5e7eb' }
+          },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y}`
+            }
+          }
+        }
+      }
+    });
+  }
+
+  // Se preferir barras empilhadas, troque "stacked: false" por true em x e y.
+</script>
+
+
     <div class="grid">
       <!-- Tabela por cidade -->
       <div class="card">
