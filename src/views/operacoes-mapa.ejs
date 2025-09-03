@@ -60,30 +60,16 @@
     <div id="map" class="card"></div>
   </div>
 
-  
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-  // vindo do servidor
   const rawMarkers = <%- JSON.stringify(markers || []) %>;
   console.log('rawMarkers recebidos:', rawMarkers.length, rawMarkers.slice(0,3));
 
-  // helpers numéricos
-  const toNum = v => {
-    const n = Number(v);
-    return Number.isFinite(n) ? n : null;
-  };
-  const toMeters = v => {
-    const n = Number(v);
-    return Number.isFinite(n) && n > 0 ? n : 0;
-  };
+  const toNum = v => { const n = Number(v); return Number.isFinite(n) ? n : null; };
+  const toMeters = v => { const n = Number(v); return Number.isFinite(n) && n > 0 ? n : 0; };
 
-  // normaliza marcadores
   const markersData = rawMarkers.map(m => ({
-    ...m,
-    lat: toNum(m.lat),
-    lng: toNum(m.lng),
-    accuracy: toMeters(m.accuracy)
+    ...m, lat: toNum(m.lat), lng: toNum(m.lng), accuracy: toMeters(m.accuracy)
   }));
   console.log('markers normalizados:', markersData.length);
 
@@ -93,6 +79,9 @@
     attribution: '&copy; OpenStreetMap',
     maxZoom: 19
   }).addTo(map);
+
+  // 🔧 view inicial obrigatória (antes de adicionar qualquer layer vetorial)
+  map.setView([-14.2350, -51.9253], 4); // centro do Brasil
 
   // grupos por tipo
   const gFis = L.layerGroup().addTo(map);
@@ -113,10 +102,7 @@
     if (m.lat === null || m.lng === null) return;
 
     const circle = L.circleMarker([m.lat, m.lng], {
-      radius: 8,
-      weight: 2,
-      color: colorFor(m.tipo),
-      fillOpacity: .7
+      radius: 8, weight: 2, color: colorFor(m.tipo), fillOpacity: .7
     });
     if (m.popup) circle.bindPopup(m.popup);
 
@@ -130,27 +116,23 @@
 
     if (m.accuracy > 0) {
       L.circle([m.lat, m.lng], {
-        radius: m.accuracy,
-        color: colorFor(m.tipo),
-        weight: 1,
-        opacity: .3,
-        fillOpacity: .05
+        radius: m.accuracy, color: colorFor(m.tipo), weight: 1, opacity: .3, fillOpacity: .05
       }).addTo(map);
     }
   });
 
   if (allLatLng.length){
     map.fitBounds(L.latLngBounds(allLatLng).pad(0.2));
-  } else {
-    map.setView([-14.2350, -51.9253], 4); // fallback Brasil
   }
-
+  // (sem else, já temos setView inicial)
+  
   // toggles
   document.getElementById('chk-fis').addEventListener('change', e => e.target.checked ? gFis.addTo(map) : map.removeLayer(gFis));
   document.getElementById('chk-pes').addEventListener('change', e => e.target.checked ? gPes.addTo(map) : map.removeLayer(gPes));
   document.getElementById('chk-vei').addEventListener('change', e => e.target.checked ? gVei.addTo(map) : map.removeLayer(gVei));
   document.getElementById('chk-apr').addEventListener('change', e => e.target.checked ? gApr.addTo(map) : map.removeLayer(gApr));
 </script>
+
 
 </body>
 </html>
