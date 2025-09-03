@@ -10,7 +10,8 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "strict": false,
-    "types": ["node", "express"]
+    "lib": ["ES2020"],
+    "types": ["node", "express", "multer"]
   },
   "include": ["src/**/*"]
 }

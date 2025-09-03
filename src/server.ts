@@ -1,23 +1,25 @@
 // src/server.ts
 import express, { Request, Response, NextFunction } from 'express';
-import type { Express } from 'express'; // para poder usar Express.Multer.File
+import type * as ExpressNS from 'express'; // <- para usar ExpressNS.Multer.File nos tipos
+
 import session from 'express-session';
 import compression from 'compression';
 import morgan from 'morgan';
-import path from 'path';
+import * as path from 'path';
+import * as fs from 'fs';
+import * as crypto from 'crypto';
 import dotenv from 'dotenv';
 import helmet from 'helmet';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
-import fs from 'fs';
 import knex, { Knex } from 'knex';
 import bcrypt from 'bcryptjs';
 import csurf from 'csurf';
 import cookieParser from 'cookie-parser';
 import multer from 'multer';
-import crypto from 'crypto';
-import { query } from './db';  // ajuste o caminho se seu db.ts estiver em outra pasta
 
+
+const app = express();
 
 
 // rota de teste para confirmar conexão com Neon
@@ -39,7 +41,7 @@ app.get('/debug/db-version', async (_req: Request, res: Response) => {
 });
 dotenv.config();
 
-const app = express();
+
 const PORT = Number(process.env.PORT || 3000);
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const IN_PROD = NODE_ENV === 'production';
