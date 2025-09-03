@@ -2184,10 +2184,9 @@ app.get('/operacoes/:id/acoes/nova', requireAuth, csrfProtection, async (req, re
 // MAPA DA OPERAÇÃO (usa geolocalização das fotos dos eventos)
 // -----------------------------------------------------------------------------
 // /operacoes/:id/mapa  (substitua a rota atual por esta)
-app.get('/operacoes/:id/mapa', requireAuth, async (req: Request, res: Response) => {
+app.get('/operacoes/:id/mapa', requireAuth, async (req, res) => {
   const user = (req.session as any).user;
   const id = Number(req.params.id);
-  if (!Number.isFinite(id)) return res.status(400).send('ID inválido');
 
   const op = await db('operacoes').where({ id }).first();
   if (!op) return res.status(404).send('Operação não encontrada.');
@@ -2201,47 +2200,109 @@ app.get('/operacoes/:id/mapa', requireAuth, async (req: Request, res: Response) 
   }
 
   // subquery: última foto COM geo por evento (pode não existir)
-  const gsub = db('evento_fotos')
+  const gEvt = db('evento_fotos')
     .whereNotNull('lat').whereNotNull('lng')
     .select('evento_id')
-    .max<{ evento_id: number; max_id: number }>('id as max_id')
+    .max('id as max_id')
     .groupBy('evento_id')
-    .as('g');
+    .as('g_evt');
 
-  // COALESCE(evento.geo, foto.geo) para não perder eventos sem foto
-  const colLat = (DB_CLIENT === 'pg')
-    ? db.raw('COALESCE(e.lat, ef.lat)::float as lat')
-    : db.raw('COALESCE(e.lat, ef.lat) as lat');
-  const colLng = (DB_CLIENT === 'pg')
-    ? db.raw('COALESCE(e.lng, ef.lng)::float as lng')
-    : db.raw('COALESCE(e.lng, ef.lng) as lng');
-  const colAcc = (DB_CLIENT === 'pg')
-    ? db.raw('COALESCE(e.accuracy, ef.accuracy)::float as accuracy')
-    : db.raw('COALESCE(e.accuracy, ef.accuracy) as accuracy');
+  // subquery: última foto COM geo da fiscalização referenciada
+  const gFis = db('evento_fotos')
+    .whereNotNull('lat').whereNotNull('lng')
+    .select('evento_id')
+    .max('id as max_id')
+    .groupBy('evento_id')
+    .as('g_fis');
 
-  const rows = await db('operacao_eventos as e')
+  const q = db('operacao_eventos as e')
     .where('e.operacao_id', id)
-    .leftJoin(gsub, 'g.evento_id', 'e.id')
-    .leftJoin('evento_fotos as ef', 'ef.id', 'g.max_id')
-    .select('e.id', 'e.tipo', 'e.ts', colLat, colLng, colAcc)
-    .orderBy('e.ts','desc')
-    .limit(300);
 
-  const markers = rows
-    .map((r: any) => {
-      const lat = Number(r.lat), lng = Number(r.lng);
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-      if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
-      return { id: r.id, tipo: r.tipo, lat, lng, accuracy: r.accuracy == null ? null : Number(r.accuracy) };
+    // próprio evento: foto mais recente com geo
+    .leftJoin(gEvt, 'g_evt.evento_id', 'e.id')
+    .leftJoin('evento_fotos as ef', 'ef.id', 'g_evt.max_id')
+
+    // payload por tipo
+    .leftJoin('evento_fiscalizacao as f', 'f.evento_id', 'e.id')
+    .leftJoin('evento_pessoa as p', 'p.evento_id', 'e.id')
+    .leftJoin('evento_veiculo as v', 'v.evento_id', 'e.id')
+    .leftJoin('evento_apreensao as a', 'a.evento_id', 'e.id')
+
+    // fiscalização referenciada por pessoa/veículo/apreensão
+    .leftJoin('operacao_eventos as e_fis', function () {
+      this.on('e_fis.id', '=', 'p.fiscalizacao_evento_id')
+        .orOn('e_fis.id', '=', 'v.fiscalizacao_evento_id')
+        .orOn('e_fis.id', '=', 'a.fiscalizacao_evento_id');
     })
-    .filter(Boolean) as Array<{id:number; tipo:string; lat:number; lng:number; accuracy:number|null}>;
+    .leftJoin(gFis, 'g_fis.evento_id', 'e_fis.id')
+    .leftJoin('evento_fotos as ef_fis', 'ef_fis.id', 'g_fis.max_id')
+    .leftJoin('evento_fiscalizacao as ff', 'ff.evento_id', 'e_fis.id');
+
+  const colLat = (DB_CLIENT === 'pg')
+    ? db.raw('COALESCE(e.lat, ef.lat, e_fis.lat, ef_fis.lat)::float as lat')
+    : db.raw('COALESCE(e.lat, ef.lat, e_fis.lat, ef_fis.lat) as lat');
+
+  const colLng = (DB_CLIENT === 'pg')
+    ? db.raw('COALESCE(e.lng, ef.lng, e_fis.lng, ef_fis.lng)::float as lng')
+    : db.raw('COALESCE(e.lng, ef.lng, e_fis.lng, ef_fis.lng) as lng');
+
+  const colAcc = (DB_CLIENT === 'pg')
+    ? db.raw('COALESCE(e.accuracy, ef.accuracy, e_fis.accuracy, ef_fis.accuracy)::float as accuracy')
+    : db.raw('COALESCE(e.accuracy, ef.accuracy, e_fis.accuracy, ef_fis.accuracy) as accuracy');
+
+  const rows = await q
+    .select(
+      'e.id', 'e.tipo', 'e.ts', 'e.obs',
+      colLat, colLng, colAcc,
+      'f.tipo_local as fis_local',           // se o próprio evento for uma fiscalização
+      'ff.tipo_local as ref_local',          // local da fiscalização referenciada (p/v/a)
+      'v.placa',
+      'a.tipo as apr_tipo', 'a.quantidade', 'a.unidade'
+    )
+    .orderBy('e.ts', 'desc');
+
+  // opcional: “janela Brasil” para filtrar outliers
+  const inBrazil = (lat: number, lng: number) =>
+    lat >= -35 && lat <= 7 && lng >= -75 && lng <= -30;
+
+  const markers = rows.map((r: any) => {
+    const lat = Number(r.lat), lng = Number(r.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    if (!inBrazil(lat, lng)) return null; // evita “pin no Atlântico”
+
+    const local = r.ref_local || r.fis_local || null;
+
+    let title = '';
+    if (r.tipo === 'fiscalizacao') {
+      title = `<strong>Fiscalização</strong><br>Local: ${local ?? '—'}`;
+    } else if (r.tipo === 'pessoa') {
+      title = `<strong>Pessoa</strong><br>Local: ${local ?? '—'}`;
+    } else if (r.tipo === 'veiculo') {
+      title = `<strong>Veículo</strong><br>Placa: ${r.placa || '—'}<br>Local: ${local ?? '—'}`;
+    } else if (r.tipo === 'apreensao') {
+      title = `<strong>Apreensão</strong><br>Tipo: ${r.apr_tipo || '—'}<br>Qtd: ${r.quantidade ?? '—'} ${r.unidade || ''}<br>Local: ${local ?? '—'}`;
+    }
+
+    const when = new Date(r.ts).toLocaleString('pt-BR');
+    const rodape = `<div class="muted">${when}</div>`;
+    const obs = r.obs ? `<div class="muted">${r.obs}</div>` : '';
+
+    return {
+      id: r.id,
+      tipo: r.tipo,
+      lat, lng,
+      accuracy: (r.accuracy == null ? null : Number(r.accuracy)),
+      popup: `${title}${obs ? '<br>' + obs : ''}<br>${rodape}`
+    };
+  }).filter(Boolean);
 
   return res.render('operacoes-mapa', {
-    user,
+    user: (req.session as any).user,
     operacao: { id: op.id, nome: op.nome, inicio_agendado: op.inicio_agendado, status: op.status },
     markers
   });
 });
+
 
 
 
