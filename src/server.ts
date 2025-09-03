@@ -1993,9 +1993,11 @@ app.get('/operacoes/:opId/apreensoes/:eventoId/editar',
   }
 );
 
-app.post('/operacoes/:opId/apreensoes/:eventoId/editar',
-  requireAuth, csrfProtection,
-  async (req, res) => {
+app.post(
+  '/operacoes/:opId/apreensoes/:eventoId/editar',
+  requireAuth,
+  csrfProtection,
+  async (req: Request, res: Response) => {
     const user = (req.session as any).user;
     const opId = Number(req.params.opId);
     const eventoId = Number(req.params.eventoId);
@@ -2005,21 +2007,29 @@ app.post('/operacoes/:opId/apreensoes/:eventoId/editar',
 
     const tipo = String(req.body.tipo || '').trim();
     const quantidade = Number(req.body.quantidade);
-    if (!Number.isFinite(quantidade)) return res.status(400).send('Informe a quantidade.');
+    const unidade = String(req.body.unidade || '').trim() || null; // <<< declare aqui
     const fiscalizacao_id = req.body.fiscalizacao_id ? Number(req.body.fiscalizacao_id) : null;
     const obs = String(req.body.obs || '').trim() || null;
 
-    await db('evento_apreensao').where({ evento_id: eventoId }).update({
-      tipo: tipo || null,
-      quantidade,
-      unidade,
-      fiscalizacao_evento_id: fiscalizacao_id
-    });
+    if (!Number.isFinite(quantidade)) {
+      return res.status(400).send('Informe a quantidade.');
+    }
+
+    await db('evento_apreensao')
+      .where({ evento_id: eventoId })
+      .update({
+        tipo: tipo || null,
+        quantidade,
+        unidade, // <<< agora existe
+        fiscalizacao_evento_id: fiscalizacao_id
+      });
+
     await db('operacao_eventos').where({ id: eventoId }).update({ obs });
 
     return res.redirect(`/operacoes/${opId}/apreensoes/${eventoId}/editar`);
   }
 );
+
 
 app.post('/operacoes/:opId/apreensoes/:eventoId/fotos',
   requireAuth,
