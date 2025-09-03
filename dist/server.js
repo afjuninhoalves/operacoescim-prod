@@ -1663,7 +1663,7 @@ app.get('/operacoes/:id/monitor', requireAdminOrGestor, async (req, res) => {
         outros_agentes: Number(ef?.outros_agentes) || 0,
         outros_viaturas: Number(ef?.outros_viaturas) || 0,
     };
-    // ---- Séries por cidade (contagem e somas)
+    // ---- Séries por cidade (contagem, somas e flags)
     const subF = db('operacao_eventos as e')
         .join('evento_fiscalizacao as f', 'f.evento_id', 'e.id')
         .where('e.operacao_id', id)
@@ -1672,6 +1672,9 @@ app.get('/operacoes/:id/monitor', requireAdminOrGestor, async (req, res) => {
         .count({ fisc_cnt: 'e.id' })
         .sum({ pes_sum: db.raw('COALESCE(f.pessoas_abordadas,0)') })
         .sum({ vei_sum: db.raw('COALESCE(f.veiculos_abordados,0)') })
+        .sum({ lac_sum: db.raw('CASE WHEN f.lacrado THEN 1 ELSE 0 END') })
+        .sum({ fec_sum: db.raw('CASE WHEN f.fechado THEN 1 ELSE 0 END') })
+        .sum({ mult_sum: db.raw('CASE WHEN f.multado THEN 1 ELSE 0 END') })
         .groupBy('e.cidade_id')
         .as('sf');
     const subA = db('operacao_eventos as e')
@@ -1686,7 +1689,7 @@ app.get('/operacoes/:id/monitor', requireAdminOrGestor, async (req, res) => {
         .leftJoin(subF, 'sf.cidade_id', 'oc.cidade_id')
         .leftJoin(subA, 'sa.cidade_id', 'oc.cidade_id')
         .where('oc.operacao_id', id)
-        .select('c.id as cidade_id', 'c.nome as cidade', db.raw('COALESCE(sf.fisc_cnt,0)  as fiscalizacao'), db.raw('COALESCE(sf.pes_sum,0)   as pessoa'), db.raw('COALESCE(sf.vei_sum,0)   as veiculo'), db.raw('COALESCE(sa.apr_cnt,0)   as apreensao'))
+        .select('c.id as cidade_id', 'c.nome as cidade', db.raw('COALESCE(sf.fisc_cnt,0)  as fiscalizacao'), db.raw('COALESCE(sf.pes_sum,0)   as pessoa'), db.raw('COALESCE(sf.vei_sum,0)   as veiculo'), db.raw('COALESCE(sa.apr_cnt,0)   as apreensao'), db.raw('COALESCE(sf.lac_sum,0)   as lacrado'), db.raw('COALESCE(sf.fec_sum,0)   as fechado'), db.raw('COALESCE(sf.mult_sum,0)  as multado'))
         .orderBy('c.nome');
     // ---- Feed (últimos 20)
     const feed = await db('operacao_eventos as e')

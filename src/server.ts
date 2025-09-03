@@ -835,24 +835,24 @@ app.post(
     const operacao_id = Number(req.params.id);
     if (!Number.isFinite(operacao_id)) return res.status(400).send('ID inválido');
 
-    const num  = (v:any) => { const n = Number(v); return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0; };
-    const bool = (v:any) => v === 'on' || v === 'true' || v === '1';
+    const num = (v: any) => { const n = Number(v); return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0; };
+    const bool = (v: any) => v === 'on' || v === 'true' || v === '1';
 
-    const cidade_id       = req.body.cidade_id ? Number(req.body.cidade_id) : null;
+    const cidade_id = req.body.cidade_id ? Number(req.body.cidade_id) : null;
 
-    const total_agentes   = num(req.body.total_agentes);
-    const total_viaturas  = num(req.body.total_viaturas);
+    const total_agentes = num(req.body.total_agentes);
+    const total_viaturas = num(req.body.total_viaturas);
 
-    const pc              = bool(req.body.pc);
-    const pc_agentes      = pc ? num(req.body.pc_agentes)  : 0;
-    const pc_viaturas     = pc ? num(req.body.pc_viaturas) : 0;
+    const pc = bool(req.body.pc);
+    const pc_agentes = pc ? num(req.body.pc_agentes) : 0;
+    const pc_viaturas = pc ? num(req.body.pc_viaturas) : 0;
 
-    const pm              = bool(req.body.pm);
-    const pm_agentes      = pm ? num(req.body.pm_agentes)  : 0;
-    const pm_viaturas     = pm ? num(req.body.pm_viaturas) : 0;
+    const pm = bool(req.body.pm);
+    const pm_agentes = pm ? num(req.body.pm_agentes) : 0;
+    const pm_viaturas = pm ? num(req.body.pm_viaturas) : 0;
 
-    const outros          = bool(req.body.outros);
-    const outros_agentes  = outros ? num(req.body.outros_agentes)  : 0;
+    const outros = bool(req.body.outros);
+    const outros_agentes = outros ? num(req.body.outros_agentes) : 0;
     const outros_viaturas = outros ? num(req.body.outros_viaturas) : 0;
 
     const payload = {
@@ -1896,7 +1896,7 @@ app.get('/operacoes/:id/monitor', requireAdminOrGestor, async (req, res) => {
     outros_viaturas: Number(ef?.outros_viaturas) || 0,
   };
 
-  // ---- Séries por cidade (contagem e somas)
+  // ---- Séries por cidade (contagem, somas e flags)
   const subF = db('operacao_eventos as e')
     .join('evento_fiscalizacao as f', 'f.evento_id', 'e.id')
     .where('e.operacao_id', id)
@@ -1905,6 +1905,9 @@ app.get('/operacoes/:id/monitor', requireAdminOrGestor, async (req, res) => {
     .count({ fisc_cnt: 'e.id' })
     .sum({ pes_sum: db.raw('COALESCE(f.pessoas_abordadas,0)') })
     .sum({ vei_sum: db.raw('COALESCE(f.veiculos_abordados,0)') })
+    .sum({ lac_sum: db.raw('CASE WHEN f.lacrado THEN 1 ELSE 0 END') })
+    .sum({ fec_sum: db.raw('CASE WHEN f.fechado THEN 1 ELSE 0 END') })
+    .sum({ mult_sum: db.raw('CASE WHEN f.multado THEN 1 ELSE 0 END') })
     .groupBy('e.cidade_id')
     .as('sf');
 
@@ -1927,9 +1930,13 @@ app.get('/operacoes/:id/monitor', requireAdminOrGestor, async (req, res) => {
       db.raw('COALESCE(sf.fisc_cnt,0)  as fiscalizacao'),
       db.raw('COALESCE(sf.pes_sum,0)   as pessoa'),
       db.raw('COALESCE(sf.vei_sum,0)   as veiculo'),
-      db.raw('COALESCE(sa.apr_cnt,0)   as apreensao')
+      db.raw('COALESCE(sa.apr_cnt,0)   as apreensao'),
+      db.raw('COALESCE(sf.lac_sum,0)   as lacrado'),
+      db.raw('COALESCE(sf.fec_sum,0)   as fechado'),
+      db.raw('COALESCE(sf.mult_sum,0)  as multado')
     )
     .orderBy('c.nome');
+
 
   // ---- Feed (últimos 20)
   const feed = await db('operacao_eventos as e')
