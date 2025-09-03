@@ -291,7 +291,7 @@
     <!-- Chart.js (apenas UMA vez) -->
    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <script>
-  // dados vindos do servidor (sem espaço entre <% e -)
+  // dados vindos do servidor
   const series = <%- JSON.stringify(seriesPorCidade || []) %>;
 
   function hasAnyValue(rows){
@@ -305,15 +305,12 @@
 
   window.addEventListener('load', () => {
     const canvas = document.getElementById('byCityChart');
-    const noData = document.getElementById('noChartData');
+    const noData  = document.getElementById('noChartData');
 
     if (!hasAnyValue(series)) {
       noData.style.display = 'block';
       return;
     }
-
-    canvas.style.width = '100%';
-    canvas.style.height = '100%';
 
     const labels = series.map(r => r.cidade);
     const mk = (k, label, color) => ({
@@ -332,9 +329,9 @@
         labels,
         datasets: [
           mk('fiscalizacao', 'Fiscalizações', '#60a5fa'),
-          mk('pessoa',       'Pessoas',        '#f87171'),
-          mk('veiculo',      'Veículos',       '#34d399'),
-          mk('apreensao',    'Apreensões',     '#fbbf24'),
+          mk('pessoa',       'Pessoas',       '#f87171'),
+          mk('veiculo',      'Veículos',      '#34d399'),
+          mk('apreensao',    'Apreensões',    '#fbbf24'),
         ]
       },
       options: {
@@ -350,6 +347,7 @@
     });
   });
 </script>
+
 
 
 
