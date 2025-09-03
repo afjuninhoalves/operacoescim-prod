@@ -2191,7 +2191,6 @@ app.get('/operacoes/:id/mapa', requireAuth, async (req, res) => {
   const op = await db('operacoes').where({ id }).first();
   if (!op) return res.status(404).send('Operação não encontrada.');
 
-  // permissão: admin/gestor vê tudo; demais, somente se sua cidade participa
   if (!['admin', 'gestor'].includes(user.role)) {
     const participa = await db('operacao_cidades')
       .where({ operacao_id: id, cidade_id: user.cidade_id })
@@ -2199,7 +2198,13 @@ app.get('/operacoes/:id/mapa', requireAuth, async (req, res) => {
     if (!participa) return res.status(403).send('Sem permissão.');
   }
 
-  // subquery: última foto COM geo por evento (pode não existir)
+  // cidades participantes (para o <select>)
+  const cidades = await db('operacao_cidades as oc')
+    .join('cidades as c', 'c.id', 'oc.cidade_id')
+    .where('oc.operacao_id', id)
+    .select('c.id', 'c.nome')
+    .orderBy('c.nome', 'asc');
+
   const gEvt = db('evento_fotos')
     .whereNotNull('lat').whereNotNull('lng')
     .select('evento_id')
@@ -2207,7 +2212,6 @@ app.get('/operacoes/:id/mapa', requireAuth, async (req, res) => {
     .groupBy('evento_id')
     .as('g_evt');
 
-  // subquery: última foto COM geo da fiscalização referenciada
   const gFis = db('evento_fotos')
     .whereNotNull('lat').whereNotNull('lng')
     .select('evento_id')
@@ -2218,17 +2222,14 @@ app.get('/operacoes/:id/mapa', requireAuth, async (req, res) => {
   const q = db('operacao_eventos as e')
     .where('e.operacao_id', id)
 
-    // próprio evento: foto mais recente com geo
     .leftJoin(gEvt, 'g_evt.evento_id', 'e.id')
     .leftJoin('evento_fotos as ef', 'ef.id', 'g_evt.max_id')
 
-    // payload por tipo
     .leftJoin('evento_fiscalizacao as f', 'f.evento_id', 'e.id')
     .leftJoin('evento_pessoa as p', 'p.evento_id', 'e.id')
     .leftJoin('evento_veiculo as v', 'v.evento_id', 'e.id')
     .leftJoin('evento_apreensao as a', 'a.evento_id', 'e.id')
 
-    // fiscalização referenciada por pessoa/veículo/apreensão
     .leftJoin('operacao_eventos as e_fis', function () {
       this.on('e_fis.id', '=', 'p.fiscalizacao_evento_id')
         .orOn('e_fis.id', '=', 'v.fiscalizacao_evento_id')
@@ -2236,7 +2237,11 @@ app.get('/operacoes/:id/mapa', requireAuth, async (req, res) => {
     })
     .leftJoin(gFis, 'g_fis.evento_id', 'e_fis.id')
     .leftJoin('evento_fotos as ef_fis', 'ef_fis.id', 'g_fis.max_id')
-    .leftJoin('evento_fiscalizacao as ff', 'ff.evento_id', 'e_fis.id');
+    .leftJoin('evento_fiscalizacao as ff', 'ff.evento_id', 'e_fis.id')
+
+    // cidades do próprio evento e da fiscalização referenciada
+    .leftJoin('cidades as c_evt', 'c_evt.id', 'e.cidade_id')
+    .leftJoin('cidades as c_ref', 'c_ref.id', 'e_fis.cidade_id');
 
   const colLat = (DB_CLIENT === 'pg')
     ? db.raw('COALESCE(e.lat, ef.lat, e_fis.lat, ef_fis.lat)::float as lat')
@@ -2252,25 +2257,28 @@ app.get('/operacoes/:id/mapa', requireAuth, async (req, res) => {
 
   const rows = await q
     .select(
-      'e.id', 'e.tipo', 'e.ts', 'e.obs',
+      'e.id','e.tipo','e.ts','e.obs',
       colLat, colLng, colAcc,
-      'f.tipo_local as fis_local',           // se o próprio evento for uma fiscalização
-      'ff.tipo_local as ref_local',          // local da fiscalização referenciada (p/v/a)
+      'f.tipo_local as fis_local',
+      'ff.tipo_local as ref_local',
       'v.placa',
-      'a.tipo as apr_tipo', 'a.quantidade', 'a.unidade'
+      'a.tipo as apr_tipo','a.quantidade','a.unidade',
+      'e.cidade_id as e_cid','c_evt.nome as e_cidade',
+      'e_fis.cidade_id as ref_cid','c_ref.nome as ref_cidade'
     )
-    .orderBy('e.ts', 'desc');
+    .orderBy('e.ts','desc');
 
-  // opcional: “janela Brasil” para filtrar outliers
-  const inBrazil = (lat: number, lng: number) =>
+  const inBrazil = (lat:number, lng:number) =>
     lat >= -35 && lat <= 7 && lng >= -75 && lng <= -30;
 
   const markers = rows.map((r: any) => {
     const lat = Number(r.lat), lng = Number(r.lng);
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-    if (!inBrazil(lat, lng)) return null; // evita “pin no Atlântico”
+    if (!inBrazil(lat, lng)) return null;
 
     const local = r.ref_local || r.fis_local || null;
+    const cidade_id   = r.e_cid ?? r.ref_cid ?? null;
+    const cidade_nome = r.e_cidade ?? r.ref_cidade ?? null;
 
     let title = '';
     if (r.tipo === 'fiscalizacao') {
@@ -2284,14 +2292,13 @@ app.get('/operacoes/:id/mapa', requireAuth, async (req, res) => {
     }
 
     const when = new Date(r.ts).toLocaleString('pt-BR');
-    const rodape = `<div class="muted">${when}</div>`;
+    const rodape = `<div class="muted">${when}${cidade_nome ? ` · ${cidade_nome}` : ''}</div>`;
     const obs = r.obs ? `<div class="muted">${r.obs}</div>` : '';
 
     return {
-      id: r.id,
-      tipo: r.tipo,
-      lat, lng,
-      accuracy: (r.accuracy == null ? null : Number(r.accuracy)),
+      id: r.id, tipo: r.tipo,
+      lat, lng, accuracy: (r.accuracy == null ? null : Number(r.accuracy)),
+      cidade_id, cidade: cidade_nome,
       popup: `${title}${obs ? '<br>' + obs : ''}<br>${rodape}`
     };
   }).filter(Boolean);
@@ -2299,9 +2306,11 @@ app.get('/operacoes/:id/mapa', requireAuth, async (req, res) => {
   return res.render('operacoes-mapa', {
     user: (req.session as any).user,
     operacao: { id: op.id, nome: op.nome, inicio_agendado: op.inicio_agendado, status: op.status },
-    markers
+    markers,
+    cidades // <<<<<< envia pro EJS
   });
 });
+
 
 
 
