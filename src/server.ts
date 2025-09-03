@@ -2345,6 +2345,110 @@ app.post('/operacoes/:id/editar', requireAdminOrGestor, csrfProtection, async (r
   return res.redirect(`/operacoes/${id}`);
 });
 
+// == DEBUG GEO ================================================================
+// 1) Checar se colunas existem e tipos
+app.get('/debug/geo/schema', requireAdminOrGestor, async (_req: Request, res: Response) => {
+  try {
+    if (DB_CLIENT === 'pg') {
+      const cols = await db
+        .select('column_name as col', 'data_type as type')
+        .from('information_schema.columns')
+        .whereIn('column_name', ['lat','lng','accuracy'])
+        .andWhere({ table_name: 'operacao_eventos' })
+        .orderBy('column_name');
+      return res.json({ db: 'pg', table: 'operacao_eventos', cols });
+    } else {
+      const pragma = await db.raw("PRAGMA table_info('operacao_eventos')");
+      const cols = (pragma as any)?.[0]
+        ?.filter((r: any) => ['lat','lng','accuracy'].includes(r.name))
+        ?.map((r: any) => ({ col: r.name, type: r.type }));
+      return res.json({ db: 'sqlite', table: 'operacao_eventos', cols });
+    }
+  } catch (e:any) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+// 2) Listar geo por operação (evento e foto) para inspecionar
+app.get('/debug/geo/op/:id', requireAdminOrGestor, async (req: Request, res: Response) => {
+  try {
+    const opId = Number(req.params.id);
+    if (!Number.isFinite(opId)) return res.status(400).json({ error: 'opId inválido' });
+
+    // subquery: última foto com geo por evento (pode não existir)
+    const gsub = db('evento_fotos')
+      .whereNotNull('lat').whereNotNull('lng')
+      .select('evento_id')
+      .max<{ evento_id:number; max_id:number }>('id as max_id')
+      .groupBy('evento_id')
+      .as('g');
+
+    const rows = await db('operacao_eventos as e')
+      .where('e.operacao_id', opId)
+      .leftJoin(gsub, 'g.evento_id', 'e.id')
+      .leftJoin('evento_fotos as ef', 'ef.id', 'g.max_id')
+      .select(
+        'e.id',
+        'e.tipo',
+        'e.ts',
+        'e.obs',
+        'e.lat as e_lat',
+        'e.lng as e_lng',
+        'e.accuracy as e_acc',
+        'ef.lat as ef_lat',
+        'ef.lng as ef_lng',
+        'ef.accuracy as ef_acc'
+      )
+      .orderBy('e.ts','desc')
+      .limit(200);
+
+    const stats = {
+      total: rows.length,
+      withEventGeo: rows.filter(r => r.e_lat != null && r.e_lng != null).length,
+      withPhotoGeoOnly: rows.filter(r => (r.e_lat == null || r.e_lng == null) && r.ef_lat != null && r.ef_lng != null).length,
+      withoutAnyGeo: rows.filter(r => (r.e_lat == null || r.e_lng == null) && (r.ef_lat == null || r.ef_lng == null)).length
+    };
+
+    return res.json({ opId, stats, sample: rows.slice(0, 30) });
+  } catch (e:any) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+// 3) (Opcional) Executar backfill agora e mostrar quantos eventos ganharam geo
+app.post('/debug/geo/backfill/:id?', requireAdminOrGestor, async (req: Request, res: Response) => {
+  try {
+    const opId = req.params.id ? Number(req.params.id) : null;
+
+    const sub = db('evento_fotos')
+      .whereNotNull('lat').whereNotNull('lng')
+      .select('evento_id')
+      .max('id as max_id')
+      .groupBy('evento_id')
+      .as('g');
+
+    let base = db('operacao_eventos as e')
+      .leftJoin(sub, 'g.evento_id', 'e.id')
+      .leftJoin('evento_fotos as ef', 'ef.id', 'g.max_id')
+      .whereNull('e.lat').whereNull('e.lng')
+      .whereNotNull('ef.lat').whereNotNull('ef.lng')
+      .select('e.id as evento_id', 'ef.lat', 'ef.lng', 'ef.accuracy');
+
+    if (opId && Number.isFinite(opId)) base = base.andWhere('e.operacao_id', opId);
+
+    const rows = await base;
+    let updated = 0;
+    for (const r of rows) {
+      await db('operacao_eventos').where({ id: r.evento_id }).update({
+        lat: r.lat, lng: r.lng, accuracy: r.accuracy ?? null
+      });
+      updated++;
+    }
+    return res.json({ opId: opId ?? 'ALL', candidates: rows.length, updated });
+  } catch (e:any) {
+    return res.status(500).json({ error: e.message });
+  }
+});
 
 
 // =============================================================================
