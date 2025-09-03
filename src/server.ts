@@ -470,6 +470,17 @@ function tryUnlinkUpload(p?: string | null) {
   }
 }
 
+
+// editar operações 
+function toInputDateTime(v: any): string {
+  const d = new Date(v);
+  if (isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+
+
 // Aceita imagens comuns (inclui HEIC)
 function imageFilter(_req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback): void {
   if (/^image\/(jpe?g|png|webp|gif|bmp|heic)$/i.test(file.mimetype)) return cb(null, true);
@@ -1018,8 +1029,15 @@ app.get('/operacoes', requireAuth, async (req, res) => {
 // NOVA (ADMIN ou GESTOR)
 app.get('/operacoes/nova', requireAdminOrGestor, csrfProtection, async (_req, res) => {
   const cidades = await db('cidades').select('*').orderBy('nome');
-  res.render('operacoes-form', { csrfToken: (_req as any).csrfToken(), cidades, values: {}, errors: [] });
+  res.render('operacoes-form', { 
+    mode: 'create',                    // << adicionado
+    csrfToken: (_req as any).csrfToken(), 
+    cidades, 
+    values: {}, 
+    errors: [] 
+  });
 });
+
 
 app.post('/operacoes/nova', requireAdminOrGestor, csrfProtection, async (req, res) => {
   try {
@@ -2337,8 +2355,86 @@ app.get('/operacoes/:id/mapa', requireAuth, async (req, res) => {
   });
 });
 
+// edicçao de operação
+
+app.get('/operacoes/:id/editar', requireAdminOrGestor, csrfProtection, async (req: Request, res: Response) => {
+  const id = Number(req.params.id);
+  const op = await db('operacoes').where({ id }).first();
+  if (!op) return res.status(404).send('Operação não encontrada.');
+
+  const cidades = await db('cidades').select('*').orderBy('nome');
+  const participantes: number[] = await db('operacao_cidades').where({ operacao_id: id }).pluck('cidade_id');
+
+  res.render('operacoes-form', {
+    mode: 'edit',
+    csrfToken: (req as any).csrfToken(),
+    cidades,
+    errors: [],
+    values: {
+      id: op.id,
+      nome: op.nome || '',
+      descricao: op.descricao || '',
+      inicio_agendado: toInputDateTime(op.inicio_agendado),
+      cidades: participantes
+    }
+  });
+});
 
 
+app.post('/operacoes/:id/editar', requireAdminOrGestor, csrfProtection, async (req: Request, res: Response) => {
+  const id = Number(req.params.id);
+  const op = await db('operacoes').where({ id }).first();
+  if (!op) return res.status(404).send('Operação não encontrada.');
+
+  const nome = String(req.body.nome || '').trim();
+  const descricao = String(req.body.descricao || '').trim();
+  const inicio_agendado = String(req.body.inicio_agendado || '').trim();
+
+  let cidadesSel = req.body.cidades || [];
+  if (!Array.isArray(cidadesSel)) cidadesSel = [cidadesSel];
+  const cidadesNum = cidadesSel
+    .filter(Boolean)
+    .map((x: any) => Number(x))
+    .filter((n: number) => Number.isFinite(n));
+
+  const errors: string[] = [];
+  if (!nome) errors.push('Informe o nome da operação.');
+  if (!inicio_agendado) errors.push('Informe a data/hora agendadas.');
+  if (!cidadesNum.length) errors.push('Selecione ao menos uma cidade participante.');
+
+  const allCidades = await db('cidades').select('*').orderBy('nome');
+
+  if (errors.length) {
+    return res.status(400).render('operacoes-form', {
+      mode: 'edit',
+      csrfToken: (req as any).csrfToken(),
+      cidades: allCidades,
+      errors,
+      values: { id, nome, descricao, inicio_agendado, cidades: cidadesNum }
+    });
+  }
+
+  // Atualiza operação (mantém status atual)
+  await db('operacoes').where({ id }).update({
+    nome,
+    descricao: descricao || null,
+    inicio_agendado
+  });
+
+  // Sincroniza participantes
+  const atuais: number[] = await db('operacao_cidades').where({ operacao_id: id }).pluck('cidade_id');
+  const toAdd = cidadesNum.filter(cid => !atuais.includes(cid));
+  const toRemove = atuais.filter(cid => !cidadesNum.includes(cid));
+
+  if (toRemove.length) {
+    await db('operacao_cidades').where({ operacao_id: id }).whereIn('cidade_id', toRemove).del();
+  }
+  if (toAdd.length) {
+    await db('operacao_cidades').insert(toAdd.map(cid => ({ operacao_id: id, cidade_id: cid })));
+  }
+
+  return res.redirect(`/operacoes/${id}`);
+});
 
 
 

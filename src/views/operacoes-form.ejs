@@ -1,87 +1,77 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-br">
 <head>
-  <meta charset="utf-8" />
-  <title>Nova operação</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title><%= (mode === 'edit' ? 'Editar operação' : 'Nova operação') %></title>
   <style>
-    body { background:#0f172a; color:#e5e7eb; font-family: system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
-    .wrap { max-width:900px; margin:24px auto; padding:0 16px; }
-    .card { background:#111827; border-radius:12px; box-shadow:0 8px 22px rgba(0,0,0,.35); padding:20px; }
-    .btn { display:inline-block; padding:8px 12px; border-radius:8px; background:#2563eb; color:#fff; text-decoration:none; font-weight:600; border:0; }
-    .btn:hover { background:#1d4ed8; }
-    .btn-ghost { background:transparent; border:1px solid #334155; color:#e5e7eb; }
-    .btn-ghost:hover { filter:brightness(1.1); }
-    label { display:block; margin:10px 0 6px; color:#cbd5e1; }
-    input[type="text"], textarea, input[type="datetime-local"], select {
-      width:100%; padding:10px 12px; border-radius:8px; border:1px solid #334155; background:#0b1220; color:#e5e7eb;
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial;margin:0;background:#0b1220;color:#e5e7eb}
+    .wrap{max-width:900px;margin:30px auto;padding:0 16px}
+    .card{background:#0f172a;border:1px solid #1f2937;border-radius:12px;padding:18px}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    label{display:block;margin:10px 0 6px}
+    input[type=text],input[type=datetime-local],textarea{
+      width:100%;padding:10px;border-radius:10px;border:1px solid #1f2937;background:#111827;color:#e5e7eb
     }
-    .err { background:#7f1d1d; color:#fecaca; padding:10px 12px; border-radius:8px; margin-bottom:12px; }
-    .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    textarea{min-height:90px}
+    .btns{display:flex;gap:10px;margin-top:14px}
+    .btn{padding:10px 14px;border-radius:10px;border:1px solid #374151;background:#111827;color:#e5e7eb;text-decoration:none}
+    .btn:hover{filter:brightness(1.08)}
+    .errors{background:#1f2937;border:1px solid #ef4444;color:#fff;padding:12px;border-radius:10px;margin-bottom:12px}
+    .cities{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin-top:8px}
   </style>
 </head>
 <body>
   <div class="wrap">
-    <div style="margin-bottom:10px;"><a class="btn" href="/operacoes">Voltar</a></div>
-    <div class="card">
-      <h2 style="margin-top:0;">Nova operação</h2>
+    <h2><%= (mode === 'edit' ? 'Editar operação' : 'Nova operação') %></h2>
 
-      <% if (errors && errors.length) { %>
-        <div class="err"><ul style="margin:0; padding-left:18px;"><% errors.forEach(e=>{ %><li><%= e %></li><% }) %></ul></div>
-      <% } %>
+    <% if (errors && errors.length) { %>
+      <div class="errors">
+        <ul style="margin:0;padding-left:18px">
+          <% errors.forEach(e => { %><li><%= e %></li><% }) %>
+        </ul>
+      </div>
+    <% } %>
 
-      <form method="post" action="/operacoes/nova">
-        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <form method="post" action="<%= (mode === 'edit' ? ('/operacoes/' + values.id + '/editar') : '/operacoes/nova') %>">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>"/>
 
-        <label>Nome</label>
-        <input type="text" name="nome" value="<%= values.nome||'' %>" required>
-
-        <label>Descrição (opcional)</label>
-        <textarea name="descricao" rows="3"><%= values.descricao||'' %></textarea>
-
-        <label>Início agendado</label>
-        <input type="datetime-local" name="inicio_agendado" value="<%= values.inicio_agendado||'' %>" required>
-
-        <div class="row" style="margin-top:10px; margin-bottom:6px;">
-          <label style="margin:0;">Cidades participantes (Ctrl/Shift para múltipla)</label>
-          <button type="button" class="btn-ghost" id="selectAll">Selecionar todas</button>
-          <button type="button" class="btn-ghost" id="clearAll">Limpar seleção</button>
+      <div class="card">
+        <div class="row">
+          <div>
+            <label>Nome da operação</label>
+            <input type="text" name="nome" value="<%= (values && values.nome) || '' %>" required />
+          </div>
+          <div>
+            <label>Início agendado</label>
+            <input type="datetime-local" name="inicio_agendado" value="<%= (values && values.inicio_agendado) || '' %>" required />
+          </div>
         </div>
-        <select name="cidades" id="cidadesSelect" multiple size="8" required>
-          <% cidades.forEach(c => { %>
-            <option value="<%= c.id %>" <%= (values.cidades||[]).includes(c.id)?'selected':'' %>><%= c.nome %></option>
-          <% }) %>
-        </select>
 
-        <div style="margin-top:14px;">
-          <button class="btn" type="submit">Criar</button>
+        <div>
+          <label>Descrição</label>
+          <textarea name="descricao"><%= (values && values.descricao) || '' %></textarea>
         </div>
-      </form>
-    </div>
+
+        <div>
+          <label>Cidades participantes</label>
+          <div class="cities">
+            <% (cidades || []).forEach(c => { 
+                 const sel = Array.isArray(values?.cidades) ? values.cidades.includes(c.id) : false; %>
+              <label>
+                <input type="checkbox" name="cidades" value="<%= c.id %>" <%= sel ? 'checked' : '' %> />
+                <%= c.nome %>
+              </label>
+            <% }) %>
+          </div>
+        </div>
+
+        <div class="btns">
+          <a class="btn" href="<%= (mode === 'edit' ? ('/operacoes/' + values.id) : '/operacoes') %>">Cancelar</a>
+          <button class="btn" type="submit">Salvar</button>
+        </div>
+      </div>
+    </form>
   </div>
-
-  <script>
-    (function(){
-      const sel = document.getElementById('cidadesSelect');
-      const btnAll = document.getElementById('selectAll');
-      const btnClear = document.getElementById('clearAll');
-
-      function selectAll() {
-        if (!sel) return;
-        for (const opt of sel.options) opt.selected = true;
-        // dispara change para algum script de validação, se houver
-        sel.dispatchEvent(new Event('change', { bubbles:true }));
-      }
-
-      function clearAll() {
-        if (!sel) return;
-        for (const opt of sel.options) opt.selected = false;
-        sel.dispatchEvent(new Event('change', { bubbles:true }));
-      }
-
-      if (btnAll) btnAll.addEventListener('click', selectAll);
-      if (btnClear) btnClear.addEventListener('click', clearAll);
-    })();
-  </script>
 </body>
 </html>
