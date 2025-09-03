@@ -1202,299 +1202,197 @@ app.post('/operacoes/:id/status', requireAdminOrGestor, csrfProtection, async (r
 
 // -----------------------------------------------------------------------------
 // Fiscalização
-app.post(
-  '/operacoes/:id/fiscalizacoes',
-  requireAuth,
-  uploadFotosFields, // multer antes do CSRF
-  csrfProtection,
-  async (req: Request, res: Response) => {
+app.post('/operacoes/:id/fiscalizacoes',
+  requireAuth, uploadFotosFields, csrfProtection,
+  async (req, res) => {
     const user = (req.session as any).user;
     const operacao_id = Number(req.params.id);
     const fallback = `/operacoes/${operacao_id}`;
     const go = pickReturnTo(req, fallback);
 
-    // operação deve estar em andamento
-    if (!(await canUserPostOnOperation(operacao_id, user))) {
-      return res.status(403).send('Sem permissão.');
-    }
+    if (!user?.cidade_id) return res.status(400).send('Usuário sem cidade vinculada.');
+    if (!(await canUserPostOnOperation(operacao_id, user))) return res.status(403).send('Sem permissão.');
 
-    // cidade: admin/gestor pode escolher; demais, a do usuário
-    let cidade_id: number | null =
-      user?.role === 'admin' || user?.role === 'gestor'
-        ? (req.body.cidade_id ? Number(req.body.cidade_id) : (user.cidade_id ?? null))
-        : (user.cidade_id ?? null);
-
-    if (!Number.isFinite(cidade_id)) return res.status(400).send('Selecione a cidade.');
-
-    const participa = await db('operacao_cidades').where({ operacao_id, cidade_id }).first();
-    if (!participa) return res.status(400).send('Cidade não participa desta operação.');
-
-    // campos obrigatórios
     const tipo_local = String(req.body.tipo_local || '').trim();
-    if (!tipo_local) return res.status(400).send('Informe o tipo de local da fiscalização.');
-
     const obs = String(req.body.obs || '').trim() || null;
+    if (!tipo_local) return res.redirect(go);
 
-    // evento base
-    const { lat, lng, acc } = getGeoFromBody(req);
+    // ✅ calcule UMA vez
+    const geo = getGeoFromBody(req);
+
     const evento_id = await createEventoBase({
       operacao_id, cidade_id: user.cidade_id, user_id: user.id, tipo: 'fiscalizacao', obs,
-      lat, lng, acc
+      lat: geo.lat, lng: geo.lng, acc: geo.acc
     });
 
-    // detalhe da fiscalização
     await db('evento_fiscalizacao').insert({ evento_id, tipo_local });
 
-    // fotos + geo (opcional)
     const files = fotosFromRequest(req);
-    const { lat, lng, acc } = getGeoFromBody(req);
     if (files.length) {
       await db('evento_fotos').insert(
         files.map(f => ({
           evento_id,
           path: `/uploads/fotos/${f.filename}`,
-          lat,
-          lng,
-          accuracy: acc
+          lat: geo.lat, lng: geo.lng, accuracy: geo.acc
         }))
       );
     }
-
     return res.redirect(go);
   }
 );
 
 
+
 // Pessoa
-app.post(
-  '/operacoes/:id/pessoas',
-  requireAuth,
-  uploadFotosFields,
-  csrfProtection,
-  async (req: Request, res: Response) => {
+app.post('/operacoes/:id/pessoas',
+  requireAuth, uploadFotosFields, csrfProtection,
+  async (req, res) => {
     const user = (req.session as any).user;
     const operacao_id = Number(req.params.id);
     const fallback = `/operacoes/${operacao_id}`;
     const go = pickReturnTo(req, fallback);
 
-    if (!(await canUserPostOnOperation(operacao_id, user))) {
-      return res.status(403).send('Sem permissão.');
-    }
+    if (!user?.cidade_id) return res.status(400).send('Usuário sem cidade vinculada.');
+    if (!(await canUserPostOnOperation(operacao_id, user))) return res.status(403).send('Sem permissão.');
 
-    let cidade_id: number | null =
-      user?.role === 'admin' || user?.role === 'gestor'
-        ? (req.body.cidade_id ? Number(req.body.cidade_id) : (user.cidade_id ?? null))
-        : (user.cidade_id ?? null);
-
-    if (!Number.isFinite(cidade_id)) return res.status(400).send('Selecione a cidade.');
-
-    const participa = await db('operacao_cidades').where({ operacao_id, cidade_id }).first();
-    if (!participa) return res.status(400).send('Cidade não participa desta operação.');
-
-    // campos
     const nome = String(req.body.nome || '').trim();
-    const cpf = String(req.body.cpf || '').replace(/\D/g, '') || null;
+    const cpf = onlyDigits(req.body.cpf || '');
     const fiscalizacao_id = req.body.fiscalizacao_id ? Number(req.body.fiscalizacao_id) : null;
     const obs = String(req.body.obs || '').trim() || null;
 
-    // nome é NOT NULL no schema
-    if (!nome) return res.status(400).send('Informe o nome da pessoa.');
+    // ✅ calcule UMA vez
+    const geo = getGeoFromBody(req);
 
-    // cria evento base
-    const { lat, lng, acc } = getGeoFromBody(req);
     const evento_id = await createEventoBase({
       operacao_id, cidade_id: user.cidade_id, user_id: user.id, tipo: 'pessoa', obs,
-      lat, lng, acc
+      lat: geo.lat, lng: geo.lng, acc: geo.acc
     });
 
-
-    // primeira foto para compat legado
     const files = fotosFromRequest(req);
     const primeira = files[0] ? `/uploads/fotos/${files[0].filename}` : null;
 
     await db('evento_pessoa').insert({
       evento_id,
-      nome,
-      cpf,
-      foto_path: primeira,
+      nome: nome || null,
+      cpf: cpf || null,
+      foto_path: primeira, // compat legado
       fiscalizacao_evento_id: fiscalizacao_id || null
     });
 
-    // fotos canônicas + geo
-    const { lat, lng, acc } = getGeoFromBody(req);
     if (files.length) {
       await db('evento_fotos').insert(
         files.map(f => ({
           evento_id,
           path: `/uploads/fotos/${f.filename}`,
-          lat,
-          lng,
-          accuracy: acc
+          lat: geo.lat, lng: geo.lng, accuracy: geo.acc
         }))
       );
     }
-
     return res.redirect(go);
   }
 );
+
 
 
 // Veículo
-app.post(
-  '/operacoes/:id/veiculos',
-  requireAuth,
-  uploadFotosFields,
-  csrfProtection,
-  async (req: Request, res: Response) => {
+app.post('/operacoes/:id/veiculos',
+  requireAuth, uploadFotosFields, csrfProtection,
+  async (req, res) => {
     const user = (req.session as any).user;
     const operacao_id = Number(req.params.id);
     const fallback = `/operacoes/${operacao_id}`;
     const go = pickReturnTo(req, fallback);
 
-    if (!(await canUserPostOnOperation(operacao_id, user))) {
-      return res.status(403).send('Sem permissão.');
-    }
+    if (!user?.cidade_id) return res.status(400).send('Usuário sem cidade vinculada.');
+    if (!(await canUserPostOnOperation(operacao_id, user))) return res.status(403).send('Sem permissão.');
 
-    let cidade_id: number | null =
-      user?.role === 'admin' || user?.role === 'gestor'
-        ? (req.body.cidade_id ? Number(req.body.cidade_id) : (user.cidade_id ?? null))
-        : (user.cidade_id ?? null);
-
-    if (!Number.isFinite(cidade_id)) return res.status(400).send('Selecione a cidade.');
-
-    const participa = await db('operacao_cidades').where({ operacao_id, cidade_id }).first();
-    if (!participa) return res.status(400).send('Cidade não participa desta operação.');
-
-    // campos (tipo_veiculo é NOT NULL no schema)
     const tipo_veiculo = String(req.body.tipo_veiculo || '').trim();
-    if (!tipo_veiculo) return res.status(400).send('Informe o tipo do veículo.');
-
-    const marca_modelo = String(req.body.marca_modelo || '').trim() || null;
-    const placa = String(req.body.placa || '').trim().toUpperCase() || null;
+    const marca_modelo = String(req.body.marca_modelo || '').trim();
+    const placa = String(req.body.placa || '').trim().toUpperCase();
     const fiscalizacao_id = req.body.fiscalizacao_id ? Number(req.body.fiscalizacao_id) : null;
     const obs = String(req.body.obs || '').trim() || null;
 
-    // cria evento base
-    const { lat, lng, acc } = getGeoFromBody(req);
+    // ✅ calcule UMA vez
+    const geo = getGeoFromBody(req);
+
     const evento_id = await createEventoBase({
       operacao_id, cidade_id: user.cidade_id, user_id: user.id, tipo: 'veiculo', obs,
-      lat, lng, acc
+      lat: geo.lat, lng: geo.lng, acc: geo.acc
     });
-
 
     await db('evento_veiculo').insert({
       evento_id,
-      tipo_veiculo,
-      marca_modelo,
-      placa,
+      tipo_veiculo: tipo_veiculo || null,
+      marca_modelo: marca_modelo || null,
+      placa: placa || null,
       fiscalizacao_evento_id: fiscalizacao_id || null
     });
 
-    // fotos + geo
     const files = fotosFromRequest(req);
-    const { lat, lng, acc } = getGeoFromBody(req);
     if (files.length) {
       await db('evento_fotos').insert(
         files.map(f => ({
           evento_id,
           path: `/uploads/fotos/${f.filename}`,
-          lat,
-          lng,
-          accuracy: acc
+          lat: geo.lat, lng: geo.lng, accuracy: geo.acc
         }))
       );
     }
-
     return res.redirect(go);
   }
 );
 
 
+
 // Apreensão
-app.post(
-  '/operacoes/:id/apreensoes',
-  requireAuth,
-  uploadFotosFields, // multer antes do CSRF
-  csrfProtection,
-  async (req: Request, res: Response) => {
+app.post('/operacoes/:id/apreensoes',
+  requireAuth, uploadFotosFields, csrfProtection,
+  async (req, res) => {
     const user = (req.session as any).user;
     const operacao_id = Number(req.params.id);
     const fallback = `/operacoes/${operacao_id}`;
     const go = pickReturnTo(req, fallback);
 
-    // Só deixa lançar se a operação estiver EM ANDAMENTO
-    if (!(await canUserPostOnOperation(operacao_id, user))) {
-      return res.status(403).send('Sem permissão.');
-    }
+    if (!user?.cidade_id) return res.status(400).send('Usuário sem cidade vinculada.');
+    if (!(await canUserPostOnOperation(operacao_id, user))) return res.status(403).send('Sem permissão.');
 
-    // Definir a cidade do evento:
-    // - admin/gestor: pode escolher via form (name="cidade_id"); se não enviar, usa a do usuário (se tiver)
-    // - outros perfis: sempre a cidade do usuário
-    let cidade_id: number | null =
-      user?.role === 'admin' || user?.role === 'gestor'
-        ? (req.body.cidade_id ? Number(req.body.cidade_id) : (user.cidade_id ?? null))
-        : (user.cidade_id ?? null);
-
-    if (!Number.isFinite(cidade_id)) {
-      return res.status(400).send('Selecione a cidade.');
-    }
-
-    // A cidade precisa participar da operação
-    const participa = await db('operacao_cidades')
-      .where({ operacao_id, cidade_id })
-      .first();
-    if (!participa) {
-      return res.status(400).send('Cidade não participa desta operação.');
-    }
-
-    // Campos
     const tipo = String(req.body.tipo || '').trim();
-    const quantidade = Number(req.body.quantidade);
+    const quantidade = req.body.quantidade === '' ? null : Number(req.body.quantidade);
+    const errors: string[] = [];
+    if (!tipo) errors.push('Informe o tipo da apreensão.');
+    if (quantidade === null || !Number.isFinite(quantidade)) errors.push('Informe a quantidade.');
+    if (errors.length) return res.status(400).send(errors.join(' '));
+
     const unidade = String(req.body.unidade || '').trim() || null;
     const fiscalizacao_id = req.body.fiscalizacao_id ? Number(req.body.fiscalizacao_id) : null;
     const obs = String(req.body.obs || '').trim() || null;
 
-    // Validações
-    const errors: string[] = [];
-    if (!tipo) errors.push('Informe o tipo da apreensão.');
-    if (!Number.isFinite(quantidade)) errors.push('Informe a quantidade.');
-    if (errors.length) return res.status(400).send(errors.join(' '));
+    // ✅ calcule UMA vez
+    const geo = getGeoFromBody(req);
 
-    // Cria o evento base (usa helper com .returning() no PG)
-    const { lat, lng, acc } = getGeoFromBody(req);
     const evento_id = await createEventoBase({
       operacao_id, cidade_id: user.cidade_id, user_id: user.id, tipo: 'apreensao', obs,
-      lat, lng, acc
+      lat: geo.lat, lng: geo.lng, acc: geo.acc
     });
 
-
-    // Detalhes de apreensão
     await db('evento_apreensao').insert({
-      evento_id,
-      tipo,
-      quantidade,
-      unidade,
-      fiscalizacao_evento_id: fiscalizacao_id || null
+      evento_id, tipo: tipo || null, quantidade, unidade, fiscalizacao_evento_id: fiscalizacao_id || null
     });
 
-    // Fotos (opcional) + geo
     const files = fotosFromRequest(req);
-    const { lat, lng, acc } = getGeoFromBody(req);
     if (files.length) {
       await db('evento_fotos').insert(
         files.map(f => ({
           evento_id,
           path: `/uploads/fotos/${f.filename}`,
-          lat,
-          lng,
-          accuracy: acc
+          lat: geo.lat, lng: geo.lng, accuracy: geo.acc
         }))
       );
     }
-
     return res.redirect(go);
   }
 );
+
 
 
 
