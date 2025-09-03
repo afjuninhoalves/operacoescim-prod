@@ -125,36 +125,36 @@ async function ensureSchemaAndAdmin() {
 
   }
   // === TABELA: operacao_efetivo ===============================================
-async function ensureOperacaoEfetivo() {
-  const exists = await db.schema.hasTable('operacao_efetivo');
-  if (!exists) {
-    await db.schema.createTable('operacao_efetivo', (t) => {
-      t.increments('id').primary();
-      t.integer('operacao_id').notNullable()
-        .references('id').inTable('operacoes').onDelete('CASCADE');
-      t.integer('user_id').nullable()
-        .references('id').inTable('usuarios').onDelete('SET NULL');
+  async function ensureOperacaoEfetivo() {
+    const exists = await db.schema.hasTable('operacao_efetivo');
+    if (!exists) {
+      await db.schema.createTable('operacao_efetivo', (t) => {
+        t.increments('id').primary();
+        t.integer('operacao_id').notNullable()
+          .references('id').inTable('operacoes').onDelete('CASCADE');
+        t.integer('user_id').nullable()
+          .references('id').inTable('usuarios').onDelete('SET NULL');
 
-      t.integer('total_agentes').notNullable().defaultTo(0);
-      t.integer('total_viaturas').notNullable().defaultTo(0);
+        t.integer('total_agentes').notNullable().defaultTo(0);
+        t.integer('total_viaturas').notNullable().defaultTo(0);
 
-      t.boolean('pc').notNullable().defaultTo(false);
-      t.integer('pc_agentes').notNullable().defaultTo(0);
-      t.integer('pc_viaturas').notNullable().defaultTo(0);
+        t.boolean('pc').notNullable().defaultTo(false);
+        t.integer('pc_agentes').notNullable().defaultTo(0);
+        t.integer('pc_viaturas').notNullable().defaultTo(0);
 
-      t.boolean('pm').notNullable().defaultTo(false);
-      t.integer('pm_agentes').notNullable().defaultTo(0);
-      t.integer('pm_viaturas').notNullable().defaultTo(0);
+        t.boolean('pm').notNullable().defaultTo(false);
+        t.integer('pm_agentes').notNullable().defaultTo(0);
+        t.integer('pm_viaturas').notNullable().defaultTo(0);
 
-      t.boolean('outros').notNullable().defaultTo(false);
-      t.integer('outros_agentes').notNullable().defaultTo(0);
-      t.integer('outros_viaturas').notNullable().defaultTo(0);
+        t.boolean('outros').notNullable().defaultTo(false);
+        t.integer('outros_agentes').notNullable().defaultTo(0);
+        t.integer('outros_viaturas').notNullable().defaultTo(0);
 
-      t.timestamp('ts').notNullable().defaultTo(db.fn.now());
-    });
-    console.log('✓ created table operacao_efetivo');
+        t.timestamp('ts').notNullable().defaultTo(db.fn.now());
+      });
+      console.log('✓ created table operacao_efetivo');
+    }
   }
-}
 
 
   // --- USUÁRIOS
@@ -833,25 +833,25 @@ app.post(
     const operacao_id = Number(req.params.id);
     if (!Number.isFinite(operacao_id)) return res.status(400).send('ID inválido');
 
-    const num  = (v: any) => { const n = Number(v); return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0; };
+    const num = (v: any) => { const n = Number(v); return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0; };
     const bool = (v: any) => v === 'on' || v === 'true' || v === '1';
 
     // cidade opcional: vazio => registro "geral" (cidade_id = null)
     const cidade_id = req.body.cidade_id ? Number(req.body.cidade_id) : null;
 
-    const total_agentes  = num(req.body.total_agentes);
+    const total_agentes = num(req.body.total_agentes);
     const total_viaturas = num(req.body.total_viaturas);
 
-    const pc          = bool(req.body.pc);
-    const pc_agentes  = pc ? num(req.body.pc_agentes)  : 0;
+    const pc = bool(req.body.pc);
+    const pc_agentes = pc ? num(req.body.pc_agentes) : 0;
     const pc_viaturas = pc ? num(req.body.pc_viaturas) : 0;
 
-    const pm          = bool(req.body.pm);
-    const pm_agentes  = pm ? num(req.body.pm_agentes)  : 0;
+    const pm = bool(req.body.pm);
+    const pm_agentes = pm ? num(req.body.pm_agentes) : 0;
     const pm_viaturas = pm ? num(req.body.pm_viaturas) : 0;
 
-    const outros          = bool(req.body.outros);
-    const outros_agentes  = outros ? num(req.body.outros_agentes)  : 0;
+    const outros = bool(req.body.outros);
+    const outros_agentes = outros ? num(req.body.outros_agentes) : 0;
     const outros_viaturas = outros ? num(req.body.outros_viaturas) : 0;
 
     // UPSERT por (operacao_id, cidade_id)
@@ -865,7 +865,7 @@ app.post(
         pm, pm_agentes, pm_viaturas,
         outros, outros_agentes, outros_viaturas
       })
-      .onConflict(['operacao_id','cidade_id'])
+      .onConflict(['operacao_id', 'cidade_id'])
       .merge({
         user_id: user?.id ?? null,
         total_agentes, total_viaturas,
@@ -1678,7 +1678,7 @@ app.get('/operacoes/:id/monitor', requireAdminOrGestor, async (req: Request, res
   for (const r of totRows) {
     const n = Number(r.c) || 0;
     if (r.tipo === 'fiscalizacao') cards.locais = n;
-    else if (r.tipo === 'pessoa')  cards.pessoas = n;
+    else if (r.tipo === 'pessoa') cards.pessoas = n;
     else if (r.tipo === 'veiculo') cards.veiculos = n;
     else if (r.tipo === 'apreensao') cards.apreensoes = n;
   }
@@ -1707,7 +1707,7 @@ app.get('/operacoes/:id/monitor', requireAdminOrGestor, async (req: Request, res
     });
     const n = Number(r.cnt) || 0;
     if (r.tipo === 'fiscalizacao') row.fiscalizacao = n;
-    else if (r.tipo === 'pessoa')  row.pessoa = n;
+    else if (r.tipo === 'pessoa') row.pessoa = n;
     else if (r.tipo === 'veiculo') row.veiculo = n;
     else if (r.tipo === 'apreensao') row.apreensao = n;
   }
@@ -1723,17 +1723,18 @@ app.get('/operacoes/:id/monitor', requireAdminOrGestor, async (req: Request, res
     .limit(20);
 
   // ---- Efetivo total (linha "geral": cidade_id NULL)
-  const efTot = await db('operacao_efetivo')
+  const efTotRow = await db('operacao_efetivo')
     .where({ operacao_id: id })
     .whereNull('cidade_id')
-    .sum<{ agentes: any }>('total_agentes as agentes')
-    .sum<{ viaturas: any }>('total_viaturas as viaturas')
-    .first();
+    .sum({ agentes: 'total_agentes' })
+    .sum({ viaturas: 'total_viaturas' })
+    .first<{ agentes: string | number | null; viaturas: string | number | null }>();
 
   const efetivoTotal = {
-    total_agentes: Number(efTot?.agentes) || 0,
-    total_viaturas: Number(efTot?.viaturas) || 0
+    total_agentes: Number(efTotRow?.agentes ?? 0),
+    total_viaturas: Number(efTotRow?.viaturas ?? 0),
   };
+
 
   // ---- Efetivo por cidade (sempre array!)
   type EfRow = { cidade_id: number; cidade: string; total_agentes: any; total_viaturas: any };
@@ -2492,18 +2493,18 @@ app.get('/operacoes/:id/mapa', requireAuth, async (req, res) => {
 
   const rows = await q
     .select(
-      'e.id','e.tipo','e.ts','e.obs',
+      'e.id', 'e.tipo', 'e.ts', 'e.obs',
       colLat, colLng, colAcc,
       'f.tipo_local as fis_local',
       'ff.tipo_local as ref_local',
       'v.placa',
-      'a.tipo as apr_tipo','a.quantidade','a.unidade',
-      'e.cidade_id as e_cid','c_evt.nome as e_cidade',
-      'e_fis.cidade_id as ref_cid','c_ref.nome as ref_cidade'
+      'a.tipo as apr_tipo', 'a.quantidade', 'a.unidade',
+      'e.cidade_id as e_cid', 'c_evt.nome as e_cidade',
+      'e_fis.cidade_id as ref_cid', 'c_ref.nome as ref_cidade'
     )
-    .orderBy('e.ts','desc');
+    .orderBy('e.ts', 'desc');
 
-  const inBrazil = (lat:number, lng:number) =>
+  const inBrazil = (lat: number, lng: number) =>
     lat >= -35 && lat <= 7 && lng >= -75 && lng <= -30;
 
   const markers = rows.map((r: any) => {
@@ -2512,7 +2513,7 @@ app.get('/operacoes/:id/mapa', requireAuth, async (req, res) => {
     if (!inBrazil(lat, lng)) return null;
 
     const local = r.ref_local || r.fis_local || null;
-    const cidade_id   = r.e_cid ?? r.ref_cid ?? null;
+    const cidade_id = r.e_cid ?? r.ref_cid ?? null;
     const cidade_nome = r.e_cidade ?? r.ref_cidade ?? null;
 
     let title = '';
@@ -2640,18 +2641,18 @@ app.get('/debug/geo/schema', requireAdminOrGestor, async (_req: Request, res: Re
       const cols = await db
         .select('column_name as col', 'data_type as type')
         .from('information_schema.columns')
-        .whereIn('column_name', ['lat','lng','accuracy'])
+        .whereIn('column_name', ['lat', 'lng', 'accuracy'])
         .andWhere({ table_name: 'operacao_eventos' })
         .orderBy('column_name');
       return res.json({ db: 'pg', table: 'operacao_eventos', cols });
     } else {
       const pragma = await db.raw("PRAGMA table_info('operacao_eventos')");
       const cols = (pragma as any)?.[0]
-        ?.filter((r: any) => ['lat','lng','accuracy'].includes(r.name))
+        ?.filter((r: any) => ['lat', 'lng', 'accuracy'].includes(r.name))
         ?.map((r: any) => ({ col: r.name, type: r.type }));
       return res.json({ db: 'sqlite', table: 'operacao_eventos', cols });
     }
-  } catch (e:any) {
+  } catch (e: any) {
     return res.status(500).json({ error: e.message });
   }
 });
@@ -2666,7 +2667,7 @@ app.get('/debug/geo/op/:id', requireAdminOrGestor, async (req: Request, res: Res
     const gsub = db('evento_fotos')
       .whereNotNull('lat').whereNotNull('lng')
       .select('evento_id')
-      .max<{ evento_id:number; max_id:number }>('id as max_id')
+      .max<{ evento_id: number; max_id: number }>('id as max_id')
       .groupBy('evento_id')
       .as('g');
 
@@ -2686,7 +2687,7 @@ app.get('/debug/geo/op/:id', requireAdminOrGestor, async (req: Request, res: Res
         'ef.lng as ef_lng',
         'ef.accuracy as ef_acc'
       )
-      .orderBy('e.ts','desc')
+      .orderBy('e.ts', 'desc')
       .limit(200);
 
     const stats = {
@@ -2697,7 +2698,7 @@ app.get('/debug/geo/op/:id', requireAdminOrGestor, async (req: Request, res: Res
     };
 
     return res.json({ opId, stats, sample: rows.slice(0, 30) });
-  } catch (e:any) {
+  } catch (e: any) {
     return res.status(500).json({ error: e.message });
   }
 });
@@ -2735,14 +2736,14 @@ async function runGeoBackfill(opId?: number) {
 // ===== DEBUG: atalhos GET temporários para backfill (use só em homologação) ====
 app.get('/debug/geo/backfill', requireAdminOrGestor, async (_req: Request, res: Response) => {
   try { res.json(await runGeoBackfill()); }
-  catch (e:any) { res.status(500).json({ error: e.message }); }
+  catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 
 app.get('/debug/geo/backfill/:id', requireAdminOrGestor, async (req: Request, res: Response) => {
   const opId = Number(req.params.id);
   if (!Number.isFinite(opId)) return res.status(400).json({ error: 'id inválido' });
   try { res.json(await runGeoBackfill(opId)); }
-  catch (e:any) { res.status(500).json({ error: e.message }); }
+  catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 
 
@@ -2771,8 +2772,8 @@ app.get('/debug/map/:id', requireAdminOrGestor, async (req: Request, res: Respon
     .where('e.operacao_id', id)
     .leftJoin(gsub, 'g.evento_id', 'e.id')
     .leftJoin('evento_fotos as ef', 'ef.id', 'g.max_id')
-    .select('e.id','e.tipo','e.ts', colLat, colLng, colAcc)
-    .orderBy('e.ts','desc')
+    .select('e.id', 'e.tipo', 'e.ts', colLat, colLng, colAcc)
+    .orderBy('e.ts', 'desc')
     .limit(300);
 
   const markers = rows
