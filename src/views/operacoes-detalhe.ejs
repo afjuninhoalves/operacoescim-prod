@@ -356,6 +356,9 @@
         <div class="row" style="align-self:center">
           <!-- link para a nova tela de inserção -->
           <a class="btn btn-blue" href="/operacoes/<%= operacao.id %>/acoes/nova">Inserir ações</a>
+          <% if (user && (user.role==='gestor' || user.role==='admin' )) { %>
+            <a class="btn" href="/operacoes/<%= operacao.id %>/efetivo/novo">Inserir efetivo</a>
+            <% } %>
         </div>
       </div>
     </div>

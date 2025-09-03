@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Inserir efetivo — <%= operacao.nome %></title>
+  <style>
+    :root{ --bg:#0b1220; --panel:#0f172a; --panel2:#111827; --border:#1f2937; --text:#e5e7eb; --muted:#9ca3af; --blue:#2563eb; }
+    body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial}
+    .wrap{max-width:960px;margin:24px auto;padding:0 16px}
+    .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--border);border-radius:14px;padding:18px}
+    h1{font-size:20px;margin:0 0 12px}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .field{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+    .field input[type=number]{padding:10px;border-radius:10px;border:1px solid var(--border);background:#0f172a;color:var(--text)}
+    .chk{display:flex;align-items:center;gap:8px;margin:10px 0 4px}
+    .hint{color:var(--muted);font-size:12px}
+    .btns{display:flex;gap:10px;margin-top:10px}
+    .btn{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:#111826;color:var(--text);text-decoration:none}
+    .btn.primary{background:var(--blue);border-color:#1d4ed8}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>Inserir efetivo — <%= operacao.nome %></h1>
+
+      <form method="post" action="/operacoes/<%= operacao.id %>/efetivo">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>"/>
+
+        <div class="row">
+          <div class="field">
+            <label>Total de agentes empregados</label>
+            <input type="number" name="total_agentes" min="0" step="1" value="0" required>
+          </div>
+          <div class="field">
+            <label>Total de viaturas</label>
+            <input type="number" name="total_viaturas" min="0" step="1" value="0" required>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="chk"><input type="checkbox" id="pc" name="pc"> Polícia Civil participou</label>
+          <div id="pc-box" style="display:none">
+            <div class="row">
+              <div class="field">
+                <label>PC — agentes</label>
+                <input type="number" name="pc_agentes" min="0" step="1" value="0">
+              </div>
+              <div class="field">
+                <label>PC — viaturas</label>
+                <input type="number" name="pc_viaturas" min="0" step="1" value="0">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="chk"><input type="checkbox" id="pm" name="pm"> Polícia Militar participou</label>
+          <div id="pm-box" style="display:none">
+            <div class="row">
+              <div class="field">
+                <label>PM — agentes</label>
+                <input type="number" name="pm_agentes" min="0" step="1" value="0">
+              </div>
+              <div class="field">
+                <label>PM — viaturas</label>
+                <input type="number" name="pm_viaturas" min="0" step="1" value="0">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="chk"><input type="checkbox" id="outros" name="outros"> Outros órgãos participaram</label>
+          <div id="outros-box" style="display:none">
+            <div class="row">
+              <div class="field">
+                <label>Outros — agentes</label>
+                <input type="number" name="outros_agentes" min="0" step="1" value="0">
+              </div>
+              <div class="field">
+                <label>Outros — viaturas</label>
+                <input type="number" name="outros_viaturas" min="0" step="1" value="0">
+              </div>
+            </div>
+            <div class="hint">Se preferir detalhar por órgão no futuro, dá pra expandir esse modelo.</div>
+          </div>
+        </div>
+
+        <div class="btns">
+          <button class="btn primary" type="submit">Salvar</button>
+          <a class="btn" href="/operacoes/<%= operacao.id %>">Cancelar</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const bindToggle = (id, boxId) => {
+      const chk = document.getElementById(id);
+      const box = document.getElementById(boxId);
+      const sync = () => box.style.display = chk.checked ? 'block' : 'none';
+      chk.addEventListener('change', sync); sync();
+    };
+    bindToggle('pc','pc-box');
+    bindToggle('pm','pm-box');
+    bindToggle('outros','outros-box');
+  </script>
+</body>
+</html>

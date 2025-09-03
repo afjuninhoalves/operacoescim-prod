@@ -124,6 +124,38 @@ async function ensureSchemaAndAdmin() {
     await ensureColumn('cidades', 'logo_mime', t => (t as Knex.AlterTableBuilder).string('logo_mime', 128));
 
   }
+  // === TABELA: operacao_efetivo ===============================================
+async function ensureOperacaoEfetivo() {
+  const exists = await db.schema.hasTable('operacao_efetivo');
+  if (!exists) {
+    await db.schema.createTable('operacao_efetivo', (t) => {
+      t.increments('id').primary();
+      t.integer('operacao_id').notNullable()
+        .references('id').inTable('operacoes').onDelete('CASCADE');
+      t.integer('user_id').nullable()
+        .references('id').inTable('usuarios').onDelete('SET NULL');
+
+      t.integer('total_agentes').notNullable().defaultTo(0);
+      t.integer('total_viaturas').notNullable().defaultTo(0);
+
+      t.boolean('pc').notNullable().defaultTo(false);
+      t.integer('pc_agentes').notNullable().defaultTo(0);
+      t.integer('pc_viaturas').notNullable().defaultTo(0);
+
+      t.boolean('pm').notNullable().defaultTo(false);
+      t.integer('pm_agentes').notNullable().defaultTo(0);
+      t.integer('pm_viaturas').notNullable().defaultTo(0);
+
+      t.boolean('outros').notNullable().defaultTo(false);
+      t.integer('outros_agentes').notNullable().defaultTo(0);
+      t.integer('outros_viaturas').notNullable().defaultTo(0);
+
+      t.timestamp('ts').notNullable().defaultTo(db.fn.now());
+    });
+    console.log('✓ created table operacao_efetivo');
+  }
+}
+
 
   // --- USUÁRIOS
   if (!(await db.schema.hasTable('usuarios'))) {
@@ -757,6 +789,91 @@ app.post('/cidades/nova', requireAdmin, uploadLogo.single('logo'), csrfProtectio
     return res.status(500).send('Erro ao cadastrar cidade.');
   }
 });
+
+// =============================================================================
+// EFETIVO DA OPERAÇÃO
+// =============================================================================
+
+// NOVO: efetivo — somente gestor/admin
+
+app.get(
+  '/operacoes/:id/efetivo/novo',
+  requireAuth,
+  requireAdminOrGestor,          // << só gestor/admin
+  csrfProtection,
+  async (req: Request, res: Response) => {
+    const operacao_id = Number(req.params.id);
+    if (!Number.isFinite(operacao_id)) return res.status(400).send('ID inválido');
+
+    const op = await db('operacoes').where({ id: operacao_id }).first();
+    if (!op) return res.status(404).send('Operação não encontrada.');
+
+    return res.render('operacao-efetivo-form', {
+      user: (req.session as any).user,
+      operacao: { id: op.id, nome: op.nome },
+      csrfToken: (req as any).csrfToken(),
+    });
+  }
+);
+
+app.post(
+  '/operacoes/:id/efetivo',
+  requireAuth,
+  requireAdminOrGestor,          // << só gestor/admin
+  csrfProtection,
+  async (req: Request, res: Response) => {
+    const user = (req.session as any).user;
+    const operacao_id = Number(req.params.id);
+    if (!Number.isFinite(operacao_id)) return res.status(400).send('ID inválido');
+
+    // helperzinhos
+    const num = (v: any) => {
+      const n = Number(v);
+      return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0;
+    };
+    const bool = (v: any) => v === 'on' || v === 'true' || v === '1';
+
+    // campos
+    const total_agentes  = num(req.body.total_agentes);
+    const total_viaturas = num(req.body.total_viaturas);
+
+    const pc           = bool(req.body.pc);
+    const pc_agentes   = pc ? num(req.body.pc_agentes)   : 0;
+    const pc_viaturas  = pc ? num(req.body.pc_viaturas)  : 0;
+
+    const pm           = bool(req.body.pm);
+    const pm_agentes   = pm ? num(req.body.pm_agentes)   : 0;
+    const pm_viaturas  = pm ? num(req.body.pm_viaturas)  : 0;
+
+    const outros           = bool(req.body.outros);
+    const outros_agentes   = outros ? num(req.body.outros_agentes)   : 0;
+    const outros_viaturas  = outros ? num(req.body.outros_viaturas)  : 0;
+
+    // validação simples
+    if (
+      total_agentes < 0 || total_viaturas < 0 ||
+      pc_agentes < 0 || pc_viaturas < 0 ||
+      pm_agentes < 0 || pm_viaturas < 0 ||
+      outros_agentes < 0 || outros_viaturas < 0
+    ) return res.status(400).send('Valores inválidos.');
+
+    // grava
+    await db('operacao_efetivo').insert({
+      operacao_id,
+      user_id: user?.id ?? null,
+      total_agentes,
+      total_viaturas,
+      pc, pc_agentes, pc_viaturas,
+      pm, pm_agentes, pm_viaturas,
+      outros, outros_agentes, outros_viaturas
+    });
+
+    // volta para a operação
+    return res.redirect(`/operacoes/${operacao_id}`);
+  }
+);
+
+
 
 
 // GET editar cidade
