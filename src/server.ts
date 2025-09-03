@@ -2197,7 +2197,6 @@ app.get('/operacoes/:id/mapa', requireAuth, async (req, res) => {
     if (!participa) return res.status(403).send('Sem permissão.');
   }
 
-  // subquery: última foto COM geo por evento (pode não existir)
   const gsub = db('evento_fotos')
     .whereNotNull('lat').whereNotNull('lng')
     .select('evento_id')
@@ -2205,9 +2204,20 @@ app.get('/operacoes/:id/mapa', requireAuth, async (req, res) => {
     .groupBy('evento_id')
     .as('g');
 
+  // CAST explícito no PG para garantir number
+  const colLat = (DB_CLIENT === 'pg')
+    ? db.raw('COALESCE(e.lat, ef.lat)::float as lat')
+    : db.raw('COALESCE(e.lat, ef.lat) as lat');
+  const colLng = (DB_CLIENT === 'pg')
+    ? db.raw('COALESCE(e.lng, ef.lng)::float as lng')
+    : db.raw('COALESCE(e.lng, ef.lng) as lng');
+  const colAcc = (DB_CLIENT === 'pg')
+    ? db.raw('COALESCE(e.accuracy, ef.accuracy)::float as accuracy')
+    : db.raw('COALESCE(e.accuracy, ef.accuracy) as accuracy');
+
   const rows = await db('operacao_eventos as e')
     .where('e.operacao_id', id)
-    .leftJoin(gsub, 'g.evento_id', 'e.id')              // LEFT (para não filtrar eventos sem foto)
+    .leftJoin(gsub, 'g.evento_id', 'e.id')
     .leftJoin('evento_fotos as ef', 'ef.id', 'g.max_id')
     .leftJoin('cidades as c', 'c.id', 'e.cidade_id')
     .leftJoin('usuarios as u', 'u.id', 'e.user_id')
@@ -2219,10 +2229,7 @@ app.get('/operacoes/:id/mapa', requireAuth, async (req, res) => {
       'e.id', 'e.tipo', 'e.ts', 'e.obs',
       'c.nome as cidade',
       'u.nome as usuario',
-      // usa geo do EVENTO; se não tiver, cai para a foto
-      db.raw('COALESCE(e.lat, ef.lat) as lat'),
-      db.raw('COALESCE(e.lng, ef.lng) as lng'),
-      db.raw('COALESCE(e.accuracy, ef.accuracy) as accuracy'),
+      colLat, colLng, colAcc,
       'f.tipo_local',
       'p.nome as pessoa_nome', 'p.cpf as pessoa_cpf',
       'v.tipo_veiculo', 'v.marca_modelo', 'v.placa',
@@ -2230,9 +2237,16 @@ app.get('/operacoes/:id/mapa', requireAuth, async (req, res) => {
     )
     .orderBy('e.ts', 'desc');
 
+  // Constrói markers já validados e convertidos p/ number
   const markers = rows
-    .filter((r: any) => Number.isFinite(r.lat) && Number.isFinite(r.lng))
     .map((r: any) => {
+      const lat = Number(r.lat);
+      const lng = Number(r.lng);
+      const acc = (r.accuracy == null ? null : Number(r.accuracy));
+      const ok = Number.isFinite(lat) && Number.isFinite(lng)
+                 && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+      if (!ok) return null;
+
       let title = '';
       if (r.tipo === 'fiscalizacao') {
         title = `<strong>Fiscalização</strong><br>Local: ${r.tipo_local || '—'}`;
@@ -2246,15 +2260,19 @@ app.get('/operacoes/:id/mapa', requireAuth, async (req, res) => {
       const when = new Date(r.ts).toLocaleString('pt-BR');
       const rodape = `<div class="muted">Cidade: ${r.cidade || '—'} · ${when} · ${r.usuario || ''}</div>`;
       const obs = r.obs ? `<div class="muted">${r.obs}</div>` : '';
+
       return {
         id: r.id,
         tipo: r.tipo,
-        lat: Number(r.lat),
-        lng: Number(r.lng),
-        accuracy: (r.accuracy != null ? Number(r.accuracy) : null),
+        lat, lng,
+        accuracy: (acc != null && Number.isFinite(acc)) ? acc : null,
         popup: `${title}${obs ? '<br>' + obs : ''}<br>${rodape}`
       };
-    });
+    })
+    .filter(Boolean) as any[];
+
+  // Log no servidor para acompanhar
+  console.log(`[mapa] op=${id} rows=${rows.length} markers=${markers.length}`);
 
   return res.render('operacoes-mapa', {
     user: (req.session as any).user,
@@ -2262,6 +2280,7 @@ app.get('/operacoes/:id/mapa', requireAuth, async (req, res) => {
     markers
   });
 });
+
 
 
 // edicçao de operação
@@ -2445,18 +2464,66 @@ async function runGeoBackfill(opId?: number) {
   return { opId: opId ?? 'ALL', candidates: rows.length, updated };
 }
 
-// ✅ sem opcional: duas rotas
-app.post('/debug/geo/backfill', requireAdminOrGestor, async (_req, res) => {
+// ===== DEBUG: atalhos GET temporários para backfill (use só em homologação) ====
+app.get('/debug/geo/backfill', requireAdminOrGestor, async (_req: Request, res: Response) => {
   try { res.json(await runGeoBackfill()); }
   catch (e:any) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/debug/geo/backfill/:id', requireAdminOrGestor, async (req, res) => {
+app.get('/debug/geo/backfill/:id', requireAdminOrGestor, async (req: Request, res: Response) => {
   const opId = Number(req.params.id);
   if (!Number.isFinite(opId)) return res.status(400).json({ error: 'id inválido' });
   try { res.json(await runGeoBackfill(opId)); }
   catch (e:any) { res.status(500).json({ error: e.message }); }
 });
+
+
+app.get('/debug/map/:id', requireAdminOrGestor, async (req: Request, res: Response) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: 'id inválido' });
+
+  const gsub = db('evento_fotos')
+    .whereNotNull('lat').whereNotNull('lng')
+    .select('evento_id')
+    .max<{ evento_id: number; max_id: number }>('id as max_id')
+    .groupBy('evento_id')
+    .as('g');
+
+  const colLat = (DB_CLIENT === 'pg')
+    ? db.raw('COALESCE(e.lat, ef.lat)::float as lat')
+    : db.raw('COALESCE(e.lat, ef.lat) as lat');
+  const colLng = (DB_CLIENT === 'pg')
+    ? db.raw('COALESCE(e.lng, ef.lng)::float as lng')
+    : db.raw('COALESCE(e.lng, ef.lng) as lng');
+  const colAcc = (DB_CLIENT === 'pg')
+    ? db.raw('COALESCE(e.accuracy, ef.accuracy)::float as accuracy')
+    : db.raw('COALESCE(e.accuracy, ef.accuracy) as accuracy');
+
+  const rows = await db('operacao_eventos as e')
+    .where('e.operacao_id', id)
+    .leftJoin(gsub, 'g.evento_id', 'e.id')
+    .leftJoin('evento_fotos as ef', 'ef.id', 'g.max_id')
+    .select('e.id','e.tipo','e.ts', colLat, colLng, colAcc)
+    .orderBy('e.ts','desc')
+    .limit(300);
+
+  const markers = rows
+    .map((r: any) => {
+      const lat = Number(r.lat), lng = Number(r.lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+      if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+      return { id: r.id, tipo: r.tipo, lat, lng, accuracy: (r.accuracy == null ? null : Number(r.accuracy)) };
+    })
+    .filter(Boolean);
+
+  res.json({
+    opId: id,
+    rows: rows.length,
+    markers: markers.length,
+    sample: markers.slice(0, 50)
+  });
+});
+
 
 
 
