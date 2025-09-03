@@ -2415,40 +2415,49 @@ app.get('/debug/geo/op/:id', requireAdminOrGestor, async (req: Request, res: Res
   }
 });
 
-// 3) (Opcional) Executar backfill agora e mostrar quantos eventos ganharam geo
-app.post('/debug/geo/backfill/:id?', requireAdminOrGestor, async (req: Request, res: Response) => {
-  try {
-    const opId = req.params.id ? Number(req.params.id) : null;
 
-    const sub = db('evento_fotos')
-      .whereNotNull('lat').whereNotNull('lng')
-      .select('evento_id')
-      .max('id as max_id')
-      .groupBy('evento_id')
-      .as('g');
+// mesma lógica do backfill, extraída pra função
+async function runGeoBackfill(opId?: number) {
+  const sub = db('evento_fotos')
+    .whereNotNull('lat').whereNotNull('lng')
+    .select('evento_id')
+    .max('id as max_id')
+    .groupBy('evento_id')
+    .as('g');
 
-    let base = db('operacao_eventos as e')
-      .leftJoin(sub, 'g.evento_id', 'e.id')
-      .leftJoin('evento_fotos as ef', 'ef.id', 'g.max_id')
-      .whereNull('e.lat').whereNull('e.lng')
-      .whereNotNull('ef.lat').whereNotNull('ef.lng')
-      .select('e.id as evento_id', 'ef.lat', 'ef.lng', 'ef.accuracy');
+  let base = db('operacao_eventos as e')
+    .leftJoin(sub, 'g.evento_id', 'e.id')
+    .leftJoin('evento_fotos as ef', 'ef.id', 'g.max_id')
+    .whereNull('e.lat').whereNull('e.lng')
+    .whereNotNull('ef.lat').whereNotNull('ef.lng')
+    .select('e.id as evento_id', 'ef.lat', 'ef.lng', 'ef.accuracy');
 
-    if (opId && Number.isFinite(opId)) base = base.andWhere('e.operacao_id', opId);
+  if (opId && Number.isFinite(opId)) base = base.andWhere('e.operacao_id', opId);
 
-    const rows = await base;
-    let updated = 0;
-    for (const r of rows) {
-      await db('operacao_eventos').where({ id: r.evento_id }).update({
-        lat: r.lat, lng: r.lng, accuracy: r.accuracy ?? null
-      });
-      updated++;
-    }
-    return res.json({ opId: opId ?? 'ALL', candidates: rows.length, updated });
-  } catch (e:any) {
-    return res.status(500).json({ error: e.message });
+  const rows = await base;
+  let updated = 0;
+  for (const r of rows) {
+    await db('operacao_eventos').where({ id: r.evento_id }).update({
+      lat: r.lat, lng: r.lng, accuracy: r.accuracy ?? null
+    });
+    updated++;
   }
+  return { opId: opId ?? 'ALL', candidates: rows.length, updated };
+}
+
+// ✅ sem opcional: duas rotas
+app.post('/debug/geo/backfill', requireAdminOrGestor, async (_req, res) => {
+  try { res.json(await runGeoBackfill()); }
+  catch (e:any) { res.status(500).json({ error: e.message }); }
 });
+
+app.post('/debug/geo/backfill/:id', requireAdminOrGestor, async (req, res) => {
+  const opId = Number(req.params.id);
+  if (!Number.isFinite(opId)) return res.status(400).json({ error: 'id inválido' });
+  try { res.json(await runGeoBackfill(opId)); }
+  catch (e:any) { res.status(500).json({ error: e.message }); }
+});
+
 
 
 // =============================================================================
