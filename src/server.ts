@@ -1884,7 +1884,7 @@ app.get('/operacoes/:id/monitor', requireAdminOrGestor, async (req, res) => {
   const op = await db('operacoes').where({ id }).first();
   if (!op) return res.status(404).send('Operação não encontrada.');
 
-  // ---- KPIs de fiscalizações/pessoas/veículos
+  // ---- KPIs de fiscalizações / pessoas / veículos (saem de fiscalização)
   const k = await db('operacao_eventos as e')
     .leftJoin('evento_fiscalizacao as f', 'f.evento_id', 'e.id')
     .where('e.operacao_id', id)
@@ -1899,9 +1899,8 @@ app.get('/operacoes/:id/monitor', requireAdminOrGestor, async (req, res) => {
     .count<{ c: any }>('id as c')
     .first();
 
-
-  // ---- KPIs de flags (multado/fechado/lacrado)
-  const flagsRow = await db('evento_fiscalizacao as f')
+  // ---- Flags (multado/fechado/lacrado)
+  const flags = await db('evento_fiscalizacao as f')
     .join('operacao_eventos as e', 'e.id', 'f.evento_id')
     .where('e.operacao_id', id)
     .select(
@@ -1909,18 +1908,17 @@ app.get('/operacoes/:id/monitor', requireAdminOrGestor, async (req, res) => {
       db.raw('SUM(CASE WHEN f.fechado THEN 1 ELSE 0 END)  AS fechados'),
       db.raw('SUM(CASE WHEN f.lacrado THEN 1 ELSE 0 END)  AS lacrados')
     )
-    .first();
+    .first<{ multados: any; fechados: any; lacrados: any }>();
 
-  cards.multados = Number(flagsRow?.multados) || 0;
-  cards.fechados = Number(flagsRow?.fechados) || 0;
-  cards.lacrados = Number(flagsRow?.lacrados) || 0;
-
-
+  // Monte o objeto cards APÓS coletar tudo
   const cards = {
-    locais: Number(k?.locais) || 0,
-    pessoas: Number(k?.pessoas) || 0,
-    veiculos: Number(k?.veiculos) || 0,
-    apreensoes: Number(apr?.c) || 0,
+    locais:     Number(k?.locais)    || 0,
+    pessoas:    Number(k?.pessoas)   || 0,
+    veiculos:   Number(k?.veiculos)  || 0,
+    apreensoes: Number(apr?.c)       || 0,
+    multados:   Number(flags?.multados) || 0,
+    fechados:   Number(flags?.fechados) || 0,
+    lacrados:   Number(flags?.lacrados) || 0,
   };
 
   // ---- Efetivo total e quebras (PC/PM/Outros)
@@ -1937,13 +1935,13 @@ app.get('/operacoes/:id/monitor', requireAdminOrGestor, async (req, res) => {
     .first();
 
   const efetivo = {
-    total_agentes: Number(ef?.agentes) || 0,
-    total_viaturas: Number(ef?.viaturas) || 0,
-    pc_agentes: Number(ef?.pc_agentes) || 0,
-    pc_viaturas: Number(ef?.pc_viaturas) || 0,
-    pm_agentes: Number(ef?.pm_agentes) || 0,
-    pm_viaturas: Number(ef?.pm_viaturas) || 0,
-    outros_agentes: Number(ef?.outros_agentes) || 0,
+    total_agentes:   Number(ef?.agentes)         || 0,
+    total_viaturas:  Number(ef?.viaturas)        || 0,
+    pc_agentes:      Number(ef?.pc_agentes)      || 0,
+    pc_viaturas:     Number(ef?.pc_viaturas)     || 0,
+    pm_agentes:      Number(ef?.pm_agentes)      || 0,
+    pm_viaturas:     Number(ef?.pm_viaturas)     || 0,
+    outros_agentes:  Number(ef?.outros_agentes)  || 0,
     outros_viaturas: Number(ef?.outros_viaturas) || 0,
   };
 
@@ -1999,12 +1997,13 @@ app.get('/operacoes/:id/monitor', requireAdminOrGestor, async (req, res) => {
 
   res.render('operacoes-monitor', {
     operacao,
-    cards,          // {locais,pessoas,veiculos,apreensoes}
-    efetivo,        // detalhado: total + PC/PM/Outros
+    cards,          // {locais,pessoas,veiculos,apreensoes,multados,fechados,lacrados}
+    efetivo,        // total + PC/PM/Outros
     seriesPorCidade,
     feed
   });
 });
+
 
 
 
