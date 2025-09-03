@@ -1674,7 +1674,6 @@ app.get('/operacoes/:id/monitor', requireAdminOrGestor, async (req, res) => {
         .where('e.operacao_id', id)
         .select(db.raw('SUM(CASE WHEN f.multado THEN 1 ELSE 0 END)  AS multados'), db.raw('SUM(CASE WHEN f.fechado THEN 1 ELSE 0 END)  AS fechados'), db.raw('SUM(CASE WHEN f.lacrado THEN 1 ELSE 0 END)  AS lacrados'))
         .first();
-    // Monte o objeto cards APÓS coletar tudo
     const cards = {
         locais: Number(k?.locais) || 0,
         pessoas: Number(k?.pessoas) || 0,
@@ -1744,23 +1743,8 @@ app.get('/operacoes/:id/monitor', requireAdminOrGestor, async (req, res) => {
         nome: op.nome,
         inicio_fmt: op.inicio_agendado ? new Date(op.inicio_agendado).toLocaleString('pt-BR') : null
     };
-    // ---- Efetivo por cidade (sempre array)
-    const subEf = db('operacao_efetivo')
-        .where({ operacao_id: id })
-        .whereNotNull('cidade_id')
-        .select('cidade_id')
-        .sum({ total_agentes: 'total_agentes' })
-        .sum({ total_viaturas: 'total_viaturas' })
-        .groupBy('cidade_id')
-        .as('ef');
-    const efetivoByCity = await db('operacao_cidades as oc')
-        .join('cidades as c', 'c.id', 'oc.cidade_id')
-        .leftJoin(subEf, 'ef.cidade_id', 'oc.cidade_id')
-        .where('oc.operacao_id', id)
-        .select('c.id as cidade_id', 'c.nome as cidade', db.raw('COALESCE(ef.total_agentes, 0)  as total_agentes'), db.raw('COALESCE(ef.total_viaturas, 0) as total_viaturas'))
-        .orderBy('c.nome');
-    // ---- Efetivo por cidade (agentes/viaturas)
-    const subEf = db('operacao_efetivo')
+    // ---- Efetivo por cidade (agentes/viaturas) — **APENAS UMA VEZ**
+    const subEfCidades = db('operacao_efetivo')
         .where('operacao_id', id)
         .whereNotNull('cidade_id')
         .select('cidade_id')
@@ -1770,7 +1754,7 @@ app.get('/operacoes/:id/monitor', requireAdminOrGestor, async (req, res) => {
         .as('ef');
     const efetivoByCity = await db('operacao_cidades as oc')
         .join('cidades as c', 'c.id', 'oc.cidade_id')
-        .leftJoin(subEf, 'ef.cidade_id', 'oc.cidade_id')
+        .leftJoin(subEfCidades, 'ef.cidade_id', 'oc.cidade_id')
         .where('oc.operacao_id', id)
         .select('c.id as cidade_id', 'c.nome as cidade', db.raw('COALESCE(ef.agentes, 0)  as agentes'), db.raw('COALESCE(ef.viaturas, 0) as viaturas'))
         .orderBy('c.nome');
@@ -1780,7 +1764,7 @@ app.get('/operacoes/:id/monitor', requireAdminOrGestor, async (req, res) => {
         efetivo,
         seriesPorCidade,
         feed,
-        efetivoByCity, // <--- novo
+        efetivoByCity, // tabela de efetivo por cidade no EJS
     });
 });
 app.get('/operacoes/:id/metrics', requireAdminOrGestor, async (req, res) => {

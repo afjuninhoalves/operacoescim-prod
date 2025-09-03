@@ -1910,7 +1910,6 @@ app.get('/operacoes/:id/monitor', requireAdminOrGestor, async (req, res) => {
     )
     .first<{ multados: any; fechados: any; lacrados: any }>();
 
-  // Monte o objeto cards APÓS coletar tudo
   const cards = {
     locais: Number(k?.locais) || 0,
     pessoas: Number(k?.pessoas) || 0,
@@ -1994,29 +1993,9 @@ app.get('/operacoes/:id/monitor', requireAdminOrGestor, async (req, res) => {
     nome: op.nome,
     inicio_fmt: op.inicio_agendado ? new Date(op.inicio_agendado).toLocaleString('pt-BR') : null
   };
-  // ---- Efetivo por cidade (sempre array)
-  const subEf = db('operacao_efetivo')
-    .where({ operacao_id: id })
-    .whereNotNull('cidade_id')
-    .select('cidade_id')
-    .sum({ total_agentes: 'total_agentes' })
-    .sum({ total_viaturas: 'total_viaturas' })
-    .groupBy('cidade_id')
-    .as('ef');
 
-  const efetivoByCity = await db('operacao_cidades as oc')
-    .join('cidades as c', 'c.id', 'oc.cidade_id')
-    .leftJoin(subEf, 'ef.cidade_id', 'oc.cidade_id')
-    .where('oc.operacao_id', id)
-    .select(
-      'c.id as cidade_id',
-      'c.nome as cidade',
-      db.raw('COALESCE(ef.total_agentes, 0)  as total_agentes'),
-      db.raw('COALESCE(ef.total_viaturas, 0) as total_viaturas'),
-    )
-    .orderBy('c.nome');
-  // ---- Efetivo por cidade (agentes/viaturas)
-  const subEf = db('operacao_efetivo')
+  // ---- Efetivo por cidade (agentes/viaturas) — **APENAS UMA VEZ**
+  const subEfCidades = db('operacao_efetivo')
     .where('operacao_id', id)
     .whereNotNull('cidade_id')
     .select('cidade_id')
@@ -2027,7 +2006,7 @@ app.get('/operacoes/:id/monitor', requireAdminOrGestor, async (req, res) => {
 
   const efetivoByCity = await db('operacao_cidades as oc')
     .join('cidades as c', 'c.id', 'oc.cidade_id')
-    .leftJoin(subEf, 'ef.cidade_id', 'oc.cidade_id')
+    .leftJoin(subEfCidades, 'ef.cidade_id', 'oc.cidade_id')
     .where('oc.operacao_id', id)
     .select(
       'c.id as cidade_id',
@@ -2037,18 +2016,16 @@ app.get('/operacoes/:id/monitor', requireAdminOrGestor, async (req, res) => {
     )
     .orderBy('c.nome');
 
-
-
   res.render('operacoes-monitor', {
-  operacao,
-  cards,
-  efetivo,
-  seriesPorCidade,
-  feed,
-  efetivoByCity,   // <--- novo
+    operacao,
+    cards,
+    efetivo,
+    seriesPorCidade,
+    feed,
+    efetivoByCity, // tabela de efetivo por cidade no EJS
+  });
 });
 
-});
 
 
 
