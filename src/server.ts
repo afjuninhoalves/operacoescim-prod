@@ -203,6 +203,11 @@ async function ensureSchemaAndAdmin() {
       t.integer('fiscalizacao_evento_id').references('evento_id').inTable('evento_fiscalizacao').onDelete('SET NULL');
     });
   } else {
+    // --- GEO NO EVENTO (para não depender da foto)
+    await ensureColumn('operacao_eventos', 'lat', t => (t as Knex.AlterTableBuilder).float('lat'));
+    await ensureColumn('operacao_eventos', 'lng', t => (t as Knex.AlterTableBuilder).float('lng'));
+    await ensureColumn('operacao_eventos', 'accuracy', t => (t as Knex.AlterTableBuilder).float('accuracy'));
+
     await ensureColumn('evento_pessoa', 'foto_path', (t) => (t as Knex.AlterTableBuilder).string('foto_path', 255));
     await ensureColumn('evento_pessoa', 'fiscalizacao_evento_id', (t) =>
       (t as Knex.AlterTableBuilder).integer('fiscalizacao_evento_id')
@@ -476,7 +481,7 @@ function toInputDateTime(v: any): string {
   const d = new Date(v);
   if (isNaN(d.getTime())) return '';
   const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 
@@ -585,17 +590,29 @@ async function canUserPostOnOperation(opId: number, user: any) {
 }
 
 async function createEventoBase(args: {
-  operacao_id: number; cidade_id: number; user_id: number; tipo: string; obs: string | null;
+  operacao_id: number; cidade_id: number; user_id: number; tipo: string;
+  obs: string | null; lat?: number | null; lng?: number | null; acc?: number | null;
 }): Promise<number> {
-  const eventoId = await insertGetId('operacao_eventos', {
+  const row = {
     operacao_id: args.operacao_id,
     cidade_id: args.cidade_id,
     user_id: args.user_id,
     tipo: args.tipo,
-    obs: args.obs || null
-  });
-  return eventoId;
+    obs: args.obs || null,
+    lat: (Number.isFinite(args.lat as any) ? args.lat : null) as any,
+    lng: (Number.isFinite(args.lng as any) ? args.lng : null) as any,
+    accuracy: (Number.isFinite(args.acc as any) ? args.acc : null) as any
+  };
+
+  if (DB_CLIENT === 'pg') {
+    const [ret] = await db('operacao_eventos').insert(row, ['id']);
+    return Number((ret as any).id);
+  } else {
+    const [id] = await db('operacao_eventos').insert(row);
+    return Number(id);
+  }
 }
+
 
 
 //-----  Rota de health check----- 
@@ -1029,12 +1046,12 @@ app.get('/operacoes', requireAuth, async (req, res) => {
 // NOVA (ADMIN ou GESTOR)
 app.get('/operacoes/nova', requireAdminOrGestor, csrfProtection, async (_req, res) => {
   const cidades = await db('cidades').select('*').orderBy('nome');
-  res.render('operacoes-form', { 
+  res.render('operacoes-form', {
     mode: 'create',                    // << adicionado
-    csrfToken: (_req as any).csrfToken(), 
-    cidades, 
-    values: {}, 
-    errors: [] 
+    csrfToken: (_req as any).csrfToken(),
+    cidades,
+    values: {},
+    errors: []
   });
 });
 
@@ -1219,12 +1236,10 @@ app.post(
     const obs = String(req.body.obs || '').trim() || null;
 
     // evento base
+    const { lat, lng, acc } = getGeoFromBody(req);
     const evento_id = await createEventoBase({
-      operacao_id,
-      cidade_id: Number(cidade_id),
-      user_id: user.id,
-      tipo: 'fiscalizacao',
-      obs
+      operacao_id, cidade_id: user.cidade_id, user_id: user.id, tipo: 'fiscalizacao', obs,
+      lat, lng, acc
     });
 
     // detalhe da fiscalização
@@ -1286,13 +1301,12 @@ app.post(
     if (!nome) return res.status(400).send('Informe o nome da pessoa.');
 
     // cria evento base
+    const { lat, lng, acc } = getGeoFromBody(req);
     const evento_id = await createEventoBase({
-      operacao_id,
-      cidade_id: Number(cidade_id),
-      user_id: user.id,
-      tipo: 'pessoa',
-      obs
+      operacao_id, cidade_id: user.cidade_id, user_id: user.id, tipo: 'pessoa', obs,
+      lat, lng, acc
     });
+
 
     // primeira foto para compat legado
     const files = fotosFromRequest(req);
@@ -1361,13 +1375,12 @@ app.post(
     const obs = String(req.body.obs || '').trim() || null;
 
     // cria evento base
+    const { lat, lng, acc } = getGeoFromBody(req);
     const evento_id = await createEventoBase({
-      operacao_id,
-      cidade_id: Number(cidade_id),
-      user_id: user.id,
-      tipo: 'veiculo',
-      obs
+      operacao_id, cidade_id: user.cidade_id, user_id: user.id, tipo: 'veiculo', obs,
+      lat, lng, acc
     });
+
 
     await db('evento_veiculo').insert({
       evento_id,
@@ -1448,13 +1461,12 @@ app.post(
     if (errors.length) return res.status(400).send(errors.join(' '));
 
     // Cria o evento base (usa helper com .returning() no PG)
+    const { lat, lng, acc } = getGeoFromBody(req);
     const evento_id = await createEventoBase({
-      operacao_id,
-      cidade_id: Number(cidade_id),
-      user_id: user.id,
-      tipo: 'apreensao',
-      obs
+      operacao_id, cidade_id: user.cidade_id, user_id: user.id, tipo: 'apreensao', obs,
+      lat, lng, acc
     });
+
 
     // Detalhes de apreensão
     await db('evento_apreensao').insert({
@@ -2280,7 +2292,6 @@ app.get('/operacoes/:id/mapa', requireAuth, async (req, res) => {
   const op = await db('operacoes').where({ id }).first();
   if (!op) return res.status(404).send('Operação não encontrada.');
 
-  // permissão: admin/gestor vê tudo; demais, somente se sua cidade participa
   if (!['admin', 'gestor'].includes(user.role)) {
     const participa = await db('operacao_cidades')
       .where({ operacao_id: id, cidade_id: user.cidade_id })
@@ -2288,7 +2299,7 @@ app.get('/operacoes/:id/mapa', requireAuth, async (req, res) => {
     if (!participa) return res.status(403).send('Sem permissão.');
   }
 
-  // subquery: última foto COM geo por evento
+  // subquery: última foto COM geo por evento (pode não existir)
   const gsub = db('evento_fotos')
     .whereNotNull('lat').whereNotNull('lng')
     .select('evento_id')
@@ -2298,8 +2309,8 @@ app.get('/operacoes/:id/mapa', requireAuth, async (req, res) => {
 
   const rows = await db('operacao_eventos as e')
     .where('e.operacao_id', id)
-    .join(gsub, 'g.evento_id', 'e.id')
-    .join('evento_fotos as ef', 'ef.id', 'g.max_id')
+    .leftJoin(gsub, 'g.evento_id', 'e.id')              // LEFT (para não filtrar eventos sem foto)
+    .leftJoin('evento_fotos as ef', 'ef.id', 'g.max_id')
     .leftJoin('cidades as c', 'c.id', 'e.cidade_id')
     .leftJoin('usuarios as u', 'u.id', 'e.user_id')
     .leftJoin('evento_fiscalizacao as f', 'f.evento_id', 'e.id')
@@ -2310,7 +2321,10 @@ app.get('/operacoes/:id/mapa', requireAuth, async (req, res) => {
       'e.id', 'e.tipo', 'e.ts', 'e.obs',
       'c.nome as cidade',
       'u.nome as usuario',
-      'ef.lat', 'ef.lng', 'ef.accuracy',
+      // usa geo do EVENTO; se não tiver, cai para a foto
+      db.raw('COALESCE(e.lat, ef.lat) as lat'),
+      db.raw('COALESCE(e.lng, ef.lng) as lng'),
+      db.raw('COALESCE(e.accuracy, ef.accuracy) as accuracy'),
       'f.tipo_local',
       'p.nome as pessoa_nome', 'p.cpf as pessoa_cpf',
       'v.tipo_veiculo', 'v.marca_modelo', 'v.placa',
@@ -2318,35 +2332,31 @@ app.get('/operacoes/:id/mapa', requireAuth, async (req, res) => {
     )
     .orderBy('e.ts', 'desc');
 
-  // monta popup por tipo (e números garantidos)
-  const markers = rows.map(r => {
-    let title = '';
-    if (r.tipo === 'fiscalizacao') {
-      title = `<strong>Fiscalização</strong><br>Local: ${r.tipo_local || '—'}`;
-    } else if (r.tipo === 'pessoa') {
-      title = `<strong>Pessoa</strong><br>Nome: ${r.pessoa_nome || '—'}<br>CPF: ${r.pessoa_cpf || '—'}`;
-    } else if (r.tipo === 'veiculo') {
-      title = `<strong>Veículo</strong><br>Tipo: ${r.tipo_veiculo || '—'}<br>Modelo: ${r.marca_modelo || '—'}<br>Placa: ${r.placa || '—'}`;
-    } else if (r.tipo === 'apreensao') {
-      title = `<strong>Apreensão</strong><br>Tipo: ${r.apreensao_tipo || '—'}<br>Qtd: ${r.quantidade ?? '—'} ${r.unidade || ''}`;
-    }
-    const when = new Date(r.ts).toLocaleString('pt-BR');
-    const rodape = `<div class="muted">Cidade: ${r.cidade || '—'} · ${when} · ${r.usuario || ''}</div>`;
-    const obs = r.obs ? `<div class="muted">${r.obs}</div>` : '';
-
-    const lat = Number(r.lat);
-    const lng = Number(r.lng);
-    const acc = Number.isFinite(Number(r.accuracy)) ? Number(r.accuracy) : 0;
-
-    return {
-      id: r.id,
-      tipo: r.tipo,
-      lat,
-      lng,
-      accuracy: acc, // nunca null/NaN
-      popup: `${title}${obs ? '<br>' + obs : ''}<br>${rodape}`
-    };
-  });
+  const markers = rows
+    .filter((r: any) => Number.isFinite(r.lat) && Number.isFinite(r.lng))
+    .map((r: any) => {
+      let title = '';
+      if (r.tipo === 'fiscalizacao') {
+        title = `<strong>Fiscalização</strong><br>Local: ${r.tipo_local || '—'}`;
+      } else if (r.tipo === 'pessoa') {
+        title = `<strong>Pessoa</strong><br>Nome: ${r.pessoa_nome || '—'}<br>CPF: ${r.pessoa_cpf || '—'}`;
+      } else if (r.tipo === 'veiculo') {
+        title = `<strong>Veículo</strong><br>Tipo: ${r.tipo_veiculo || '—'}<br>Modelo: ${r.marca_modelo || '—'}<br>Placa: ${r.placa || '—'}`;
+      } else if (r.tipo === 'apreensao') {
+        title = `<strong>Apreensão</strong><br>Tipo: ${r.apreensao_tipo || '—'}<br>Qtd: ${r.quantidade ?? '—'} ${r.unidade || ''}`;
+      }
+      const when = new Date(r.ts).toLocaleString('pt-BR');
+      const rodape = `<div class="muted">Cidade: ${r.cidade || '—'} · ${when} · ${r.usuario || ''}</div>`;
+      const obs = r.obs ? `<div class="muted">${r.obs}</div>` : '';
+      return {
+        id: r.id,
+        tipo: r.tipo,
+        lat: Number(r.lat),
+        lng: Number(r.lng),
+        accuracy: (r.accuracy != null ? Number(r.accuracy) : null),
+        popup: `${title}${obs ? '<br>' + obs : ''}<br>${rodape}`
+      };
+    });
 
   return res.render('operacoes-mapa', {
     user: (req.session as any).user,
@@ -2354,6 +2364,7 @@ app.get('/operacoes/:id/mapa', requireAuth, async (req, res) => {
     markers
   });
 });
+
 
 // edicçao de operação
 
