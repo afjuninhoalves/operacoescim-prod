@@ -761,55 +761,13 @@ app.get('/operacoes/:id/efetivo/novo', requireAuth, requireAdminOrGestor, csrfPr
         csrfToken: req.csrfToken(),
     });
 });
-app.post('/operacoes/:id/efetivo', requireAuth, requireAdminOrGestor, csrfProtection, async (req, res) => {
+// posta de efetivo 
+app.post('/operacoes/:id/efetivo', requireAuth, requireAdminOrGestor, // mantenha só este gate (ou o seu canUserPostOnOperation, mas não os dois)
+csrfProtection, async (req, res) => {
     const user = req.session.user;
     const operacao_id = Number(req.params.id);
     if (!Number.isFinite(operacao_id))
         return res.status(400).send('ID inválido');
-    const num = (v) => { const n = Number(v); return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0; };
-    const bool = (v) => v === 'on' || v === 'true' || v === '1';
-    // cidade opcional: vazio => registro "geral" (cidade_id = null)
-    const cidade_id = req.body.cidade_id ? Number(req.body.cidade_id) : null;
-    const total_agentes = num(req.body.total_agentes);
-    const total_viaturas = num(req.body.total_viaturas);
-    const pc = bool(req.body.pc);
-    const pc_agentes = pc ? num(req.body.pc_agentes) : 0;
-    const pc_viaturas = pc ? num(req.body.pc_viaturas) : 0;
-    const pm = bool(req.body.pm);
-    const pm_agentes = pm ? num(req.body.pm_agentes) : 0;
-    const pm_viaturas = pm ? num(req.body.pm_viaturas) : 0;
-    const outros = bool(req.body.outros);
-    const outros_agentes = outros ? num(req.body.outros_agentes) : 0;
-    const outros_viaturas = outros ? num(req.body.outros_viaturas) : 0;
-    // UPSERT por (operacao_id, cidade_id)
-    await db('operacao_efetivo')
-        .insert({
-        operacao_id,
-        cidade_id,
-        user_id: user?.id ?? null,
-        total_agentes, total_viaturas,
-        pc, pc_agentes, pc_viaturas,
-        pm, pm_agentes, pm_viaturas,
-        outros, outros_agentes, outros_viaturas
-    })
-        .onConflict(['operacao_id', 'cidade_id'])
-        .merge({
-        user_id: user?.id ?? null,
-        total_agentes, total_viaturas,
-        pc, pc_agentes, pc_viaturas,
-        pm, pm_agentes, pm_viaturas,
-        outros, outros_agentes, outros_viaturas,
-        ts: db.fn.now()
-    });
-    return res.redirect(`/operacoes/${operacao_id}`);
-});
-app.post('/operacoes/:id/efetivo', requireAuth, csrfProtection, async (req, res) => {
-    const user = req.session.user;
-    const operacao_id = Number(req.params.id);
-    if (!Number.isFinite(operacao_id))
-        return res.status(400).send('ID inválido');
-    if (!(await canUserPostOnOperation(operacao_id, user)))
-        return res.status(403).send('Sem permissão.');
     const num = (v) => { const n = Number(v); return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0; };
     const bool = (v) => v === 'on' || v === 'true' || v === '1';
     const cidade_id = req.body.cidade_id ? Number(req.body.cidade_id) : null;
@@ -826,7 +784,7 @@ app.post('/operacoes/:id/efetivo', requireAuth, csrfProtection, async (req, res)
     const outros_viaturas = outros ? num(req.body.outros_viaturas) : 0;
     const payload = {
         operacao_id,
-        cidade_id, // pode ser null
+        cidade_id, // pode ser null (linha "Geral")
         user_id: user?.id ?? null,
         total_agentes, total_viaturas,
         pc, pc_agentes, pc_viaturas,
@@ -835,7 +793,7 @@ app.post('/operacoes/:id/efetivo', requireAuth, csrfProtection, async (req, res)
         ts: db.fn.now()
     };
     if (cidade_id == null) {
-        // ---- caso "GERAL" (cidade nula) -> update manual
+        // Linha "Geral" (cidade nula) — trata manualmente p/ não colidir com a constraint parcial
         const exists = await db('operacao_efetivo')
             .where({ operacao_id })
             .whereNull('cidade_id')
@@ -851,7 +809,7 @@ app.post('/operacoes/:id/efetivo', requireAuth, csrfProtection, async (req, res)
         }
     }
     else {
-        // ---- caso por CIDADE -> upsert pelo par (operacao_id, cidade_id)
+        // Por cidade — UPSERT pelo par (operacao_id, cidade_id)
         await db('operacao_efetivo')
             .insert(payload)
             .onConflict(['operacao_id', 'cidade_id'])
