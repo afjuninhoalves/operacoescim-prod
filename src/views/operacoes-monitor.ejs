@@ -380,30 +380,35 @@
                 const apr = Number(row.apreensao || 0);
 
                 const ef = efMap.get(row.cidade_id) || {};
-                const totalEfetivo = Number(ef.agentes || 0); // <- usa "agentes" // se quiser agentes + viaturas,
-                  troque por: // const totalEfetivo=(Number(ef.agentes||0) + Number(ef.viaturas||0)); %>
-                  <tr>
-                    <td>
-                      <%= row.cidade %>
-                    </td>
-                    <td>
-                      <%= fisc %>
-                    </td>
-                    <td>
-                      <%= pes %>
-                    </td>
-                    <td>
-                      <%= vei %>
-                    </td>
-                    <td>
-                      <%= apr %>
-                    </td>
-                    <td>
-                      <%= totalEfetivo %>
-                    </td>
-                  </tr>
-                  <% }) %>
+
+                // Usa só "agentes" no total. Se quiser somar viaturas também,
+                // troque pela linha comentada abaixo.
+                const totalEfetivo = Number(ef.agentes || 0);
+                // const totalEfetivo = Number(ef.agentes || 0) + Number(ef.viaturas || 0);
+                %>
+                <tr>
+                  <td>
+                    <%= row.cidade %>
+                  </td>
+                  <td>
+                    <%= fisc %>
+                  </td>
+                  <td>
+                    <%= pes %>
+                  </td>
+                  <td>
+                    <%= vei %>
+                  </td>
+                  <td>
+                    <%= apr %>
+                  </td>
+                  <td>
+                    <%= totalEfetivo %>
+                  </td>
+                </tr>
+                <% }) %>
             </tbody>
+
           </table>
       </div>
 
