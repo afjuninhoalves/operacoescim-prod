@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>Operações CIM — Home</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      --bg: #0b1220;
+      --panel: #0f172a;
+      --panel-2: #111827;
+      --border: #1f2937;
+      --muted: #9ca3af;
+      --text: #e5e7eb;
+      --brand: #60a5fa;
+      /* azul suave */
+      --accent: #22c55e;
+      /* verde */
+      --blue: #2563eb;
+      --shadow: 0 10px 30px rgba(0, 0, 0, .35);
+      --radius: 14px;
+      --gap: 22px;
+    }
+
+    /* RESET */
+    * {
+      box-sizing: border-box
+    }
+
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, 'Helvetica Neue', Arial
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none
+    }
+
+    button {
+      font: inherit
+    }
+
+    /* WRAPPER */
+    .container {
+      max-width: 1160px;
+      margin: 0 auto;
+      padding: 28px 20px 56px
+    }
+
+    /* TOP BAR */
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      backdrop-filter: saturate(140%) blur(8px);
+      background: linear-gradient(to bottom, rgba(17, 24, 39, .86), rgba(17, 24, 39, .70));
+      border-bottom: 1px solid var(--border);
+    }
+
+    .topbar-inner {
+      max-width: 1160px;
+      margin: 0 auto;
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      letter-spacing: .2px
+    }
+
+    .brand-badge {
+      display: inline-grid;
+      place-items: center;
+      width: 30px;
+      height: 30px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--blue), #0ea5e9);
+      box-shadow: 0 6px 16px rgba(37, 99, 235, .35);
+      font-weight: 900;
+      color: white;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-weight: 600
+    }
+
+    /* BUTTONS */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      cursor: pointer
+    }
+
+    .btn:hover {
+      filter: brightness(1.08)
+    }
+
+    .btn-blue {
+      background: var(--blue);
+      border-color: rgba(37, 99, 235, .7);
+      color: #fff
+    }
+
+    .btn-green {
+      background: var(--accent);
+      border-color: rgba(34, 197, 94, .6);
+      color: #06260f
+    }
+
+    .btn-ghost {
+      background: transparent
+    }
+
+    /* GRID */
+    .grid {
+      display: grid;
+      gap: var(--gap);
+      grid-template-columns: 1fr;
+    }
+
+    @media(min-width:980px) {
+      .grid {
+        grid-template-columns: 1.2fr .8fr;
+      }
+    }
+
+    /* CARDS */
+    .section {
+      margin-top: 28px;
+      margin-bottom: 10px
+    }
+
+    .section h1 {
+      margin: 0 0 8px;
+      font-size: 22px;
+      letter-spacing: .2px
+    }
+
+    .section p {
+      margin: 0;
+      color: var(--muted)
+    }
+
+    .card {
+      background: linear-gradient(180deg, var(--panel), var(--panel-2));
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 20px;
+    }
+
+    .card+.card {
+      margin-top: var(--gap)
+    }
+
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px
+    }
+
+    .k {
+      display: grid;
+      gap: 6px
+    }
+
+    .muted {
+      color: var(--muted)
+    }
+
+    .spacer {
+      height: 6px
+    }
+
+    /* CITY INFO */
+    .city {
+      display: flex;
+      gap: 16px;
+      align-items: flex-start
+    }
+
+    .city .logo {
+      width: 56px;
+      height: 56px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      object-fit: cover;
+      background: #0b1220
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: #0b1325;
+      font-weight: 600;
+      color: #c7d2fe
+    }
+
+    /* LIST CTA */
+    .cta {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap
+    }
+
+    .hr {
+      height: 1px;
+      background: var(--border);
+      margin: 14px 0
+    }
+  </style>
+</head>
+
+<body>
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <span class="brand-badge">C</span>
+        <div>
+          Operações CIM
+          <div class="subtitle">
+            <strong>
+              <%= user.nome %>
+            </strong> • <%= user.role %>
+          </div>
+        </div>
+      </div>
+
+      <form method="post" action="/logout">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <button type="submit" class="btn btn-ghost">Sair</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="container">
+
+    <!-- TÍTULO DA PÁGINA -->
+    <div class="section">
+      <h1>Dashboard</h1>
+      <p>Visão geral da sua cidade e acesso rápido aos módulos.</p>
+    </div>
+
+    <!-- GRID PRINCIPAL -->
+    <div class="grid">
+
+      <!-- COLUNA ESQUERDA: CIDADE -->
+      <div class="col">
+        <div class="card">
+          <div class="city">
+            <% if (cidade && cidade.logo_path) { %>
+              <img src="<%= cidade.logo_path %>" class="logo" alt="Logo da cidade">
+              <% } else { %>
+                <div class="logo" style="display:grid;place-items:center;color:#64748b">N/D</div>
+                <% } %>
+
+                  <div class="k">
+                    <div class="row" style="align-items:center;gap:10px">
+                      <h2 style="margin:0">
+                        <%= cidade ? cidade.nome : 'Sem cidade vinculada' %>
+                      </h2>
+                      <% if (cidade) { %>
+                        <span class="badge">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                            <path d="M12 3l9 4.5-9 4.5L3 7.5 12 3zM3 12l9 4.5 9-4.5M3 16.5L12 21l9-4.5" stroke="#93c5fd"
+                              stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+                          </svg>
+                          <%= cidade.corporacao || 'Corporação N/D' %>
+                        </span>
+                        <% } %>
+                    </div>
+
+                    <div class="spacer"></div>
+                    <% if (cidade) { %>
+                      <div class="muted">Comandante: <strong>
+                          <%= cidade.comandante || 'N/D' %>
+                        </strong></div>
+                      <div class="muted">Contato: <strong>
+                          <%= cidade.contato || 'N/D' %>
+                        </strong></div>
+                      <% } else { %>
+                        <div class="muted">Vincule este usuário a uma cidade para ver os detalhes.</div>
+                        <% } %>
+                  </div>
+          </div>
+          <div class="hr"></div>
+          <div class="cta">
+            <a class="btn" href="/cidades">Ver todas as cidades</a>
+            <% if (user.role==='admin' ) { %>
+              <a class="btn" href="/cidades/nova">Nova cidade</a>
+              <% } %>
+          </div>
+        </div>
+
+        <!-- OPERAÇÕES (destaque) -->
+        <div class="card">
+          <h2 style="margin:0 0 8px">Operações</h2>
+          <p class="muted" style="margin:0 0 14px">Planeje, execute e acompanhe operações integradas.</p>
+          <div class="cta">
+            <a class="btn btn-blue" href="/operacoes">Ver operações</a>
+            <% if (['admin','gestor'].includes(user.role)) { %>
+              <a class="btn btn-success" href="/operacoes/nova">Nova operação</a>
+              <% } %>
+          </div>
+        </div>
+      </div>
+
+      <!-- COLUNA DIREITA: ADMIN & ATALHOS -->
+      <div class="col">
+        <div class="card">
+          <h2 style="margin:0 0 8px">Acessos rápidos</h2>
+          <div class="row">
+            <a class="btn" href="/operacoes">Minhas operações</a>
+            <a class="btn" href="/operacoes?status=agendada">Agendadas</a>
+            <a class="btn" href="/operacoes?status=em_andamento">Em andamento</a>
+          </div>
+        </div>
+
+        <% if (user.role==='admin' ) { %>
+          <div class="card">
+            <h2 style="margin:0 0 8px">Administração</h2>
+            <p class="muted" style="margin:0 0 14px">Gerencie entidades e permissões do sistema.</p>
+            <div class="row">
+              <a class="btn" href="/cidades">Gerenciar Cidades</a>
+              <a class="btn" href="/usuarios">Gerenciar Usuários</a>
+            </div>
+          </div>
+          <% } %>
+      </div>
+    </div>
+
+  </div>
+</body>
+
+</html>

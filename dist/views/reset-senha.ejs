@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <title>Redefinir senha</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body{margin:0;font-family:Inter,system-ui,Arial;background:#0f172a;color:#e5e7eb}
+    .wrap{max-width:480px;margin:40px auto;padding:0 16px}
+    .card{background:#111827;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.35);padding:24px}
+    input{width:100%;padding:10px;border-radius:8px;border:1px solid #374151;background:#0b1220;color:#e5e7eb}
+    .btn{padding:10px 16px;border-radius:8px;border:none;background:#2563eb;color:#fff;cursor:pointer}
+    .error{background:#7f1d1d;border:1px solid #991b1b;color:#fecaca;padding:10px;border-radius:8px;margin-bottom:12px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h2>Redefinir senha</h2>
+      <% if (errors && errors.length) { %>
+        <div class="error">
+          <ul><% errors.forEach(e=>{ %><li><%= e %></li><% }) %></ul>
+        </div>
+      <% } %>
+      <form method="post" action="">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <label>Nova senha</label>
+        <input type="password" name="senha" placeholder="Min 10 chars, maiúscula, minúscula, número e especial" required>
+        <div style="margin-top:12px">
+          <button class="btn" type="submit">Salvar senha</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</body>
+</html>

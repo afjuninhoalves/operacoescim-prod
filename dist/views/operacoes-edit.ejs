@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Editar Operação</title>
+  <!-- se seu CSS principal é /login.css, mantenha; ajuste se for outro -->
+  <link rel="stylesheet" href="/login.css">
+  <style>
+    .container{max-width:980px;margin:32px auto;padding:16px}
+    .form-group{margin:12px 0}
+    .btn{display:inline-block;background:#3b82f6;color:#fff;border:0;border-radius:8px;padding:8px 14px;text-decoration:none;cursor:pointer}
+    .btn-secondary{background:#334155}
+    .checkboxes label{font-weight:normal}
+    input, textarea{width:100%;padding:8px;border-radius:6px;border:1px solid #334155;background:#0f172a;color:#e2e8f0}
+  </style>
+</head>
+<body>
+<div class="container">
+  <h2>Editar Operação</h2>
+
+  <form method="post" action="/operacoes/<%= operacao.id %>/editar">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+    <div class="form-group">
+      <label>Nome</label>
+      <input type="text" name="nome" required value="<%= operacao.nome %>">
+    </div>
+
+    <div class="form-group">
+      <label>Descrição</label>
+      <textarea name="descricao" rows="3"><%= operacao.descricao || '' %></textarea>
+    </div>
+
+    <div class="form-group">
+      <label>Início (agendado)</label>
+      <input type="datetime-local" name="inicio_agendado" required value="<%= operacao.inicio_local || '' %>">
+    </div>
+
+    <div class="form-group">
+      <label>Cidades participantes</label>
+      <div class="checkboxes">
+        <% cidades.forEach(c => { %>
+          <label>
+            <input type="checkbox" name="cidades" value="<%= c.id %>"
+              <%= selecionadas.has(c.id) ? 'checked' : '' %> >
+            <%= c.nome %>
+          </label>
+        <% }) %>
+      </div>
+    </div>
+
+    <button class="btn">Salvar</button>
+    <a class="btn btn-secondary" href="/operacoes/<%= operacao.id %>">Cancelar</a>
+  </form>
+</div>
+</body>
+</html>

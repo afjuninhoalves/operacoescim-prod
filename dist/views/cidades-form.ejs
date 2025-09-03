@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title><%= (typeof mode !== 'undefined' && mode === 'edit') ? 'Editar cidade' : 'Nova cidade' %></title>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial;margin:0;background:#0b1220;color:#e5e7eb}
+    .wrap{max-width:900px;margin:30px auto;padding:0 16px}
+    .card{background:#0f172a;border:1px solid #1f2937;border-radius:12px;padding:18px}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .row-1{display:grid;grid-template-columns:1fr;gap:12px}
+    label{display:block;margin:10px 0 6px}
+    input[type=text],input[type=datetime-local],input[type=email],input[type=file]{
+      width:100%;padding:10px;border-radius:10px;border:1px solid #1f2937;background:#111827;color:#e5e7eb
+    }
+    .btns{display:flex;gap:10px;margin-top:14px}
+    .btn{padding:10px 14px;border-radius:10px;border:1px solid #374151;background:#111827;color:#e5e7eb;text-decoration:none}
+    .btn:hover{filter:brightness(1.08)}
+    .muted{color:#9ca3af}
+    .errors{background:#1f2937;border:1px solid #ef4444;color:#fff;padding:12px;border-radius:10px;margin-bottom:12px}
+    img.logo{max-height:80px;border:1px solid #374151;border-radius:8px;background:#111827;padding:6px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h2><%= (typeof mode !== 'undefined' && mode === 'edit') ? 'Editar cidade' : 'Nova cidade' %></h2>
+
+    <% if (errors && errors.length) { %>
+      <div class="errors">
+        <ul style="margin:0;padding-left:18px">
+          <% errors.forEach(e => { %><li><%= e %></li><% }) %>
+        </ul>
+      </div>
+    <% } %>
+
+    <form method="post" enctype="multipart/form-data"
+      action="<%= (typeof mode !== 'undefined' && mode === 'edit') ? ('/cidades/' + values.id + '/editar') : '/cidades/nova' %>">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>"/>
+
+      <div class="card">
+        <div class="row">
+          <div>
+            <label>Nome da cidade</label>
+            <input type="text" name="nome" value="<%= (values && values.nome) || '' %>" required />
+          </div>
+          <div>
+            <label>Corporação</label>
+            <input type="text" name="corporacao" value="<%= (values && values.corporacao) || '' %>" />
+          </div>
+        </div>
+
+        <div class="row">
+          <div>
+            <label>Comandante</label>
+            <input type="text" name="comandante" value="<%= (values && values.comandante) || '' %>" />
+          </div>
+          <div>
+            <label>Contato</label>
+            <input type="text" name="contato" value="<%= (values && values.contato) || '' %>" />
+          </div>
+        </div>
+
+        <div class="row-1" style="margin-top:8px">
+          <div>
+            <label>Logo (imagem)</label>
+            <input type="file" name="logo" accept="image/*" />
+            <% if (values && values.logo_path) { %>
+              <div class="muted" style="margin-top:6px">Logo atual:</div>
+              <img class="logo" src="<%= values.logo_path %>" alt="logo atual"/>
+              <div style="margin-top:8px">
+                <label><input type="checkbox" name="remover_logo" value="1" /> Remover logo</label>
+              </div>
+            <% } %>
+          </div>
+        </div>
+
+        <div class="btns">
+          <a class="btn" href="/cidades">Cancelar</a>
+          <button class="btn" type="submit">Salvar</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</body>
+</html>

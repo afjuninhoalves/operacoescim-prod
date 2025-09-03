@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Efetivo — <%= operacao.nome %></title>
+  <style>
+    :root{ --bg:#0b1220; --panel:#0f172a; --panel2:#111827; --border:#1f2937; --text:#e5e7eb; --muted:#9ca3af; --ok:#10b981; --warn:#f59e0b; }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial}
+    .container{max-width:960px;margin:24px auto;padding:0 16px}
+    .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--border);border-radius:14px;padding:16px}
+    .row{display:grid;gap:12px}
+    .row.cols-2{grid-template-columns:1fr 1fr}
+    .row.cols-3{grid-template-columns:1fr 1fr 1fr}
+    label{display:block;font-size:14px;color:var(--muted);margin-bottom:6px}
+    input[type="number"],select{width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:#0f1628;color:var(--text)}
+    .switch{display:flex;align-items:center;gap:8px;margin:6px 0 10px}
+    .muted{color:var(--muted)}
+    .btns{display:flex;gap:10px;margin-top:16px}
+    .btn{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:#111826;color:var(--text);text-decoration:none}
+    .btn:hover{filter:brightness(1.08)}
+    .btn.primary{background:#1e293b;border-color:#334155}
+    .section-title{font-weight:700;margin:8px 0 6px}
+    .grid-box{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+    @media (max-width:720px){ .row.cols-2,.row.cols-3,.grid-box{grid-template-columns:1fr} }
+    .disabled{opacity:.6;pointer-events:none}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2 style="margin:0 0 12px">Efetivo — <span class="muted"><%= operacao.nome %></span></h2>
+
+    <form class="card" method="post" action="/operacoes/<%= operacao.id %>/efetivo">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>"/>
+
+      <!-- Cidade opcional -->
+      <div class="row">
+        <div>
+          <label>Cidade (opcional) — deixe “Geral” para efetivo total</label>
+          <select name="cidade_id">
+            <option value="">Geral (todas)</option>
+            <% (cidades || []).forEach(c => { %>
+              <option value="<%= c.id %>"><%= c.nome %></option>
+            <% }) %>
+          </select>
+        </div>
+      </div>
+
+      <!-- Totais -->
+      <div class="row cols-2" style="margin-top:8px">
+        <div>
+          <label>Total de agentes (geral)</label>
+          <input type="number" min="0" name="total_agentes" value="0" required>
+        </div>
+        <div>
+          <label>Total de viaturas (geral)</label>
+          <input type="number" min="0" name="total_viaturas" value="0" required>
+        </div>
+      </div>
+
+      <!-- Polícia Civil -->
+      <div style="margin-top:18px">
+        <div class="section-title">Polícia Civil</div>
+        <div class="switch">
+          <input id="sw-pc" type="checkbox" name="pc">
+          <label for="sw-pc" style="margin:0">Houve participação</label>
+        </div>
+        <div id="box-pc" class="grid-box disabled">
+          <div>
+            <label>Agentes (PC)</label>
+            <input type="number" min="0" name="pc_agentes" value="0" disabled>
+          </div>
+          <div>
+            <label>Viaturas (PC)</label>
+            <input type="number" min="0" name="pc_viaturas" value="0" disabled>
+          </div>
+        </div>
+      </div>
+
+      <!-- Polícia Militar -->
+      <div style="margin-top:18px">
+        <div class="section-title">Polícia Militar</div>
+        <div class="switch">
+          <input id="sw-pm" type="checkbox" name="pm">
+          <label for="sw-pm" style="margin:0">Houve participação</label>
+        </div>
+        <div id="box-pm" class="grid-box disabled">
+          <div>
+            <label>Agentes (PM)</label>
+            <input type="number" min="0" name="pm_agentes" value="0" disabled>
+          </div>
+          <div>
+            <label>Viaturas (PM)</label>
+            <input type="number" min="0" name="pm_viaturas" value="0" disabled>
+          </div>
+        </div>
+      </div>
+
+      <!-- Outros órgãos -->
+      <div style="margin-top:18px">
+        <div class="section-title">Outros órgãos</div>
+        <div class="switch">
+          <input id="sw-outros" type="checkbox" name="outros">
+          <label for="sw-outros" style="margin:0">Houve participação</label>
+        </div>
+        <div id="box-outros" class="grid-box disabled">
+          <div>
+            <label>Agentes (outros)</label>
+            <input type="number" min="0" name="outros_agentes" value="0" disabled>
+          </div>
+          <div>
+            <label>Viaturas (outros)</label>
+            <input type="number" min="0" name="outros_viaturas" value="0" disabled>
+          </div>
+        </div>
+      </div>
+
+      <div class="btns">
+        <a class="btn" href="/operacoes/<%= operacao.id %>">Cancelar</a>
+        <button class="btn primary" type="submit">Salvar efetivo</button>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    function wireToggle(idSwitch, idBox){
+      const sw = document.getElementById(idSwitch);
+      const box = document.getElementById(idBox);
+      const inputs = () => box.querySelectorAll('input[type="number"]');
+      function apply(){
+        const on = sw.checked;
+        box.classList.toggle('disabled', !on);
+        inputs().forEach(i => i.disabled = !on);
+      }
+      sw.addEventListener('change', apply);
+      apply();
+    }
+    wireToggle('sw-pc', 'box-pc');
+    wireToggle('sw-pm', 'box-pm');
+    wireToggle('sw-outros', 'box-outros');
+  </script>
+</body>
+</html>

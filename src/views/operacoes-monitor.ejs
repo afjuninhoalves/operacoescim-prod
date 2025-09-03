@@ -291,142 +291,178 @@
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
     <script>
-(function () {
-  // Dados vindos do servidor
-  const series = <%- JSON.stringify(seriesPorCidade || []) %>;
-  console.log('[monitor] seriesPorCidade:', series);
+      (function () {
+        // Dados vindos do servidor
+        const series = <% - JSON.stringify(seriesPorCidade || []) %>;
+        console.log('[monitor] seriesPorCidade:', series);
 
-  const toN = (v) => {
-    const n = Number(v);
-    return Number.isFinite(n) ? n : 0;
-  };
+        const toN = (v) => {
+          const n = Number(v);
+          return Number.isFinite(n) ? n : 0;
+        };
 
-  // Há algum valor positivo?
-  const hasAny =
-    Array.isArray(series) &&
-    series.length > 0 &&
-    series.some(r => (toN(r.fiscalizacao) + toN(r.pessoa) + toN(r.veiculo) + toN(r.apreensao)) > 0);
+        // Há algum valor positivo?
+        const hasAny =
+          Array.isArray(series) &&
+          series.length > 0 &&
+          series.some(r => (toN(r.fiscalizacao) + toN(r.pessoa) + toN(r.veiculo) + toN(r.apreensao)) > 0);
 
-  const noDataEl = document.getElementById('noChartData');
-  const canvas = document.getElementById('byCityChart');
+        const noDataEl = document.getElementById('noChartData');
+        const canvas = document.getElementById('byCityChart');
 
-  if (!hasAny) {
-    if (noDataEl) {
-      noDataEl.textContent = 'Sem dados suficientes para o gráfico.';
-      noDataEl.style.display = 'block';
-    }
-    return;
-  }
-
-  if (!window.Chart) {
-    if (noDataEl) {
-      noDataEl.textContent = 'Não foi possível carregar o gráfico (Chart.js bloqueado).';
-      noDataEl.style.display = 'block';
-    }
-    return;
-  }
-
-  const labels = series.map(r => r.cidade);
-
-  const datasets = [
-    { key: 'fiscalizacao', label: 'Fiscalizações', color: '#60a5fa' },
-    { key: 'pessoa',       label: 'Pessoas',       color: '#f87171' },
-    { key: 'veiculo',      label: 'Veículos',      color: '#34d399' },
-    { key: 'apreensao',    label: 'Apreensões',    color: '#fbbf24' },
-  ].map(d => ({
-    label: d.label,
-    data: series.map(r => toN(r[d.key])),
-    backgroundColor: d.color,
-    borderColor: d.color,
-    borderWidth: 1,
-    borderRadius: 6,
-    maxBarThickness: 36,
-  }));
-
-  const ctx = canvas.getContext('2d');
-  new Chart(ctx, {
-    type: 'bar',
-    data: { labels, datasets },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      scales: {
-        x: {
-          stacked: false,
-          ticks: { color: '#e5e7eb' },
-          grid: { display: false }
-        },
-        y: {
-          beginAtZero: true,
-          ticks: { precision: 0, color: '#e5e7eb' },
-          grid: { color: 'rgba(229,231,235,0.1)' }
+        if (!hasAny) {
+          if (noDataEl) {
+            noDataEl.textContent = 'Sem dados suficientes para o gráfico.';
+            noDataEl.style.display = 'block';
+          }
+          return;
         }
-      },
-      plugins: {
-        legend: { position: 'top', labels: { color: '#e5e7eb' } },
-        tooltip: {
-          callbacks: { label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y}` }
+
+        if (!window.Chart) {
+          if (noDataEl) {
+            noDataEl.textContent = 'Não foi possível carregar o gráfico (Chart.js bloqueado).';
+            noDataEl.style.display = 'block';
+          }
+          return;
         }
-      }
-    }
-  });
-})();
-</script>
+
+        const labels = series.map(r => r.cidade);
+
+        const datasets = [
+          { key: 'fiscalizacao', label: 'Fiscalizações', color: '#60a5fa' },
+          { key: 'pessoa', label: 'Pessoas', color: '#f87171' },
+          { key: 'veiculo', label: 'Veículos', color: '#34d399' },
+          { key: 'apreensao', label: 'Apreensões', color: '#fbbf24' },
+        ].map(d => ({
+          label: d.label,
+          data: series.map(r => toN(r[d.key])),
+          backgroundColor: d.color,
+          borderColor: d.color,
+          borderWidth: 1,
+          borderRadius: 6,
+          maxBarThickness: 36,
+        }));
+
+        const ctx = canvas.getContext('2d');
+        new Chart(ctx, {
+          type: 'bar',
+          data: { labels, datasets },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              x: {
+                stacked: false,
+                ticks: { color: '#e5e7eb' },
+                grid: { display: false }
+              },
+              y: {
+                beginAtZero: true,
+                ticks: { precision: 0, color: '#e5e7eb' },
+                grid: { color: 'rgba(229,231,235,0.1)' }
+              }
+            },
+            plugins: {
+              legend: { position: 'top', labels: { color: '#e5e7eb' } },
+              tooltip: {
+                callbacks: { label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y}` }
+              }
+            }
+          }
+        });
+      })();
+    </script>
 
 
     <div class="grid">
       <!-- Tabela por cidade -->
       <div class="card">
         <div style="font-weight:700;margin-bottom:8px">Distribuição por cidade</div>
-        <% const efMap=new Map((efetivoByCity||[]).map(e=> [e.cidade_id, e])); %>
-          <table>
-            <thead>
+        <table>
+          <thead>
+            <tr>
+              <th>Cidade</th>
+              <th>Fiscalizações</th>
+              <th>Pessoas</th>
+              <th>Veículos</th>
+              <th>Apreensões</th>
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% (seriesPorCidade||[]).forEach(row=> {
+              const fisc = Number(row.fiscalizacao || 0);
+              const pes = Number(row.pessoa || 0);
+              const vei = Number(row.veiculo || 0);
+              const apr = Number(row.apreensao || 0);
+              const total = fisc + pes + vei + apr;
+              %>
               <tr>
-                <th>Cidade</th>
-                <th>Fiscalizações</th>
-                <th>Pessoas</th>
-                <th>Veículos</th>
-                <th>Apreensões</th>
-                <th>Efetivo (ag.)</th>
-                <th>Viaturas</th>
-                <th>Total eventos</th>
+                <td>
+                  <%= row.cidade %>
+                </td>
+                <td>
+                  <%= fisc %>
+                </td>
+                <td>
+                  <%= pes %>
+                </td>
+                <td>
+                  <%= vei %>
+                </td>
+                <td>
+                  <%= apr %>
+                </td>
+                <td>
+                  <%= total %>
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              <% (seriesPorCidade||[]).forEach(row=> {
-                const ef = efMap.get(row.cidade_id) || { total_agentes:0, total_viaturas:0 };
-                const totalEv = (row.fiscalizacao||0)+(row.pessoa||0)+(row.veiculo||0)+(row.apreensao||0);
-                %>
+              <% }) %>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card" style="margin-top:12px">
+        <div style="font-weight:700;margin-bottom:8px">Efetivo por cidade</div>
+        <table>
+          <thead>
+            <tr>
+              <th>Cidade</th>
+              <th>Agentes</th>
+              <th>Viaturas</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% const totAg=(efetivoByCity||[]).reduce((a,c)=>a + Number(c.agentes || 0), 0);
+              const totVt = (efetivoByCity||[]).reduce((a,c)=>a + Number(c.viaturas || 0), 0);
+              (efetivoByCity||[]).forEach(row => {
+              %>
+              <tr>
+                <td>
+                  <%= row.cidade %>
+                </td>
+                <td>
+                  <%= Number(row.agentes || 0) %>
+                </td>
+                <td>
+                  <%= Number(row.viaturas || 0) %>
+                </td>
+              </tr>
+              <% }) %>
                 <tr>
-                  <td>
-                    <%= row.cidade %>
+                  <td style="font-weight:700">Total</td>
+                  <td style="font-weight:700">
+                    <%= totAg %>
                   </td>
-                  <td>
-                    <%= row.fiscalizacao || 0 %>
-                  </td>
-                  <td>
-                    <%= row.pessoa || 0 %>
-                  </td>
-                  <td>
-                    <%= row.veiculo || 0 %>
-                  </td>
-                  <td>
-                    <%= row.apreensao || 0 %>
-                  </td>
-                  <td>
-                    <%= ef.total_agentes || 0 %>
-                  </td>
-                  <td>
-                    <%= ef.total_viaturas || 0 %>
-                  </td>
-                  <td>
-                    <%= totalEv %>
+                  <td style="font-weight:700">
+                    <%= totVt %>
                   </td>
                 </tr>
-                <% }) %>
-            </tbody>
-          </table>
+          </tbody>
+        </table>
       </div>
+
+
 
       <!-- Feed -->
       <div class="card">

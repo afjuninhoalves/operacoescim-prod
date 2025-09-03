@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <title>Registros — Operações CIM</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{
+      --bg:#0b1220; --panel:#0f172a; --panel-2:#111827; --border:#1f2937;
+      --muted:#9ca3af; --text:#e5e7eb; --blue:#2563eb; --accent:#22c55e; --red:#ef4444;
+      --shadow:0 10px 30px rgba(0,0,0,.35); --radius:14px; --gap:22px; --field:#0b1325
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,'Helvetica Neue',Arial}
+    a{color:inherit;text-decoration:none}
+    button{font:inherit}
+
+    /* Topbar */
+    .topbar{position:sticky;top:0;z-index:10;backdrop-filter:saturate(140%) blur(8px);
+      background:linear-gradient(to bottom,rgba(17,24,39,.86),rgba(17,24,39,.70));
+      border-bottom:1px solid var(--border)}
+    .topbar-inner{max-width:1160px;margin:0 auto;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+    .brand{display:flex;align-items:center;gap:10px;font-weight:700}
+    .brand-badge{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:10px;
+      background:linear-gradient(135deg,var(--blue),#0ea5e9);color:#fff;font-weight:900;
+      box-shadow:0 6px 16px rgba(37,99,235,.35)}
+
+    /* Layout */
+    .container{max-width:1160px;margin:0 auto;padding:28px 20px 56px}
+    .row{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+    .grid{display:grid;gap:var(--gap)}
+    .muted{color:var(--muted)}
+    .pill{display:inline-flex;align-items:center;padding:4px 10px;border-radius:999px;background:#0b1325;border:1px solid var(--border)}
+
+    /* Cards / Buttons / Inputs */
+    .card{background:linear-gradient(180deg,var(--panel),var(--panel-2));border:1px solid var(--border);
+      border-radius:var(--radius);box-shadow:var(--shadow);padding:18px}
+    .card h2{margin:0 0 6px}
+    .btn{display:inline-flex;align-items:center;gap:8px;padding:9px 12px;border-radius:10px;border:1px solid var(--border);
+      background:#111826;color:var(--text);cursor:pointer}
+    .btn:hover{filter:brightness(1.08)}
+    .btn-primary{background:var(--blue);border-color:rgba(37,99,235,.6);color:#fff}
+    .btn-ghost{background:#0b1325}
+    input[type="text"],input[type="date"],select{
+      width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border);
+      background:var(--field);color:var(--text);outline:none}
+    .filters{display:grid;gap:12px;grid-template-columns:1fr}
+    @media (min-width:980px){.filters{grid-template-columns:repeat(6,1fr)}}
+
+    /* Table */
+    table{width:100%;border-collapse:separate;border-spacing:0}
+    thead th{font-weight:600;text-align:left;padding:12px;border-bottom:1px solid var(--border);background:#0d1527}
+    tbody td{padding:12px;border-bottom:1px solid var(--border);vertical-align:top}
+    .pager{display:flex;gap:10px;align-items:center;justify-content:flex-end;margin-top:12px}
+    .hr{height:1px;background:var(--border);margin:16px 0}
+  </style>
+</head>
+<body>
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <span class="brand-badge">C</span>
+        <div>
+          Operações CIM
+          <div class="muted">Registros</div>
+        </div>
+      </div>
+      <div class="row">
+        <a class="btn" href="/">Início</a>
+        <a class="btn" href="/operacoes">Operações</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="card">
+      <h2>Registros</h2>
+      <div class="muted">Lista unificada de <strong>fiscalizações</strong>, <strong>pessoas</strong>, <strong>veículos</strong> e <strong>apreensões</strong>.</div>
+      <div class="hr"></div>
+
+      <!-- FILTROS (GET, não precisa CSRF) -->
+      <form method="get">
+        <div class="filters">
+          <div>
+            <label class="muted">Tipo</label>
+            <select name="tipo">
+              <option value="todos" <%= filtros.tipo==='todos' || !filtros.tipo ? 'selected' : '' %>>Todos</option>
+              <option value="fiscalizacao" <%= filtros.tipo==='fiscalizacao'?'selected':'' %>>Fiscalização</option>
+              <option value="pessoa" <%= filtros.tipo==='pessoa'?'selected':'' %>>Pessoa</option>
+              <option value="veiculo" <%= filtros.tipo==='veiculo'?'selected':'' %>>Veículo</option>
+              <option value="apreensao" <%= filtros.tipo==='apreensao'?'selected':'' %>>Apreensão</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="muted">Operação</label>
+            <select name="opId">
+              <option value="">Todas</option>
+              <% opsList.forEach(function(op){ %>
+                <option value="<%= op.id %>" <%= Number(filtros.opId)===op.id ? 'selected':'' %>><%= op.nome %></option>
+              <% }) %>
+            </select>
+          </div>
+
+          <div>
+            <label class="muted">Cidade</label>
+            <select name="cidade_id">
+              <option value="">Todas</option>
+              <% cidades.forEach(function(c){ %>
+                <option value="<%= c.id %>" <%= Number(filtros.cidadeId)===c.id ? 'selected':'' %>><%= c.nome %></option>
+              <% }) %>
+            </select>
+          </div>
+
+          <div>
+            <label class="muted">De</label>
+            <input type="date" name="from" value="<%= (filtros.from||'').slice(0,10) %>">
+          </div>
+
+          <div>
+            <label class="muted">Até</label>
+            <input type="date" name="to" value="<%= (filtros.to||'').slice(0,10) %>">
+          </div>
+
+          <div>
+            <label class="muted">Busca</label>
+            <input type="text" name="q" placeholder="texto, placa, CPF, tipo..." value="<%= filtros.q || '' %>">
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:10px;justify-content:flex-end">
+          <button class="btn btn-primary" type="submit">Filtrar</button>
+          <a class="btn btn-ghost" href="/registros">Limpar</a>
+        </div>
+      </form>
+    </div>
+
+    <!-- LISTA -->
+    <div class="card" style="margin-top:18px">
+      <div class="row" style="justify-content:space-between;margin-bottom:8px">
+        <div><strong><%= total %></strong> registro(s)</div>
+        <div class="pager">
+          <% const makeQS = (p) => {
+               const params = new URLSearchParams({
+                 tipo: filtros.tipo || '',
+                 opId: filtros.opId ? String(filtros.opId) : '',
+                 cidade_id: filtros.cidadeId ? String(filtros.cidadeId) : '',
+                 from: filtros.from || '',
+                 to: filtros.to || '',
+                 q: filtros.q || '',
+                 page: String(p)
+               });
+               return '/registros?' + params.toString();
+             };
+          %>
+          <a class="btn" href="<%= makeQS(Math.max(1, page-1)) %>">« Anterior</a>
+          <span class="muted">Página <strong><%= page %></strong> de <strong><%= pages %></strong></span>
+          <a class="btn" href="<%= makeQS(Math.min(pages, page+1)) %>">Próxima »</a>
+        </div>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Quando</th>
+            <th>Tipo</th>
+            <th>Operação / Cidade</th>
+            <th>Detalhes</th>
+            <th>Fotos</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% if (!registros.length) { %>
+            <tr><td colspan="6" class="muted">Nenhum registro com os filtros atuais.</td></tr>
+          <% } %>
+
+          <% registros.forEach(function(r){ %>
+            <tr>
+              <td>
+                <div><%= new Date(r.ts).toLocaleString('pt-BR') %></div>
+                <div class="muted"><%= r.user_nome || '—' %></div>
+              </td>
+              <td>
+                <% if (r.tipo==='fiscalizacao') { %>
+                  <span class="pill">Fiscalização</span>
+                <% } else if (r.tipo==='pessoa') { %>
+                  <span class="pill">Pessoa</span>
+                <% } else if (r.tipo==='veiculo') { %>
+                  <span class="pill">Veículo</span>
+                <% } else if (r.tipo==='apreensao') { %>
+                  <span class="pill">Apreensão</span>
+                <% } %>
+              </td>
+              <td>
+                <div><strong><%= r.op_nome %></strong></div>
+                <div class="muted"><%= r.cidade_nome %></div>
+              </td>
+              <td>
+                <% if (r.tipo==='fiscalizacao') { %>
+                  <div><strong>Local:</strong> <%= r.tipo_local || '—' %></div>
+                  <div class="muted"><%= r.obs || '' %></div>
+                <% } else if (r.tipo==='pessoa') { %>
+                  <div><strong>Nome:</strong> <%= r.pessoa_nome || '—' %></div>
+                  <div class="muted"><strong>CPF:</strong> <%= r.pessoa_cpf || '—' %></div>
+                  <div class="muted"><%= r.obs || '' %></div>
+                <% } else if (r.tipo==='veiculo') { %>
+                  <div><strong>Tipo:</strong> <%= r.tipo_veiculo || '—' %></div>
+                  <div class="muted"><strong>Modelo:</strong> <%= r.marca_modelo || '—' %></div>
+                  <div class="muted"><strong>Placa:</strong> <%= r.placa || '—' %></div>
+                  <div class="muted"><%= r.obs || '' %></div>
+                <% } else if (r.tipo==='apreensao') { %>
+                  <div><strong>Tipo:</strong> <%= r.apreensao_tipo || '—' %></div>
+                  <div class="muted"><strong>Qtd:</strong> <%= r.quantidade ?? '—' %> <%= r.unidade || '' %></div>
+                  <div class="muted"><%= r.obs || '' %></div>
+                <% } %>
+              </td>
+              <td><%= r.fotos %></td>
+              <td class="row">
+                <a class="btn" href="/operacoes/<%= r.operacao_id %>">Ver operação</a>
+                <% if (r.tipo==='fiscalizacao') { %>
+                  <a class="btn btn-primary" href="/operacoes/<%= r.operacao_id %>/fiscalizacoes/<%= r.id %>/editar">Editar</a>
+                <% } else if (r.tipo==='pessoa') { %>
+                  <a class="btn btn-primary" href="/operacoes/<%= r.operacao_id %>/pessoas/<%= r.id %>/editar">Editar</a>
+                <% } else if (r.tipo==='veiculo') { %>
+                  <a class="btn btn-primary" href="/operacoes/<%= r.operacao_id %>/veiculos/<%= r.id %>/editar">Editar</a>
+                <% } else if (r.tipo==='apreensao') { %>
+                  <a class="btn btn-primary" href="/operacoes/<%= r.operacao_id %>/apreensoes/<%= r.id %>/editar">Editar</a>
+                <% } %>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+
+      <div class="pager">
+        <a class="btn" href="<%= makeQS(Math.max(1, page-1)) %>">« Anterior</a>
+        <span class="muted">Página <strong><%= page %></strong> de <strong><%= pages %></strong></span>
+        <a class="btn" href="<%= makeQS(Math.min(pages, page+1)) %>">Próxima »</a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
