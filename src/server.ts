@@ -41,6 +41,7 @@ app.get('/debug/db-version', async (_req: Request, res: Response) => {
 });
 dotenv.config();
 
+const STORAGE_LOGOS = (process.env.STORAGE_LOGOS || 'disk').toLowerCase(); // 'db' | 'disk'
 
 const PORT = Number(process.env.PORT || 3000);
 const NODE_ENV = process.env.NODE_ENV || 'development';
@@ -119,7 +120,9 @@ async function ensureSchemaAndAdmin() {
     await ensureColumn('cidades', 'corporacao', (t) => (t as Knex.AlterTableBuilder).string('corporacao', 180));
     await ensureColumn('cidades', 'comandante', (t) => (t as Knex.AlterTableBuilder).string('comandante', 160));
     await ensureColumn('cidades', 'contato', (t) => (t as Knex.AlterTableBuilder).string('contato', 60));
-    await ensureColumn('cidades', 'logo_path', (t) => (t as Knex.AlterTableBuilder).string('logo_path', 255));
+    await ensureColumn('cidades', 'logo_data', t => (t as Knex.AlterTableBuilder).binary('logo_data'));
+    await ensureColumn('cidades', 'logo_mime', t => (t as Knex.AlterTableBuilder).string('logo_mime', 128));
+
   }
 
   // --- USUÁRIOS
@@ -480,11 +483,10 @@ const uploadFotos = multer({
 });
 
 // Uploader para logos
-const uploadLogo = multer({
-  storage: makeStorage('logos'),
-  limits: { fileSize: MAX_MB },
-  fileFilter: imageFilter
-});
+const uploadLogo = (STORAGE_LOGOS === 'db')
+  ? multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_MB }, fileFilter: imageFilter })
+  : multer({ storage: makeStorage('logos'), limits: { fileSize: MAX_MB }, fileFilter: imageFilter });
+
 
 // Aceitar tanto "foto" (1) quanto "fotos" (várias) nos formulários
 const uploadFotosFields = uploadFotos.fields([
@@ -589,6 +591,23 @@ async function createEventoBase(args: {
 
 app.get('/healthz', (_req, res) => res.status(200).send('ok'));
 
+
+//  rota para logo 
+
+
+app.get('/logo/cidade/:id', async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) return res.status(400).send('id inválido');
+
+  const c = await db('cidades').where({ id }).first();
+  if (!c || !c.logo_data) return res.status(404).send('Logo não encontrada');
+
+  res.setHeader('Content-Type', c.logo_mime || 'image/png');
+  res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+  res.send(c.logo_data);
+});
+
+
 // =============================================================================
 // AUTH
 // =============================================================================
@@ -670,13 +689,39 @@ app.post('/cidades/nova', requireAdmin, uploadLogo.single('logo'), csrfProtectio
       });
     }
 
-    await db('cidades').insert({
+    // === NOVO: tratar logo
+    let logo_path: string | null = null;
+    let logo_data: Buffer | null = null;
+    let logo_mime: string | null = null;
+
+    if (req.file) {
+      if (STORAGE_LOGOS === 'db') {
+        logo_data = req.file.buffer;
+        logo_mime = req.file.mimetype || 'image/png';
+      } else {
+        logo_path = `/uploads/logos/${req.file.filename}`;
+      }
+    }
+
+    // insere e pega id
+    const inserted = await db('cidades').insert({
       nome,
       corporacao: corporacao || null,
       comandante: comandante || null,
       contato: contato || null,
-      logo_path: req.file ? `/uploads/logos/${req.file.filename}` : null
-    });
+      logo_path,      // usado quando STORAGE_LOGOS=disk
+      logo_data,      // usado quando STORAGE_LOGOS=db
+      logo_mime       // usado quando STORAGE_LOGOS=db
+    }, ['id']);
+
+    const cidadeId = Array.isArray(inserted)
+      ? (typeof inserted[0] === 'object' ? inserted[0].id : inserted[0])
+      : null;
+
+    // Se salvou no DB, expõe uma URL estável para a view
+    if (STORAGE_LOGOS === 'db' && cidadeId) {
+      await db('cidades').where({ id: cidadeId }).update({ logo_path: `/logo/cidade/${cidadeId}` });
+    }
 
     return res.redirect('/cidades');
   } catch (e) {
@@ -684,6 +729,7 @@ app.post('/cidades/nova', requireAdmin, uploadLogo.single('logo'), csrfProtectio
     return res.status(500).send('Erro ao cadastrar cidade.');
   }
 });
+
 
 // =============================================================================
 // USUÁRIOS (ADMIN)
