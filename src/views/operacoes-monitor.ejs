@@ -288,12 +288,14 @@
       </div>
     </div>
 
+    <!-- Chart.js (apenas UMA vez) -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
     <script>
+      // dados vindos do servidor (corrigido: <%- ... %>)
       const series = <% - JSON.stringify(seriesPorCidade || []) %>;
 
       function hasAnyValue(rows) {
-        return rows.some(r =>
+        return Array.isArray(rows) && rows.some(r =>
           (Number(r.fiscalizacao) || 0) +
           (Number(r.pessoa) || 0) +
           (Number(r.veiculo) || 0) +
@@ -301,24 +303,23 @@
         );
       }
 
-      function renderChart() {
-        const wrap = document.getElementById('chartWrap');
+      window.addEventListener('load', () => {
         const canvas = document.getElementById('byCityChart');
         const noData = document.getElementById('noChartData');
 
-        if (!series.length || !hasAnyValue(series)) {
+        if (!hasAnyValue(series)) {
           noData.style.display = 'block';
           return;
         }
 
-        // garante dimensões
+        // garante dimensões do canvas dentro do container
         canvas.style.width = '100%';
         canvas.style.height = '100%';
 
         const labels = series.map(r => r.cidade);
-        const mk = (key, label, color) => ({
+        const mk = (k, label, color) => ({
           label,
-          data: series.map(r => Number(r[key] || 0)),
+          data: series.map(r => Number(r[k] || 0)),
           backgroundColor: color,
           borderColor: color,
           borderWidth: 1,
@@ -336,8 +337,7 @@
           ]
         };
 
-        const ctx = canvas.getContext('2d');
-        new Chart(ctx, {
+        new Chart(canvas.getContext('2d'), {
           type: 'bar',
           data,
           options: {
@@ -351,97 +351,9 @@
             plugins: { legend: { position: 'top', labels: { color: '#e5e7eb' } } }
           }
         });
-      }
-
-      // espera layout concluir
-      window.addEventListener('load', renderChart);
+      });
     </script>
 
-
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-    <script>
-      (function () {
-        // Dados vindos do servidor
-        const series = <% - JSON.stringify(seriesPorCidade || []) %>;
-        console.log('[monitor] seriesPorCidade:', series);
-
-        const toN = (v) => {
-          const n = Number(v);
-          return Number.isFinite(n) ? n : 0;
-        };
-
-        // Há algum valor positivo?
-        const hasAny =
-          Array.isArray(series) &&
-          series.length > 0 &&
-          series.some(r => (toN(r.fiscalizacao) + toN(r.pessoa) + toN(r.veiculo) + toN(r.apreensao)) > 0);
-
-        const noDataEl = document.getElementById('noChartData');
-        const canvas = document.getElementById('byCityChart');
-
-        if (!hasAny) {
-          if (noDataEl) {
-            noDataEl.textContent = 'Sem dados suficientes para o gráfico.';
-            noDataEl.style.display = 'block';
-          }
-          return;
-        }
-
-        if (!window.Chart) {
-          if (noDataEl) {
-            noDataEl.textContent = 'Não foi possível carregar o gráfico (Chart.js bloqueado).';
-            noDataEl.style.display = 'block';
-          }
-          return;
-        }
-
-        const labels = series.map(r => r.cidade);
-
-        const datasets = [
-          { key: 'fiscalizacao', label: 'Fiscalizações', color: '#60a5fa' },
-          { key: 'pessoa', label: 'Pessoas', color: '#f87171' },
-          { key: 'veiculo', label: 'Veículos', color: '#34d399' },
-          { key: 'apreensao', label: 'Apreensões', color: '#fbbf24' },
-        ].map(d => ({
-          label: d.label,
-          data: series.map(r => toN(r[d.key])),
-          backgroundColor: d.color,
-          borderColor: d.color,
-          borderWidth: 1,
-          borderRadius: 6,
-          maxBarThickness: 36,
-        }));
-
-        const ctx = canvas.getContext('2d');
-        new Chart(ctx, {
-          type: 'bar',
-          data: { labels, datasets },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-              x: {
-                stacked: false,
-                ticks: { color: '#e5e7eb' },
-                grid: { display: false }
-              },
-              y: {
-                beginAtZero: true,
-                ticks: { precision: 0, color: '#e5e7eb' },
-                grid: { color: 'rgba(229,231,235,0.1)' }
-              }
-            },
-            plugins: {
-              legend: { position: 'top', labels: { color: '#e5e7eb' } },
-              tooltip: {
-                callbacks: { label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y}` }
-              }
-            }
-          }
-        });
-      })();
-    </script>
 
 
     <div class="grid">
