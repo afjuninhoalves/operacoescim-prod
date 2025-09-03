@@ -58,21 +58,21 @@ const DB_CLIENT: DbClient = process.env.DATABASE_URL ? 'pg' : 'sqlite3';
 const db: Knex = knex(
   DB_CLIENT === 'sqlite3'
     ? {
-        client: 'sqlite3',
-        connection: { filename: path.join(DATA_DIR, 'operacoescim.sqlite') },
-        useNullAsDefault: true,
-        pool: { min: 0, max: 1 }
-      }
+      client: 'sqlite3',
+      connection: { filename: path.join(DATA_DIR, 'operacoescim.sqlite') },
+      useNullAsDefault: true,
+      pool: { min: 0, max: 1 }
+    }
     : {
-        client: 'pg',
-        connection: {
-          // no Render/Heroku, a URL já vem com usuário/senha/host/DB
-          connectionString: process.env.DATABASE_URL as string,
-          // SSL costuma ser obrigatório no Render/Heroku
-          ssl: process.env.DB_SSL === 'false' ? false : { rejectUnauthorized: false }
-        },
-        pool: { min: 0, max: 10 }
-      }
+      client: 'pg',
+      connection: {
+        // no Render/Heroku, a URL já vem com usuário/senha/host/DB
+        connectionString: process.env.DATABASE_URL as string,
+        // SSL costuma ser obrigatório no Render/Heroku
+        ssl: process.env.DB_SSL === 'false' ? false : { rejectUnauthorized: false }
+      },
+      pool: { min: 0, max: 10 }
+    }
 );
 
 // Helper para adicionar coluna, se ainda não existir
@@ -85,10 +85,23 @@ async function ensureColumn(
   if (!has) await db.schema.alterTable(table, (t) => add(t));
 }
 
+const isPg = DB_CLIENT === 'pg';
+
+async function insertGetId(table: string, data: any, idCol: string = 'id'): Promise<number> {
+  if (isPg) {
+    const [row] = await db(table).insert(data).returning(idCol);
+    return Number(row[idCol]);
+  } else {
+    const [id] = await db(table).insert(data);
+    return Number(id);
+  }
+}
+
+
 async function ensureSchemaAndAdmin() {
   // Habilita FKs no SQLite
   if (DB_CLIENT === 'sqlite3') {
-    try { await db.raw('PRAGMA foreign_keys = ON'); } catch {}
+    try { await db.raw('PRAGMA foreign_keys = ON'); } catch { }
   }
 
   // --- CIDADES
@@ -241,8 +254,8 @@ async function ensureSchemaAndAdmin() {
       t.index(['evento_id']);
     });
   } else {
-    await ensureColumn('evento_fotos', 'lat',      (t) => (t as Knex.AlterTableBuilder).float('lat'));
-    await ensureColumn('evento_fotos', 'lng',      (t) => (t as Knex.AlterTableBuilder).float('lng'));
+    await ensureColumn('evento_fotos', 'lat', (t) => (t as Knex.AlterTableBuilder).float('lat'));
+    await ensureColumn('evento_fotos', 'lng', (t) => (t as Knex.AlterTableBuilder).float('lng'));
     await ensureColumn('evento_fotos', 'accuracy', (t) => (t as Knex.AlterTableBuilder).float('accuracy'));
   }
 
@@ -286,7 +299,7 @@ async function ensureSchemaAndAdmin() {
       nome: ADMIN_NOME,
       senha_hash: hash,
       role: 'admin',
-      ativo: 1,
+      ativo: true,
       cidade_id: null
     });
     console.log(`Usuário admin criado (cpf=${ADMIN_CPF}, email=${ADMIN_EMAIL}).`);
@@ -339,9 +352,9 @@ function getGeoFromBody(req: any) {
   const acc = Number(req.body.acc ?? req.body.accuracy);
 
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return { lat: null, lng: null, acc: null };
-  if (lat < -90 || lat > 90 || lng < -180 || lng > 180)   return { lat: null, lng: null, acc: null };
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return { lat: null, lng: null, acc: null };
   // descarta 0,0 e “quase 0,0”
-  if (Math.abs(lat) < 0.0001 && Math.abs(lng) < 0.0001)    return { lat: null, lng: null, acc: null };
+  if (Math.abs(lat) < 0.0001 && Math.abs(lng) < 0.0001) return { lat: null, lng: null, acc: null };
 
   return { lat, lng, acc: Number.isFinite(acc) ? acc : null };
 }
@@ -354,7 +367,7 @@ function parseMaybeNumber(v: any): number | null {
 }
 
 // helper (coloque perto dos outros helpers)
-function parseLocation(body:any){
+function parseLocation(body: any) {
   const lat = Number(body.lat ?? body.latitude);
   const lng = Number(body.lng ?? body.longitude);
   const acc = Number(body.acc ?? body.accuracy);
@@ -448,7 +461,7 @@ function tryUnlinkUpload(p?: string | null) {
     const rel = p.replace(/^\/+/, ''); // remove "/" inicial
     const abs = path.resolve(process.cwd(), rel);
     // só apaga se estiver dentro da pasta /uploads
-    if (abs.startsWith(uploadsDir)) fs.unlink(abs, () => {});
+    if (abs.startsWith(uploadsDir)) fs.unlink(abs, () => { });
   } catch {
     // ignora
   }
@@ -475,7 +488,7 @@ const uploadLogo = multer({
 
 // Aceitar tanto "foto" (1) quanto "fotos" (várias) nos formulários
 const uploadFotosFields = uploadFotos.fields([
-  { name: 'foto',  maxCount: 1  },
+  { name: 'foto', maxCount: 1 },
   { name: 'fotos', maxCount: 10 },
 ]);
 
@@ -484,7 +497,7 @@ function fotosFromRequest(req: any): Express.Multer.File[] {
   if (req.files && !Array.isArray(req.files)) {
     const out: Express.Multer.File[] = [];
     if (Array.isArray(req.files.fotos)) out.push(...req.files.fotos);
-    if (Array.isArray(req.files.foto))  out.push(...req.files.foto);
+    if (Array.isArray(req.files.foto)) out.push(...req.files.foto);
     return out;
   }
   return (req.files as Express.Multer.File[]) || [];
@@ -548,23 +561,27 @@ function requireAdminOrGestor(req: Request, res: Response, next: NextFunction): 
 async function canUserPostOnOperation(opId: number, user: any) {
   const op = await db('operacoes').where({ id: opId }).first();
   if (!op || op.status !== 'em_andamento') return false;
+  // Admin/Gestor pode lançar sem estar atrelado a uma cidade participante
+  if (user?.role === 'admin' || user?.role === 'gestor') return true;
+  // Demais perfis: cidade obrigatória + participação na operação
   if (!user?.cidade_id) return false;
   const participante = await db('operacao_cidades')
     .where({ operacao_id: opId, cidade_id: user.cidade_id })
     .first();
   return !!participante;
 }
+
 async function createEventoBase(args: {
   operacao_id: number; cidade_id: number; user_id: number; tipo: string; obs: string | null;
 }): Promise<number> {
-  const [eventoId] = await db('operacao_eventos').insert({
+  const eventoId = await insertGetId('operacao_eventos', {
     operacao_id: args.operacao_id,
     cidade_id: args.cidade_id,
     user_id: args.user_id,
     tipo: args.tipo,
     obs: args.obs || null
   });
-  return Number(eventoId);
+  return eventoId;
 }
 
 
@@ -698,7 +715,7 @@ app.post('/admin/usuarios/novo', requireAdmin, csrfProtection, async (req, res) 
 
     if (!nome) errors.push('Informe o nome.');
     if (!cpf || cpf.length !== 11) errors.push('CPF inválido.');
-    if (!['admin','gestor','operador','auditor'].includes(role)) errors.push('Perfil inválido.');
+    if (!['admin', 'gestor', 'operador', 'auditor'].includes(role)) errors.push('Perfil inválido.');
     if (!cidade_id) errors.push('Selecione a cidade.');
     if (!senha || senha.length < 10) errors.push('Senha muito curta (mín. 10).');
 
@@ -729,7 +746,7 @@ app.get('/admin/usuarios/:id/editar', requireAdmin, csrfProtection, async (req, 
   const u = await db('usuarios').where({ id }).first();
   if (!u) return res.status(404).send('Usuário não encontrado.');
 
-  const cidades = await db('cidades').select('id','nome').orderBy('nome');
+  const cidades = await db('cidades').select('id', 'nome').orderBy('nome');
   res.render('admin-usuarios-form', {
     mode: 'edit',
     csrfToken: (req as any).csrfToken(),
@@ -741,7 +758,7 @@ app.get('/admin/usuarios/:id/editar', requireAdmin, csrfProtection, async (req, 
 
 app.post('/admin/usuarios/:id/editar', requireAdmin, csrfProtection, async (req, res) => {
   const id = Number(req.params.id);
-  const cidades = await db('cidades').select('id','nome').orderBy('nome');
+  const cidades = await db('cidades').select('id', 'nome').orderBy('nome');
   try {
     const nome = String(req.body.nome || '').trim();
     const cpf = String(req.body.cpf || '').replace(/\D/g, '');
@@ -756,7 +773,7 @@ app.post('/admin/usuarios/:id/editar', requireAdmin, csrfProtection, async (req,
 
     if (!nome) errors.push('Informe o nome.');
     if (!cpf || cpf.length !== 11) errors.push('CPF inválido.');
-    if (!['admin','gestor','operador','auditor'].includes(role)) errors.push('Perfil inválido.');
+    if (!['admin', 'gestor', 'operador', 'auditor'].includes(role)) errors.push('Perfil inválido.');
     if (!cidade_id) errors.push('Selecione a cidade.');
 
     const dupCpf = await db('usuarios').where({ cpf }).andWhereNot({ id }).first();
@@ -791,7 +808,7 @@ app.post('/admin/usuarios/:id/toggle', requireAdmin, csrfProtection, async (req,
   const id = Number(req.params.id);
   const u = await db('usuarios').where({ id }).first();
   if (!u) return res.status(404).send('Usuário não encontrado.');
-  await db('usuarios').where({ id }).update({ ativo: u.ativo ? 0 : 1 });
+  await db('usuarios').where({ id }).update({ ativo: !u.ativo });
   return res.redirect('/admin/usuarios');
 });
 
@@ -895,12 +912,13 @@ app.post('/operacoes/nova', requireAdminOrGestor, csrfProtection, async (req, re
       });
     }
 
-    const [opId] = await db('operacoes').insert({
+    const opId = await insertGetId('operacoes', {
       nome,
       descricao: descricao || null,
       inicio_agendado,
       status: 'agendada',
       created_by: user.id
+
     });
 
     await db('operacao_cidades').insert(
@@ -937,17 +955,17 @@ app.get('/operacoes/:id', requireAuth, csrfProtection, async (req, res) => {
     .leftJoin('evento_veiculo as v', 'v.evento_id', 'e.id')
     .leftJoin('evento_apreensao as a', 'a.evento_id', 'e.id')
     .select(
-      'e.id','e.tipo','e.ts','e.obs',
-      'e.user_id as e_user_id','e.cidade_id as e_cidade_id',
+      'e.id', 'e.tipo', 'e.ts', 'e.obs',
+      'e.user_id as e_user_id', 'e.cidade_id as e_cidade_id',
       'c.nome as cidade_nome',
       'u.nome as user_nome',
       db.raw("COALESCE(p.foto_path, f.foto_path, v.foto_path, a.foto_path) as foto_path"),
       'f.tipo_local',
-      'p.nome as pessoa_nome','p.cpf as pessoa_cpf',
-      'v.tipo_veiculo','v.marca_modelo','v.placa',
-      'a.tipo as apreensao_tipo','a.quantidade','a.unidade'
+      'p.nome as pessoa_nome', 'p.cpf as pessoa_cpf',
+      'v.tipo_veiculo', 'v.marca_modelo', 'v.placa',
+      'a.tipo as apreensao_tipo', 'a.quantidade', 'a.unidade'
     )
-    .orderBy('e.ts','desc')
+    .orderBy('e.ts', 'desc')
     .limit(100);
 
   // Fiscalizações da MINHA CIDADE (para selects)
@@ -966,7 +984,7 @@ app.get('/operacoes/:id', requireAuth, csrfProtection, async (req, res) => {
     ...op,
     inicio_fmt: op.inicio_agendado ? new Date(op.inicio_agendado).toLocaleString('pt-BR') : null,
     cidades_str: cidades.map((c: any) => c.nome).join(', '),
-    podeEncerrar: ['admin','gestor'].includes(user?.role) && op.status !== 'encerrada'
+    podeEncerrar: ['admin', 'gestor'].includes(user?.role) && op.status !== 'encerrada'
   };
 
   const countOf = async (tipo: string) => {
@@ -975,9 +993,9 @@ app.get('/operacoes/:id', requireAuth, csrfProtection, async (req, res) => {
   };
   const resumo = {
     fiscalizacoes: await countOf('fiscalizacao'),
-    pessoas:       await countOf('pessoa'),
-    veiculos:      await countOf('veiculo'),
-    apreensoes:    await countOf('apreensao')
+    pessoas: await countOf('pessoa'),
+    veiculos: await countOf('veiculo'),
+    apreensoes: await countOf('apreensao')
   };
 
   res.render('operacoes-detalhe', {
@@ -1014,27 +1032,52 @@ app.post('/operacoes/:id/status', requireAdminOrGestor, csrfProtection, async (r
 
 // -----------------------------------------------------------------------------
 // Fiscalização
-app.post('/operacoes/:id/fiscalizacoes',
-  requireAuth, uploadFotosFields, csrfProtection,
-  async (req, res) => {
+app.post(
+  '/operacoes/:id/fiscalizacoes',
+  requireAuth,
+  uploadFotosFields, // multer antes do CSRF
+  csrfProtection,
+  async (req: Request, res: Response) => {
     const user = (req.session as any).user;
     const operacao_id = Number(req.params.id);
     const fallback = `/operacoes/${operacao_id}`;
     const go = pickReturnTo(req, fallback);
 
-    if (!user?.cidade_id) return res.status(400).send('Usuário sem cidade vinculada.');
-    if (!(await canUserPostOnOperation(operacao_id, user))) return res.status(403).send('Sem permissão.');
+    // operação deve estar em andamento
+    if (!(await canUserPostOnOperation(operacao_id, user))) {
+      return res.status(403).send('Sem permissão.');
+    }
 
+    // cidade: admin/gestor pode escolher; demais, a do usuário
+    let cidade_id: number | null =
+      user?.role === 'admin' || user?.role === 'gestor'
+        ? (req.body.cidade_id ? Number(req.body.cidade_id) : (user.cidade_id ?? null))
+        : (user.cidade_id ?? null);
+
+    if (!Number.isFinite(cidade_id)) return res.status(400).send('Selecione a cidade.');
+
+    const participa = await db('operacao_cidades').where({ operacao_id, cidade_id }).first();
+    if (!participa) return res.status(400).send('Cidade não participa desta operação.');
+
+    // campos obrigatórios
     const tipo_local = String(req.body.tipo_local || '').trim();
-    const obs = String(req.body.obs || '').trim() || null;
-    if (!tipo_local) return res.redirect(go);
+    if (!tipo_local) return res.status(400).send('Informe o tipo de local da fiscalização.');
 
+    const obs = String(req.body.obs || '').trim() || null;
+
+    // evento base
     const evento_id = await createEventoBase({
-      operacao_id, cidade_id: user.cidade_id, user_id: user.id, tipo: 'fiscalizacao', obs
+      operacao_id,
+      cidade_id: Number(cidade_id),
+      user_id: user.id,
+      tipo: 'fiscalizacao',
+      obs
     });
 
+    // detalhe da fiscalização
     await db('evento_fiscalizacao').insert({ evento_id, tipo_local });
 
+    // fotos + geo (opcional)
     const files = fotosFromRequest(req);
     const { lat, lng, acc } = getGeoFromBody(req);
     if (files.length) {
@@ -1042,90 +1085,146 @@ app.post('/operacoes/:id/fiscalizacoes',
         files.map(f => ({
           evento_id,
           path: `/uploads/fotos/${f.filename}`,
-          lat, lng, accuracy: acc
+          lat,
+          lng,
+          accuracy: acc
         }))
       );
     }
+
     return res.redirect(go);
   }
 );
 
+
 // Pessoa
-app.post('/operacoes/:id/pessoas',
-  requireAuth, uploadFotosFields, csrfProtection,
-  async (req, res) => {
+app.post(
+  '/operacoes/:id/pessoas',
+  requireAuth,
+  uploadFotosFields,
+  csrfProtection,
+  async (req: Request, res: Response) => {
     const user = (req.session as any).user;
     const operacao_id = Number(req.params.id);
     const fallback = `/operacoes/${operacao_id}`;
     const go = pickReturnTo(req, fallback);
 
-    if (!user?.cidade_id) return res.status(400).send('Usuário sem cidade vinculada.');
-    if (!(await canUserPostOnOperation(operacao_id, user))) return res.status(403).send('Sem permissão.');
+    if (!(await canUserPostOnOperation(operacao_id, user))) {
+      return res.status(403).send('Sem permissão.');
+    }
 
+    let cidade_id: number | null =
+      user?.role === 'admin' || user?.role === 'gestor'
+        ? (req.body.cidade_id ? Number(req.body.cidade_id) : (user.cidade_id ?? null))
+        : (user.cidade_id ?? null);
+
+    if (!Number.isFinite(cidade_id)) return res.status(400).send('Selecione a cidade.');
+
+    const participa = await db('operacao_cidades').where({ operacao_id, cidade_id }).first();
+    if (!participa) return res.status(400).send('Cidade não participa desta operação.');
+
+    // campos
     const nome = String(req.body.nome || '').trim();
-    const cpf = onlyDigits(req.body.cpf || '');
+    const cpf = String(req.body.cpf || '').replace(/\D/g, '') || null;
     const fiscalizacao_id = req.body.fiscalizacao_id ? Number(req.body.fiscalizacao_id) : null;
     const obs = String(req.body.obs || '').trim() || null;
 
+    // nome é NOT NULL no schema
+    if (!nome) return res.status(400).send('Informe o nome da pessoa.');
+
+    // cria evento base
     const evento_id = await createEventoBase({
-      operacao_id, cidade_id: user.cidade_id, user_id: user.id, tipo: 'pessoa', obs
+      operacao_id,
+      cidade_id: Number(cidade_id),
+      user_id: user.id,
+      tipo: 'pessoa',
+      obs
     });
 
+    // primeira foto para compat legado
     const files = fotosFromRequest(req);
     const primeira = files[0] ? `/uploads/fotos/${files[0].filename}` : null;
 
     await db('evento_pessoa').insert({
       evento_id,
-      nome: nome || null,
-      cpf: cpf || null,
-      foto_path: primeira, // compat legado
+      nome,
+      cpf,
+      foto_path: primeira,
       fiscalizacao_evento_id: fiscalizacao_id || null
     });
 
+    // fotos canônicas + geo
     const { lat, lng, acc } = getGeoFromBody(req);
     if (files.length) {
       await db('evento_fotos').insert(
         files.map(f => ({
           evento_id,
           path: `/uploads/fotos/${f.filename}`,
-          lat, lng, accuracy: acc
+          lat,
+          lng,
+          accuracy: acc
         }))
       );
     }
+
     return res.redirect(go);
   }
 );
 
+
 // Veículo
-app.post('/operacoes/:id/veiculos',
-  requireAuth, uploadFotosFields, csrfProtection,
-  async (req, res) => {
+app.post(
+  '/operacoes/:id/veiculos',
+  requireAuth,
+  uploadFotosFields,
+  csrfProtection,
+  async (req: Request, res: Response) => {
     const user = (req.session as any).user;
     const operacao_id = Number(req.params.id);
     const fallback = `/operacoes/${operacao_id}`;
     const go = pickReturnTo(req, fallback);
 
-    if (!user?.cidade_id) return res.status(400).send('Usuário sem cidade vinculada.');
-    if (!(await canUserPostOnOperation(operacao_id, user))) return res.status(403).send('Sem permissão.');
+    if (!(await canUserPostOnOperation(operacao_id, user))) {
+      return res.status(403).send('Sem permissão.');
+    }
 
+    let cidade_id: number | null =
+      user?.role === 'admin' || user?.role === 'gestor'
+        ? (req.body.cidade_id ? Number(req.body.cidade_id) : (user.cidade_id ?? null))
+        : (user.cidade_id ?? null);
+
+    if (!Number.isFinite(cidade_id)) return res.status(400).send('Selecione a cidade.');
+
+    const participa = await db('operacao_cidades').where({ operacao_id, cidade_id }).first();
+    if (!participa) return res.status(400).send('Cidade não participa desta operação.');
+
+    // campos (tipo_veiculo é NOT NULL no schema)
     const tipo_veiculo = String(req.body.tipo_veiculo || '').trim();
-    const marca_modelo = String(req.body.marca_modelo || '').trim();
-    const placa = String(req.body.placa || '').trim().toUpperCase();
+    if (!tipo_veiculo) return res.status(400).send('Informe o tipo do veículo.');
+
+    const marca_modelo = String(req.body.marca_modelo || '').trim() || null;
+    const placa = String(req.body.placa || '').trim().toUpperCase() || null;
     const fiscalizacao_id = req.body.fiscalizacao_id ? Number(req.body.fiscalizacao_id) : null;
     const obs = String(req.body.obs || '').trim() || null;
 
+    // cria evento base
     const evento_id = await createEventoBase({
-      operacao_id, cidade_id: user.cidade_id, user_id: user.id, tipo: 'veiculo', obs
+      operacao_id,
+      cidade_id: Number(cidade_id),
+      user_id: user.id,
+      tipo: 'veiculo',
+      obs
     });
 
     await db('evento_veiculo').insert({
       evento_id,
-      tipo_veiculo: tipo_veiculo || null,
-      marca_modelo: marca_modelo || null,
-      placa: placa || null,
+      tipo_veiculo,
+      marca_modelo,
+      placa,
       fiscalizacao_evento_id: fiscalizacao_id || null
     });
 
+    // fotos + geo
     const files = fotosFromRequest(req);
     const { lat, lng, acc } = getGeoFromBody(req);
     if (files.length) {
@@ -1133,40 +1232,87 @@ app.post('/operacoes/:id/veiculos',
         files.map(f => ({
           evento_id,
           path: `/uploads/fotos/${f.filename}`,
-          lat, lng, accuracy: acc
+          lat,
+          lng,
+          accuracy: acc
         }))
       );
     }
+
     return res.redirect(go);
   }
 );
 
+
 // Apreensão
-app.post('/operacoes/:id/apreensoes',
-  requireAuth, uploadFotosFields, csrfProtection,
-  async (req, res) => {
+app.post(
+  '/operacoes/:id/apreensoes',
+  requireAuth,
+  uploadFotosFields, // multer antes do CSRF
+  csrfProtection,
+  async (req: Request, res: Response) => {
     const user = (req.session as any).user;
     const operacao_id = Number(req.params.id);
     const fallback = `/operacoes/${operacao_id}`;
     const go = pickReturnTo(req, fallback);
 
-    if (!user?.cidade_id) return res.status(400).send('Usuário sem cidade vinculada.');
-    if (!(await canUserPostOnOperation(operacao_id, user))) return res.status(403).send('Sem permissão.');
+    // Só deixa lançar se a operação estiver EM ANDAMENTO
+    if (!(await canUserPostOnOperation(operacao_id, user))) {
+      return res.status(403).send('Sem permissão.');
+    }
 
+    // Definir a cidade do evento:
+    // - admin/gestor: pode escolher via form (name="cidade_id"); se não enviar, usa a do usuário (se tiver)
+    // - outros perfis: sempre a cidade do usuário
+    let cidade_id: number | null =
+      user?.role === 'admin' || user?.role === 'gestor'
+        ? (req.body.cidade_id ? Number(req.body.cidade_id) : (user.cidade_id ?? null))
+        : (user.cidade_id ?? null);
+
+    if (!Number.isFinite(cidade_id)) {
+      return res.status(400).send('Selecione a cidade.');
+    }
+
+    // A cidade precisa participar da operação
+    const participa = await db('operacao_cidades')
+      .where({ operacao_id, cidade_id })
+      .first();
+    if (!participa) {
+      return res.status(400).send('Cidade não participa desta operação.');
+    }
+
+    // Campos
     const tipo = String(req.body.tipo || '').trim();
-    const quantidade = req.body.quantidade ? Number(req.body.quantidade) : null;
+    const quantidade = Number(req.body.quantidade);
     const unidade = String(req.body.unidade || '').trim() || null;
     const fiscalizacao_id = req.body.fiscalizacao_id ? Number(req.body.fiscalizacao_id) : null;
     const obs = String(req.body.obs || '').trim() || null;
 
+    // Validações
+    const errors: string[] = [];
+    if (!tipo) errors.push('Informe o tipo da apreensão.');
+    if (!Number.isFinite(quantidade)) errors.push('Informe a quantidade.');
+    if (errors.length) return res.status(400).send(errors.join(' '));
+
+    // Cria o evento base (usa helper com .returning() no PG)
     const evento_id = await createEventoBase({
-      operacao_id, cidade_id: user.cidade_id, user_id: user.id, tipo: 'apreensao', obs
+      operacao_id,
+      cidade_id: Number(cidade_id),
+      user_id: user.id,
+      tipo: 'apreensao',
+      obs
     });
 
+    // Detalhes de apreensão
     await db('evento_apreensao').insert({
-      evento_id, tipo: tipo || null, quantidade, unidade, fiscalizacao_evento_id: fiscalizacao_id || null
+      evento_id,
+      tipo,
+      quantidade,
+      unidade,
+      fiscalizacao_evento_id: fiscalizacao_id || null
     });
 
+    // Fotos (opcional) + geo
     const files = fotosFromRequest(req);
     const { lat, lng, acc } = getGeoFromBody(req);
     if (files.length) {
@@ -1174,13 +1320,17 @@ app.post('/operacoes/:id/apreensoes',
         files.map(f => ({
           evento_id,
           path: `/uploads/fotos/${f.filename}`,
-          lat, lng, accuracy: acc
+          lat,
+          lng,
+          accuracy: acc
         }))
       );
     }
+
     return res.redirect(go);
   }
 );
+
 
 
 
@@ -1207,7 +1357,7 @@ app.get('/operacoes/:id/fotos', requireAuth, async (req, res) => {
   }
 
   const cidadeFilter = req.query.cidade_id ? Number(req.query.cidade_id) : null;
-  const tipoFilter   = req.query.tipo ? String(req.query.tipo) : null; // pessoa|veiculo|apreensao|fiscalizacao
+  const tipoFilter = req.query.tipo ? String(req.query.tipo) : null; // pessoa|veiculo|apreensao|fiscalizacao
 
   const cidades = await db('operacao_cidades')
     .where({ operacao_id: id })
@@ -1221,7 +1371,7 @@ app.get('/operacoes/:id/fotos', requireAuth, async (req, res) => {
     .join('cidades as c', 'c.id', 'e.cidade_id')
     .where('e.operacao_id', id)
     .modify(q => { if (cidadeFilter) q.andWhere('e.cidade_id', cidadeFilter); })
-    .modify(q => { if (tipoFilter)   q.andWhere('e.tipo', tipoFilter); })
+    .modify(q => { if (tipoFilter) q.andWhere('e.tipo', tipoFilter); })
     .select('ef.path', 'e.tipo', 'e.ts', 'c.nome as cidade_nome');
 
   // 2) Legado: foto_path de PESSOA **apenas** se o evento não tem fotos em evento_fotos
@@ -1239,7 +1389,7 @@ app.get('/operacoes/:id/fotos', requireAuth, async (req, res) => {
           db('evento_fotos as ef').select(db.raw('1')).whereRaw('ef.evento_id = e.id')
         )
         .modify(q => { if (cidadeFilter) q.andWhere('e.cidade_id', cidadeFilter); })
-        .modify(q => { if (tipoFilter)   q.andWhere('e.tipo', tipoFilter); })
+        .modify(q => { if (tipoFilter) q.andWhere('e.tipo', tipoFilter); })
         .select('p.foto_path as path', 'e.tipo', 'e.ts', 'c.nome as cidade_nome');
 
       legado.push(...pRows);
@@ -1281,9 +1431,9 @@ async function buildOperationMetrics(opId: number) {
   const totals = { fiscalizacoes: 0, pessoas: 0, veiculos: 0, apreensoes: 0 };
   for (const r of totRows) {
     if (r.tipo === 'fiscalizacao') totals.fiscalizacoes = Number(r.c);
-    if (r.tipo === 'pessoa')       totals.pessoas       = Number(r.c);
-    if (r.tipo === 'veiculo')      totals.veiculos      = Number(r.c);
-    if (r.tipo === 'apreensao')    totals.apreensoes    = Number(r.c);
+    if (r.tipo === 'pessoa') totals.pessoas = Number(r.c);
+    if (r.tipo === 'veiculo') totals.veiculos = Number(r.c);
+    if (r.tipo === 'apreensao') totals.apreensoes = Number(r.c);
   }
   const participantes = await db('operacao_cidades as oc')
     .where('oc.operacao_id', opId)
@@ -1307,9 +1457,9 @@ async function buildOperationMetrics(opId: number) {
       cidade_id: r.cidade_id, cidade: r.cidade_nome, fiscalizacoes: 0, pessoas: 0, veiculos: 0, apreensoes: 0
     });
     if (r.tipo === 'fiscalizacao') row.fiscalizacoes = Number(r.c);
-    if (r.tipo === 'pessoa')       row.pessoas       = Number(r.c);
-    if (r.tipo === 'veiculo')      row.veiculos      = Number(r.c);
-    if (r.tipo === 'apreensao')    row.apreensoes    = Number(r.c);
+    if (r.tipo === 'pessoa') row.pessoas = Number(r.c);
+    if (r.tipo === 'veiculo') row.veiculos = Number(r.c);
+    if (r.tipo === 'apreensao') row.apreensoes = Number(r.c);
   }
   const perCity = Object.values(byCity).sort((a: any, b: any) => a.cidade.localeCompare(b.cidade));
 
@@ -1372,8 +1522,8 @@ app.get('/operacoes/:opId/fiscalizacoes/:eventoId/editar',
     const perm = await canEditEvento(user, opId, eventoId);
     if (!perm.ok) return res.status(perm.status || 403).send(perm.reason || 'Não autorizado.');
 
-    const op    = await db('operacoes').where({ id: opId }).first();
-    const f     = await db('evento_fiscalizacao').where({ evento_id: eventoId }).first();
+    const op = await db('operacoes').where({ id: opId }).first();
+    const f = await db('evento_fiscalizacao').where({ evento_id: eventoId }).first();
     const fotos = await db('evento_fotos').where({ evento_id: eventoId }).orderBy('id', 'desc');
 
     return res.render('fiscalizacao-edit', {
@@ -1406,7 +1556,7 @@ app.post('/operacoes/:opId/fiscalizacoes/:eventoId/editar',
     if (!perm.ok) return res.status(perm.status || 403).send(perm.reason || 'Não autorizado.');
 
     const tipo_local = String(req.body.tipo_local || '').trim();
-    const obs        = String(req.body.obs || '').trim() || null;
+    const obs = String(req.body.obs || '').trim() || null;
     if (!tipo_local) return res.status(400).send('Informe o tipo de local.');
 
     await db('evento_fiscalizacao').where({ evento_id: eventoId }).update({ tipo_local });
@@ -1576,14 +1726,14 @@ app.get('/registros', requireAuth, csrfProtection, async (req, res) => {
 app.get('/operacoes/:opId/pessoas/:eventoId/editar',
   requireAuth, csrfProtection,
   async (req, res) => {
-    const user     = (req.session as any).user;
-    const opId     = Number(req.params.opId);
+    const user = (req.session as any).user;
+    const opId = Number(req.params.opId);
     const eventoId = Number(req.params.eventoId);
 
     const perm = await canEditEvento(user, opId, eventoId);
     if (!perm.ok) return res.status(perm.status || 403).send(perm.reason || 'Não autorizado.');
 
-    const op  = await db('operacoes').where({ id: opId }).first();
+    const op = await db('operacoes').where({ id: opId }).first();
     const det = await db('evento_pessoa').where({ evento_id: eventoId }).first();
     const fotos = await db('evento_fotos').where({ evento_id: eventoId }).orderBy('id', 'desc');
 
@@ -1616,17 +1766,17 @@ app.get('/operacoes/:opId/pessoas/:eventoId/editar',
 app.post('/operacoes/:opId/pessoas/:eventoId/editar',
   requireAuth, csrfProtection,
   async (req, res) => {
-    const user     = (req.session as any).user;
-    const opId     = Number(req.params.opId);
+    const user = (req.session as any).user;
+    const opId = Number(req.params.opId);
     const eventoId = Number(req.params.eventoId);
 
     const perm = await canEditEvento(user, opId, eventoId);
     if (!perm.ok) return res.status(perm.status || 403).send(perm.reason || 'Não autorizado.');
 
-    const nome  = String(req.body.nome || '').trim();
-    const cpf   = String(req.body.cpf || '').replace(/\D/g, '');
+    const nome = String(req.body.nome || '').trim();
+    const cpf = String(req.body.cpf || '').replace(/\D/g, '');
     const fiscalizacao_id = req.body.fiscalizacao_id ? Number(req.body.fiscalizacao_id) : null;
-    const obs   = String(req.body.obs || '').trim() || null;
+    const obs = String(req.body.obs || '').trim() || null;
 
     await db('evento_pessoa').where({ evento_id: eventoId }).update({
       nome: nome || null,
@@ -1645,8 +1795,8 @@ app.post('/operacoes/:opId/pessoas/:eventoId/fotos',
   uploadFotosFields,
   csrfProtection,
   async (req, res) => {
-    const user     = (req.session as any).user;
-    const opId     = Number(req.params.opId);
+    const user = (req.session as any).user;
+    const opId = Number(req.params.opId);
     const eventoId = Number(req.params.eventoId);
 
     const perm = await canEditEvento(user, opId, eventoId);
@@ -1666,10 +1816,10 @@ app.post('/operacoes/:opId/pessoas/:eventoId/fotos',
 app.post('/operacoes/:opId/pessoas/:eventoId/fotos/:fotoId/delete',
   requireAuth, csrfProtection,
   async (req, res) => {
-    const user     = (req.session as any).user;
-    const opId     = Number(req.params.opId);
+    const user = (req.session as any).user;
+    const opId = Number(req.params.opId);
     const eventoId = Number(req.params.eventoId);
-    const fotoId   = Number(req.params.fotoId);
+    const fotoId = Number(req.params.fotoId);
 
     const perm = await canEditEvento(user, opId, eventoId);
     if (!perm.ok) return res.status(perm.status || 403).send(perm.reason || 'Não autorizado.');
@@ -1692,14 +1842,14 @@ app.post('/operacoes/:opId/pessoas/:eventoId/fotos/:fotoId/delete',
 app.get('/operacoes/:opId/veiculos/:eventoId/editar',
   requireAuth, csrfProtection,
   async (req, res) => {
-    const user     = (req.session as any).user;
-    const opId     = Number(req.params.opId);
+    const user = (req.session as any).user;
+    const opId = Number(req.params.opId);
     const eventoId = Number(req.params.eventoId);
 
     const perm = await canEditEvento(user, opId, eventoId);
     if (!perm.ok) return res.status(perm.status || 403).send(perm.reason || 'Não autorizado.');
 
-    const op  = await db('operacoes').where({ id: opId }).first();
+    const op = await db('operacoes').where({ id: opId }).first();
     const det = await db('evento_veiculo').where({ evento_id: eventoId }).first();
     const fotos = await db('evento_fotos').where({ evento_id: eventoId }).orderBy('id', 'desc');
 
@@ -1731,18 +1881,18 @@ app.get('/operacoes/:opId/veiculos/:eventoId/editar',
 app.post('/operacoes/:opId/veiculos/:eventoId/editar',
   requireAuth, csrfProtection,
   async (req, res) => {
-    const user     = (req.session as any).user;
-    const opId     = Number(req.params.opId);
+    const user = (req.session as any).user;
+    const opId = Number(req.params.opId);
     const eventoId = Number(req.params.eventoId);
 
     const perm = await canEditEvento(user, opId, eventoId);
     if (!perm.ok) return res.status(perm.status || 403).send(perm.reason || 'Não autorizado.');
 
-    const tipo_veiculo    = String(req.body.tipo_veiculo || '').trim();
-    const marca_modelo    = String(req.body.marca_modelo || '').trim();
-    const placa           = String(req.body.placa || '').trim().toUpperCase();
+    const tipo_veiculo = String(req.body.tipo_veiculo || '').trim();
+    const marca_modelo = String(req.body.marca_modelo || '').trim();
+    const placa = String(req.body.placa || '').trim().toUpperCase();
     const fiscalizacao_id = req.body.fiscalizacao_id ? Number(req.body.fiscalizacao_id) : null;
-    const obs             = String(req.body.obs || '').trim() || null;
+    const obs = String(req.body.obs || '').trim() || null;
 
     await db('evento_veiculo').where({ evento_id: eventoId }).update({
       tipo_veiculo: tipo_veiculo || null,
@@ -1761,8 +1911,8 @@ app.post('/operacoes/:opId/veiculos/:eventoId/fotos',
   uploadFotosFields,
   csrfProtection,
   async (req, res) => {
-    const user     = (req.session as any).user;
-    const opId     = Number(req.params.opId);
+    const user = (req.session as any).user;
+    const opId = Number(req.params.opId);
     const eventoId = Number(req.params.eventoId);
 
     const perm = await canEditEvento(user, opId, eventoId);
@@ -1781,10 +1931,10 @@ app.post('/operacoes/:opId/veiculos/:eventoId/fotos',
 app.post('/operacoes/:opId/veiculos/:eventoId/fotos/:fotoId/delete',
   requireAuth, csrfProtection,
   async (req, res) => {
-    const user     = (req.session as any).user;
-    const opId     = Number(req.params.opId);
+    const user = (req.session as any).user;
+    const opId = Number(req.params.opId);
     const eventoId = Number(req.params.eventoId);
-    const fotoId   = Number(req.params.fotoId);
+    const fotoId = Number(req.params.fotoId);
 
     const perm = await canEditEvento(user, opId, eventoId);
     if (!perm.ok) return res.status(perm.status || 403).send(perm.reason || 'Não autorizado.');
@@ -1807,14 +1957,14 @@ app.post('/operacoes/:opId/veiculos/:eventoId/fotos/:fotoId/delete',
 app.get('/operacoes/:opId/apreensoes/:eventoId/editar',
   requireAuth, csrfProtection,
   async (req, res) => {
-    const user     = (req.session as any).user;
-    const opId     = Number(req.params.opId);
+    const user = (req.session as any).user;
+    const opId = Number(req.params.opId);
     const eventoId = Number(req.params.eventoId);
 
     const perm = await canEditEvento(user, opId, eventoId);
     if (!perm.ok) return res.status(perm.status || 403).send(perm.reason || 'Não autorizado.');
 
-    const op  = await db('operacoes').where({ id: opId }).first();
+    const op = await db('operacoes').where({ id: opId }).first();
     const det = await db('evento_apreensao').where({ evento_id: eventoId }).first();
     const fotos = await db('evento_fotos').where({ evento_id: eventoId }).orderBy('id', 'desc');
 
@@ -1846,18 +1996,18 @@ app.get('/operacoes/:opId/apreensoes/:eventoId/editar',
 app.post('/operacoes/:opId/apreensoes/:eventoId/editar',
   requireAuth, csrfProtection,
   async (req, res) => {
-    const user     = (req.session as any).user;
-    const opId     = Number(req.params.opId);
+    const user = (req.session as any).user;
+    const opId = Number(req.params.opId);
     const eventoId = Number(req.params.eventoId);
 
     const perm = await canEditEvento(user, opId, eventoId);
     if (!perm.ok) return res.status(perm.status || 403).send(perm.reason || 'Não autorizado.');
 
-    const tipo  = String(req.body.tipo || '').trim();
-    const quantidade = req.body.quantidade === '' ? null : Number(req.body.quantidade);
-    const unidade = String(req.body.unidade || '').trim() || null;
+    const tipo = String(req.body.tipo || '').trim();
+    const quantidade = Number(req.body.quantidade);
+    if (!Number.isFinite(quantidade)) return res.status(400).send('Informe a quantidade.');
     const fiscalizacao_id = req.body.fiscalizacao_id ? Number(req.body.fiscalizacao_id) : null;
-    const obs   = String(req.body.obs || '').trim() || null;
+    const obs = String(req.body.obs || '').trim() || null;
 
     await db('evento_apreensao').where({ evento_id: eventoId }).update({
       tipo: tipo || null,
@@ -1876,8 +2026,8 @@ app.post('/operacoes/:opId/apreensoes/:eventoId/fotos',
   uploadFotosFields,
   csrfProtection,
   async (req, res) => {
-    const user     = (req.session as any).user;
-    const opId     = Number(req.params.opId);
+    const user = (req.session as any).user;
+    const opId = Number(req.params.opId);
     const eventoId = Number(req.params.eventoId);
 
     const perm = await canEditEvento(user, opId, eventoId);
@@ -1896,10 +2046,10 @@ app.post('/operacoes/:opId/apreensoes/:eventoId/fotos',
 app.post('/operacoes/:opId/apreensoes/:eventoId/fotos/:fotoId/delete',
   requireAuth, csrfProtection,
   async (req, res) => {
-    const user     = (req.session as any).user;
-    const opId     = Number(req.params.opId);
+    const user = (req.session as any).user;
+    const opId = Number(req.params.opId);
     const eventoId = Number(req.params.eventoId);
-    const fotoId   = Number(req.params.fotoId);
+    const fotoId = Number(req.params.fotoId);
 
     const perm = await canEditEvento(user, opId, eventoId);
     if (!perm.ok) return res.status(perm.status || 403).send(perm.reason || 'Não autorizado.');
@@ -2026,7 +2176,7 @@ app.get('/operacoes/:id/mapa', requireAuth, async (req, res) => {
       lat: r.lat,
       lng: r.lng,
       accuracy: r.accuracy,
-      popup: `${title}${obs ? '<br>'+obs : ''}<br>${rodape}`
+      popup: `${title}${obs ? '<br>' + obs : ''}<br>${rodape}`
     };
   });
 
