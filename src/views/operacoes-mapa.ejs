@@ -60,6 +60,7 @@
     <div id="map" class="card"></div>
   </div>
 
+  
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
@@ -147,8 +148,9 @@
   // toggles
   document.getElementById('chk-fis').addEventListener('change', e => e.target.checked ? gFis.addTo(map) : map.removeLayer(gFis));
   document.getElementById('chk-pes').addEventListener('change', e => e.target.checked ? gPes.addTo(map) : map.removeLayer(gPes));
-  document.getElementById('chk-vei').addEventListener('
+  document.getElementById('chk-vei').addEventListener('change', e => e.target.checked ? gVei.addTo(map) : map.removeLayer(gVei));
+  document.getElementById('chk-apr').addEventListener('change', e => e.target.checked ? gApr.addTo(map) : map.removeLayer(gApr));
+</script>
 
-  
 </body>
 </html>
