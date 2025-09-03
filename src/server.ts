@@ -2165,7 +2165,7 @@ app.get('/operacoes/:id/mapa', requireAuth, async (req, res) => {
     )
     .orderBy('e.ts', 'desc');
 
-  // monta popup por tipo
+  // monta popup por tipo (e números garantidos)
   const markers = rows.map(r => {
     let title = '';
     if (r.tipo === 'fiscalizacao') {
@@ -2180,12 +2180,17 @@ app.get('/operacoes/:id/mapa', requireAuth, async (req, res) => {
     const when = new Date(r.ts).toLocaleString('pt-BR');
     const rodape = `<div class="muted">Cidade: ${r.cidade || '—'} · ${when} · ${r.usuario || ''}</div>`;
     const obs = r.obs ? `<div class="muted">${r.obs}</div>` : '';
+
+    const lat = Number(r.lat);
+    const lng = Number(r.lng);
+    const acc = Number.isFinite(Number(r.accuracy)) ? Number(r.accuracy) : 0;
+
     return {
       id: r.id,
       tipo: r.tipo,
-      lat: r.lat,
-      lng: r.lng,
-      accuracy: r.accuracy,
+      lat,
+      lng,
+      accuracy: acc, // nunca null/NaN
       popup: `${title}${obs ? '<br>' + obs : ''}<br>${rodape}`
     };
   });
@@ -2196,6 +2201,7 @@ app.get('/operacoes/:id/mapa', requireAuth, async (req, res) => {
     markers
   });
 });
+
 
 
 

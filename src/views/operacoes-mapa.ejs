@@ -62,11 +62,30 @@
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
-    const markersData = <%- JSON.stringify(markers || []) %>;
+    // dados do servidor (sem escape para manter HTML do popup)
+    const rawMarkers = <%- JSON.stringify(markers || []) %>;
+
+    // helpers de número
+    const toNum = v => {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : null;
+    };
+    const toMeters = v => {
+      const n = Number(v);
+      return Number.isFinite(n) && n > 0 ? n : 0;
+    };
+
+    // normaliza os marcadores
+    const markersData = rawMarkers.map(m => ({
+      ...m,
+      lat: toNum(m.lat),
+      lng: toNum(m.lng),
+      accuracy: toMeters(m.accuracy)
+    }));
 
     // mapa base
     const map = L.map('map', { zoomControl: true });
-    const tiles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap',
       maxZoom: 19
     }).addTo(map);
@@ -87,28 +106,41 @@
 
     const allLatLng = [];
     markersData.forEach(m => {
-      if (typeof m.lat !== 'number' || typeof m.lng !== 'number') return;
+      if (m.lat === null || m.lng === null) return; // pula inválidos
+
       const circle = L.circleMarker([m.lat, m.lng], {
-        radius: 8, weight: 2, color: colorFor(m.tipo), fillOpacity: .7
-      }).bindPopup(m.popup);
+        radius: 8,
+        weight: 2,
+        color: colorFor(m.tipo),
+        fillOpacity: .7
+      });
+      if (m.popup) circle.bindPopup(m.popup);
 
       if (m.tipo === 'fiscalizacao') circle.addTo(gFis);
       else if (m.tipo === 'pessoa')  circle.addTo(gPes);
       else if (m.tipo === 'veiculo') circle.addTo(gVei);
       else if (m.tipo === 'apreensao') circle.addTo(gApr);
+      else circle.addTo(map);
+
       allLatLng.push([m.lat, m.lng]);
 
-      // raio de precisão (se houver)
-      if (typeof m.accuracy === 'number' && m.accuracy > 0) {
-        L.circle([m.lat, m.lng], { radius: m.accuracy, color: colorFor(m.tipo), weight:1, opacity:.3, fillOpacity:.05 })
-          .addTo(map);
+      // raio de precisão (em metros), só se > 0
+      if (m.accuracy > 0) {
+        L.circle([m.lat, m.lng], {
+          radius: m.accuracy,
+          color: colorFor(m.tipo),
+          weight: 1,
+          opacity: .3,
+          fillOpacity: .05
+        }).addTo(map);
       }
     });
 
     if (allLatLng.length){
       map.fitBounds(L.latLngBounds(allLatLng).pad(0.2));
     } else {
-      map.setView([-22.90, -47.05], 11); // fallback
+      // fallback Brasil
+      map.setView([-14.2350, -51.9253], 4);
     }
 
     // toggles
