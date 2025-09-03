@@ -289,64 +289,64 @@
     </div>
 
     <!-- Chart.js (apenas UMA vez) -->
-   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-<script>
-  // dados vindos do servidor
-  const series = <%- JSON.stringify(seriesPorCidade || []) %>;
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    <script>
+      // dados vindos do servidor
+      const series = <%- JSON.stringify(seriesPorCidade || []) %>;
 
-  function hasAnyValue(rows){
-    return Array.isArray(rows) && rows.some(r =>
-      (Number(r.fiscalizacao)||0) +
-      (Number(r.pessoa)||0) +
-      (Number(r.veiculo)||0) +
-      (Number(r.apreensao)||0) > 0
-    );
-  }
-
-  window.addEventListener('load', () => {
-    const canvas = document.getElementById('byCityChart');
-    const noData  = document.getElementById('noChartData');
-
-    if (!hasAnyValue(series)) {
-      noData.style.display = 'block';
-      return;
-    }
-
-    const labels = series.map(r => r.cidade);
-    const mk = (k, label, color) => ({
-      label,
-      data: series.map(r => Number(r[k] || 0)),
-      backgroundColor: color,
-      borderColor: color,
-      borderWidth: 1,
-      borderRadius: 6,
-      maxBarThickness: 36
-    });
-
-    new Chart(canvas.getContext('2d'), {
-      type: 'bar',
-      data: {
-        labels,
-        datasets: [
-          mk('fiscalizacao', 'Fiscalizações', '#60a5fa'),
-          mk('pessoa',       'Pessoas',       '#f87171'),
-          mk('veiculo',      'Veículos',      '#34d399'),
-          mk('apreensao',    'Apreensões',    '#fbbf24'),
-        ]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        animation: false,
-        scales: {
-          x: { ticks: { color: '#e5e7eb' }, grid: { display: false } },
-          y: { beginAtZero: true, ticks: { precision: 0, color: '#e5e7eb' }, grid: { color: 'rgba(229,231,235,0.1)' } }
-        },
-        plugins: { legend: { position: 'top', labels: { color: '#e5e7eb' } } }
+      function hasAnyValue(rows) {
+        return Array.isArray(rows) && rows.some(r =>
+          (Number(r.fiscalizacao) || 0) +
+          (Number(r.pessoa) || 0) +
+          (Number(r.veiculo) || 0) +
+          (Number(r.apreensao) || 0) > 0
+        );
       }
-    });
-  });
-</script>
+
+      window.addEventListener('load', () => {
+        const canvas = document.getElementById('byCityChart');
+        const noData = document.getElementById('noChartData');
+
+        if (!hasAnyValue(series)) {
+          noData.style.display = 'block';
+          return;
+        }
+
+        const labels = series.map(r => r.cidade);
+        const mk = (k, label, color) => ({
+          label,
+          data: series.map(r => Number(r[k] || 0)),
+          backgroundColor: color,
+          borderColor: color,
+          borderWidth: 1,
+          borderRadius: 6,
+          maxBarThickness: 36
+        });
+
+        new Chart(canvas.getContext('2d'), {
+          type: 'bar',
+          data: {
+            labels,
+            datasets: [
+              mk('fiscalizacao', 'Fiscalizações', '#60a5fa'),
+              mk('pessoa', 'Pessoas', '#f87171'),
+              mk('veiculo', 'Veículos', '#34d399'),
+              mk('apreensao', 'Apreensões', '#fbbf24'),
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            scales: {
+              x: { ticks: { color: '#e5e7eb' }, grid: { display: false } },
+              y: { beginAtZero: true, ticks: { precision: 0, color: '#e5e7eb' }, grid: { color: 'rgba(229,231,235,0.1)' } }
+            },
+            plugins: { legend: { position: 'top', labels: { color: '#e5e7eb' } } }
+          }
+        });
+      });
+    </script>
 
 
 
@@ -356,49 +356,57 @@
       <!-- Tabela por cidade -->
       <div class="card">
         <div style="font-weight:700;margin-bottom:8px">Distribuição por cidade</div>
-        <table>
-          <thead>
-            <tr>
-              <th>Cidade</th>
-              <th>Fiscalizações</th>
-              <th>Pessoas</th>
-              <th>Veículos</th>
-              <th>Apreensões</th>
-              <th>Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            <% (seriesPorCidade||[]).forEach(row=> {
-              const fisc = Number(row.fiscalizacao || 0);
-              const pes = Number(row.pessoa || 0);
-              const vei = Number(row.veiculo || 0);
-              const apr = Number(row.apreensao || 0);
-              const total = fisc + pes + vei + apr;
-              %>
+
+        <% // mapa: cidade_id -> efetivo (para buscar rápido)
+          const efMap = new Map((efetivoByCity || []).map(e => [e.cidade_id, e]));
+          %>
+
+          <table>
+            <thead>
               <tr>
-                <td>
-                  <%= row.cidade %>
-                </td>
-                <td>
-                  <%= fisc %>
-                </td>
-                <td>
-                  <%= pes %>
-                </td>
-                <td>
-                  <%= vei %>
-                </td>
-                <td>
-                  <%= apr %>
-                </td>
-                <td>
-                  <%= total %>
-                </td>
+                <th>Cidade</th>
+                <th>Fiscalizações</th>
+                <th>Pessoas</th>
+                <th>Veículos</th>
+                <th>Apreensões</th>
+                <th>Efetivo (ag.)</th> <!-- (opcional: renomeei para ficar claro) -->
               </tr>
-              <% }) %>
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              <% (seriesPorCidade || []).forEach(row=> {
+                const fisc = Number(row.fiscalizacao || 0);
+                const pes = Number(row.pessoa || 0);
+                const vei = Number(row.veiculo || 0);
+                const apr = Number(row.apreensao || 0);
+
+                const ef = efMap.get(row.cidade_id) || {};
+                const totalEfetivo = Number(ef.agentes || 0); // <- usa "agentes" // se quiser agentes + viaturas,
+                  troque por: // const totalEfetivo=(Number(ef.agentes||0) + Number(ef.viaturas||0)); %>
+                  <tr>
+                    <td>
+                      <%= row.cidade %>
+                    </td>
+                    <td>
+                      <%= fisc %>
+                    </td>
+                    <td>
+                      <%= pes %>
+                    </td>
+                    <td>
+                      <%= vei %>
+                    </td>
+                    <td>
+                      <%= apr %>
+                    </td>
+                    <td>
+                      <%= totalEfetivo %>
+                    </td>
+                  </tr>
+                  <% }) %>
+            </tbody>
+          </table>
       </div>
+
 
       <div class="card">
         <div style="font-weight:700;margin-bottom:8px">Efetivo por cidade</div>
