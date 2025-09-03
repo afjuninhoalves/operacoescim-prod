@@ -355,252 +355,71 @@
     <div class="grid">
       <!-- Tabela por cidade -->
       <div class="card">
-        <div style="font-weight:700;margin-bottom:8px">Distribuição por cidade</div>
+  <div style="font-weight:700;margin-bottom:8px">Distribuição por cidade</div>
 
-        <% // mapa: cidade_id -> efetivo (para buscar rápido)
-          const efMap = new Map((efetivoByCity || []).map(e => [e.cidade_id, e]));
-          %>
+  <% 
+    // mapa cidade_id -> efetivo (agentes) para lookup rápido
+    const efMapDist = new Map((efetivoByCity || []).map(e => [e.cidade_id, e]));
 
-          <table>
-            <thead>
-              <tr>
-                <th>Cidade</th>
-                <th>Fiscalizações</th>
-                <th>Pessoas</th>
-                <th>Veículos</th>
-                <th>Apreensões</th>
-                <th>Efetivo (ag.)</th> <!-- (opcional: renomeei para ficar claro) -->
-              </tr>
-            </thead>
-            <tbody>
-              <% (seriesPorCidade || []).forEach(row=> {
-                const fisc = Number(row.fiscalizacao || 0);
-                const pes = Number(row.pessoa || 0);
-                const vei = Number(row.veiculo || 0);
-                const apr = Number(row.apreensao || 0);
+    let tFisc = 0, tPes = 0, tVei = 0, tApr = 0, tLac = 0, tFec = 0, tMul = 0, tEf = 0;
+  %>
 
-                const ef = efMap.get(row.cidade_id) || {};
+  <table>
+    <thead>
+      <tr>
+        <th>Cidade</th>
+        <th>Fiscalizações</th>
+        <th>Pessoas</th>
+        <th>Veículos</th>
+        <th>Apreensões</th>
+        <th>Lacrados</th>
+        <th>Fechados</th>
+        <th>Multados</th>
+        <th>Efetivo (ag.)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% (seriesPorCidade || []).forEach(row => {
+           const fisc = Number(row.fiscalizacao || 0);
+           const pes  = Number(row.pessoa        || 0);
+           const vei  = Number(row.veiculo       || 0);
+           const apr  = Number(row.apreensao     || 0);
+           const lac  = Number(row.lacrado       || 0);
+           const fec  = Number(row.fechado       || 0);
+           const mul  = Number(row.multado       || 0);
 
-                // Usa só "agentes" no total. Se quiser somar viaturas também,
-                // troque pela linha comentada abaixo.
-                const totalEfetivo = Number(ef.agentes || 0);
-                // const totalEfetivo = Number(ef.agentes || 0) + Number(ef.viaturas || 0);
-                %>
-                <tr>
-                  <td>
-                    <%= row.cidade %>
-                  </td>
-                  <td>
-                    <%= fisc %>
-                  </td>
-                  <td>
-                    <%= pes %>
-                  </td>
-                  <td>
-                    <%= vei %>
-                  </td>
-                  <td>
-                    <%= apr %>
-                  </td>
-                  <td>
-                    <%= totalEfetivo %>
-                  </td>
-                </tr>
-                <% }) %>
-            </tbody>
+           const ef   = efMapDist.get(row.cidade_id) || {};
+           const efAg = Number(ef.agentes || 0);
 
-          </table>
-      </div>
-
-
-      <div class="card" <div class="card">
-        <div style="font-weight:700;margin-bottom:8px">Distribuição por cidade</div>
-
-        <% // mapa: cidade_id -> efetivo (para buscar rápido os agentes por cidade)
-          const efMap = new Map((efetivoByCity || []).map(e => [e.cidade_id, e]));
-
-          let tFisc=0, tPes=0, tVei=0, tApr=0, tLac=0, tFec=0, tMul=0, tEf=0;
-          %>
-
-          <table>
-            <thead>
-              <tr>
-                <th>Cidade</th>
-                <th>Fiscalizações</th>
-                <th>Pessoas</th>
-                <th>Veículos</th>
-                <th>Apreensões</th>
-                <th>Lacrados</th>
-                <th>Fechados</th>
-                <th>Multados</th>
-                <th>Efetivo (ag.)</th>
-              </tr>
-            </thead>
-            <tbody>
-              <% (seriesPorCidade || []).forEach(row=> {
-                const fisc = Number(row.fiscalizacao || 0);
-                const pes = Number(row.pessoa || 0);
-                const vei = Number(row.veiculo || 0);
-                const apr = Number(row.apreensao || 0);
-                const lac = Number(row.lacrado || 0);
-                const fec = Number(row.fechado || 0);
-                const mul = Number(row.multado || 0);
-
-                const ef = efMap.get(row.cidade_id) || {};
-                const efAg = Number(ef.agentes || 0); // agentes por cidade
-
-                // acumula totais
-                tFisc+=fisc; tPes+=pes; tVei+=vei; tApr+=apr; tLac+=lac; tFec+=fec; tMul+=mul; tEf+=efAg;
-                %>
-                <tr>
-                  <td>
-                    <%= row.cidade %>
-                  </td>
-                  <td>
-                    <%= fisc %>
-                  </td>
-                  <td>
-                    <%= pes %>
-                  </td>
-                  <td>
-                    <%= vei %>
-                  </td>
-                  <td>
-                    <%= apr %>
-                  </td>
-                  <td>
-                    <%= lac %>
-                  </td>
-                  <td>
-                    <%= fec %>
-                  </td>
-                  <td>
-                    <%= mul %>
-                  </td>
-                  <td>
-                    <%= efAg %>
-                  </td>
-                </tr>
-                <% }) %>
-                  <tr>
-                    <th>Total</th>
-                    <th>
-                      <%= tFisc %>
-                    </th>
-                    <th>
-                      <%= tPes %>
-                    </th>
-                    <th>
-                      <%= tVei %>
-                    </th>
-                    <th>
-                      <%= tApr %>
-                    </th>
-                    <th>
-                      <%= tLac %>
-                    </th>
-                    <th>
-                      <%= tFec %>
-                    </th>
-                    <th>
-                      <%= tMul %>
-                    </th>
-                    <th>
-                      <%= tEf %>
-                    </th>
-                  </tr>
-            </tbody>
-          </table>
-      </div>
-      >
-      <div style="font-weight:700;margin-bottom:8px">Efetivo por cidade</div>
-      <% const efRows=Array.isArray(efetivoByCity) ? efetivoByCity : []; const t=efRows.reduce((a, r)=> ({
-        ag: a.ag + (Number(r.agentes)||0),
-        vt: a.vt + (Number(r.viaturas)||0),
-        pc_ag: a.pc_ag + (Number(r.pc_agentes)||0),
-        pc_vt: a.pc_vt + (Number(r.pc_viaturas)||0),
-        pm_ag: a.pm_ag + (Number(r.pm_agentes)||0),
-        pm_vt: a.pm_vt + (Number(r.pm_viaturas)||0),
-        ou_ag: a.ou_ag + (Number(r.outros_agentes)||0),
-        ou_vt: a.ou_vt + (Number(r.outros_viaturas)||0),
-        }), {ag:0,vt:0,pc_ag:0,pc_vt:0,pm_ag:0,pm_vt:0,ou_ag:0,ou_vt:0});
-        %>
-        <table>
-          <thead>
-            <tr>
-              <th>Cidade</th>
-              <th>Agentes</th>
-              <th>Viaturas</th>
-              <th>PC (ag.)</th>
-              <th>PC (viat.)</th>
-              <th>PM (ag.)</th>
-              <th>PM (viat.)</th>
-              <th>Outros (ag.)</th>
-              <th>Outros (viat.)</th>
-            </tr>
-          </thead>
-          <tbody>
-            <% efRows.forEach(r=> { %>
-              <tr>
-                <td>
-                  <%= r.cidade %>
-                </td>
-                <td>
-                  <%= r.agentes || 0 %>
-                </td>
-                <td>
-                  <%= r.viaturas || 0 %>
-                </td>
-                <td>
-                  <%= r.pc_agentes || 0 %>
-                </td>
-                <td>
-                  <%= r.pc_viaturas || 0 %>
-                </td>
-                <td>
-                  <%= r.pm_agentes || 0 %>
-                </td>
-                <td>
-                  <%= r.pm_viaturas || 0 %>
-                </td>
-                <td>
-                  <%= r.outros_agentes || 0 %>
-                </td>
-                <td>
-                  <%= r.outros_viaturas || 0 %>
-                </td>
-              </tr>
-              <% }) %>
-                <tr>
-                  <th>Total</th>
-                  <th>
-                    <%= t.ag %>
-                  </th>
-                  <th>
-                    <%= t.vt %>
-                  </th>
-                  <th>
-                    <%= t.pc_ag %>
-                  </th>
-                  <th>
-                    <%= t.pc_vt %>
-                  </th>
-                  <th>
-                    <%= t.pm_ag %>
-                  </th>
-                  <th>
-                    <%= t.pm_vt %>
-                  </th>
-                  <th>
-                    <%= t.ou_ag %>
-                  </th>
-                  <th>
-                    <%= t.ou_vt %>
-                  </th>
-                </tr>
-          </tbody>
-        </table>
-    </div>
+           tFisc += fisc; tPes += pes; tVei += vei; tApr += apr;
+           tLac  += lac;  tFec += fec;  tMul += mul; tEf  += efAg;
+      %>
+        <tr>
+          <td><%= row.cidade %></td>
+          <td><%= fisc %></td>
+          <td><%= pes %></td>
+          <td><%= vei %></td>
+          <td><%= apr %></td>
+          <td><%= lac %></td>
+          <td><%= fec %></td>
+          <td><%= mul %></td>
+          <td><%= efAg %></td>
+        </tr>
+      <% }) %>
+      <tr>
+        <th>Total</th>
+        <th><%= tFisc %></th>
+        <th><%= tPes  %></th>
+        <th><%= tVei  %></th>
+        <th><%= tApr  %></th>
+        <th><%= tLac  %></th>
+        <th><%= tFec  %></th>
+        <th><%= tMul  %></th>
+        <th><%= tEf   %></th>
+      </tr>
+    </tbody>
+  </table>
+</div>
 
 
 
