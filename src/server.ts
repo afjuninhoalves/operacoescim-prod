@@ -794,12 +794,11 @@ app.post('/cidades/nova', requireAdmin, uploadLogo.single('logo'), csrfProtectio
 // EFETIVO DA OPERAÇÃO
 // =============================================================================
 
-// NOVO: efetivo — somente gestor/admin
-
+// Efetivo — somente admin/gestor
 app.get(
   '/operacoes/:id/efetivo/novo',
   requireAuth,
-  requireAdminOrGestor,          // << só gestor/admin
+  requireAdminOrGestor,
   csrfProtection,
   async (req: Request, res: Response) => {
     const operacao_id = Number(req.params.id);
@@ -808,9 +807,17 @@ app.get(
     const op = await db('operacoes').where({ id: operacao_id }).first();
     if (!op) return res.status(404).send('Operação não encontrada.');
 
+    // cidades participantes (opcional lançar por cidade)
+    const cidades = await db('operacao_cidades as oc')
+      .join('cidades as c', 'c.id', 'oc.cidade_id')
+      .where('oc.operacao_id', operacao_id)
+      .select('c.id', 'c.nome')
+      .orderBy('c.nome', 'asc');
+
     return res.render('operacao-efetivo-form', {
       user: (req.session as any).user,
       operacao: { id: op.id, nome: op.nome },
+      cidades,
       csrfToken: (req as any).csrfToken(),
     });
   }
@@ -819,56 +826,55 @@ app.get(
 app.post(
   '/operacoes/:id/efetivo',
   requireAuth,
-  requireAdminOrGestor,          // << só gestor/admin
+  requireAdminOrGestor,
   csrfProtection,
   async (req: Request, res: Response) => {
     const user = (req.session as any).user;
     const operacao_id = Number(req.params.id);
     if (!Number.isFinite(operacao_id)) return res.status(400).send('ID inválido');
 
-    // helperzinhos
-    const num = (v: any) => {
-      const n = Number(v);
-      return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0;
-    };
+    const num  = (v: any) => { const n = Number(v); return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0; };
     const bool = (v: any) => v === 'on' || v === 'true' || v === '1';
 
-    // campos
+    // cidade opcional: vazio => registro "geral" (cidade_id = null)
+    const cidade_id = req.body.cidade_id ? Number(req.body.cidade_id) : null;
+
     const total_agentes  = num(req.body.total_agentes);
     const total_viaturas = num(req.body.total_viaturas);
 
-    const pc           = bool(req.body.pc);
-    const pc_agentes   = pc ? num(req.body.pc_agentes)   : 0;
-    const pc_viaturas  = pc ? num(req.body.pc_viaturas)  : 0;
+    const pc          = bool(req.body.pc);
+    const pc_agentes  = pc ? num(req.body.pc_agentes)  : 0;
+    const pc_viaturas = pc ? num(req.body.pc_viaturas) : 0;
 
-    const pm           = bool(req.body.pm);
-    const pm_agentes   = pm ? num(req.body.pm_agentes)   : 0;
-    const pm_viaturas  = pm ? num(req.body.pm_viaturas)  : 0;
+    const pm          = bool(req.body.pm);
+    const pm_agentes  = pm ? num(req.body.pm_agentes)  : 0;
+    const pm_viaturas = pm ? num(req.body.pm_viaturas) : 0;
 
-    const outros           = bool(req.body.outros);
-    const outros_agentes   = outros ? num(req.body.outros_agentes)   : 0;
-    const outros_viaturas  = outros ? num(req.body.outros_viaturas)  : 0;
+    const outros          = bool(req.body.outros);
+    const outros_agentes  = outros ? num(req.body.outros_agentes)  : 0;
+    const outros_viaturas = outros ? num(req.body.outros_viaturas) : 0;
 
-    // validação simples
-    if (
-      total_agentes < 0 || total_viaturas < 0 ||
-      pc_agentes < 0 || pc_viaturas < 0 ||
-      pm_agentes < 0 || pm_viaturas < 0 ||
-      outros_agentes < 0 || outros_viaturas < 0
-    ) return res.status(400).send('Valores inválidos.');
+    // UPSERT por (operacao_id, cidade_id)
+    await db('operacao_efetivo')
+      .insert({
+        operacao_id,
+        cidade_id,
+        user_id: user?.id ?? null,
+        total_agentes, total_viaturas,
+        pc, pc_agentes, pc_viaturas,
+        pm, pm_agentes, pm_viaturas,
+        outros, outros_agentes, outros_viaturas
+      })
+      .onConflict(['operacao_id','cidade_id'])
+      .merge({
+        user_id: user?.id ?? null,
+        total_agentes, total_viaturas,
+        pc, pc_agentes, pc_viaturas,
+        pm, pm_agentes, pm_viaturas,
+        outros, outros_agentes, outros_viaturas,
+        ts: db.fn.now()
+      });
 
-    // grava
-    await db('operacao_efetivo').insert({
-      operacao_id,
-      user_id: user?.id ?? null,
-      total_agentes,
-      total_viaturas,
-      pc, pc_agentes, pc_viaturas,
-      pm, pm_agentes, pm_viaturas,
-      outros, outros_agentes, outros_viaturas
-    });
-
-    // volta para a operação
     return res.redirect(`/operacoes/${operacao_id}`);
   }
 );
@@ -1654,8 +1660,10 @@ async function buildOperationMetrics(opId: number) {
   return { totals, perCity, latest };
 }
 
-app.get('/operacoes/:id/monitor', requireAdminOrGestor, async (req, res) => {
+app.get('/operacoes/:id/monitor', requireAdminOrGestor, async (req: Request, res: Response) => {
   const id = Number(req.params.id);
+  if (!Number.isFinite(id)) return res.status(400).send('ID inválido');
+
   const op = await db('operacoes').where({ id }).first();
   if (!op) return res.status(404).send('Operação não encontrada.');
 
@@ -1663,8 +1671,234 @@ app.get('/operacoes/:id/monitor', requireAdminOrGestor, async (req, res) => {
     ...op,
     inicio_fmt: op.inicio_agendado ? new Date(op.inicio_agendado).toLocaleString('pt-BR') : null
   };
-  res.render('operacoes-monitor', { operacao });
+
+  // Cidades participantes (para preencher distribuição)
+  const participantes = await db('operacao_cidades as oc')
+    .join('cidades as c', 'c.id', 'oc.cidade_id')
+    .where('oc.operacao_id', id)
+    .select('c.id', 'c.nome')
+    .orderBy('c.nome', 'asc');
+
+  // KPIs por tipo
+  const totalsRaw = await db('operacao_eventos')
+    .where({ operacao_id: id })
+    .select('tipo')
+    .count<{ tipo: string; n: string }[]>('* as n')
+    .groupBy('tipo');
+
+  const kpis = { fiscalizacoes: 0, pessoas: 0, veiculos: 0, apreensoes: 0 };
+  for (const r of totalsRaw) {
+    const n = Number((r as any).n ?? 0);
+    if (r.tipo === 'fiscalizacao') kpis.fiscalizacoes = n;
+    else if (r.tipo === 'pessoa')   kpis.pessoas       = n;
+    else if (r.tipo === 'veiculo')  kpis.veiculos      = n;
+    else if (r.tipo === 'apreensao')kpis.apreensoes    = n;
+  }
+
+  // Distribuição por cidade (conta eventos por tipo)
+  const perCityRaw = await db('operacao_eventos as e')
+    .where('e.operacao_id', id)
+    .leftJoin('cidades as c', 'c.id', 'e.cidade_id')
+    .select('c.id as cidade_id', 'c.nome', 'e.tipo')
+    .count<{ cidade_id: number; nome: string; tipo: string; n: string }[]>('* as n')
+    .groupBy('c.id', 'c.nome', 'e.tipo');
+
+  const byCity: Record<number, {
+    cidade_id: number; nome: string;
+    fiscalizacoes: number; pessoas: number; veiculos: number; apreensoes: number; total: number;
+  }> = {};
+
+  for (const c of participantes) {
+    byCity[c.id] = { cidade_id: c.id, nome: c.nome, fiscalizacoes: 0, pessoas: 0, veiculos: 0, apreensoes: 0, total: 0 };
+  }
+  for (const r of perCityRaw) {
+    const cid = (r as any).cidade_id as number | null;
+    if (cid == null || !(cid in byCity)) continue;
+    const n = Number((r as any).n ?? 0);
+    const row = byCity[cid];
+    if (r.tipo === 'fiscalizacao') row.fiscalizacoes += n;
+    else if (r.tipo === 'pessoa')  row.pessoas       += n;
+    else if (r.tipo === 'veiculo') row.veiculos      += n;
+    else if (r.tipo === 'apreensao') row.apreensoes  += n;
+  }
+  const distribuicao = Object.values(byCity).map(r => ({
+    ...r,
+    total: r.fiscalizacoes + r.pessoas + r.veiculos + r.apreensoes
+  }));
+
+  // Feed (últimos 20)
+  const feed = await db('operacao_eventos as e')
+    .where('e.operacao_id', id)
+    .leftJoin('usuarios as u', 'u.id', 'e.user_id')
+    .leftJoin('cidades as c', 'c.id', 'e.cidade_id')
+    .select('e.id', 'e.tipo', 'e.ts', 'e.obs', 'u.nome as usuario', 'c.nome as cidade')
+    .orderBy('e.ts', 'desc')
+    .limit(20);
+
+  // --- EFETIVO --------------------------------------------------------------
+
+  // Total geral (somando todos os registros, com ou sem cidade_id)
+  const efetivoTotalRow = await db('operacao_efetivo')
+    .where({ operacao_id: id })
+    .sum<{ agentes: string }>('total_agentes as agentes')
+    .sum<{ viaturas: string }>('total_viaturas as viaturas')
+    .first();
+
+  const efetivoTotal = {
+    agentes: Number((efetivoTotalRow as any)?.agentes ?? 0),
+    viaturas: Number((efetivoTotalRow as any)?.viaturas ?? 0),
+  };
+
+  // Por cidade (somente registros com cidade_id)
+  const efetivoPorCidadeRows = await db('operacao_efetivo as e')
+    .leftJoin('cidades as c', 'c.id', 'e.cidade_id')
+    .where('e.operacao_id', id)
+    .whereNotNull('e.cidade_id')
+    .select('c.id', 'c.nome')
+    .sum<{ agentes: string }>('e.total_agentes as agentes')
+    .sum<{ viaturas: string }>('e.total_viaturas as viaturas')
+    .groupBy('c.id', 'c.nome')
+    .orderBy('c.nome', 'asc');
+
+  const efetivoPorCidade = efetivoPorCidadeRows.map(r => ({
+    id: (r as any).id,
+    nome: (r as any).nome,
+    agentes: Number((r as any).agentes ?? 0),
+    viaturas: Number((r as any).viaturas ?? 0),
+  }));
+
+  // -------------------------------------------------------------------------
+
+  res.render('operacoes-monitor', {
+    operacao,
+    kpis,               // { fiscalizacoes, pessoas, veiculos, apreensoes }
+    distribuicao,       // [{ cidade_id, nome, fiscalizacoes, pessoas, veiculos, apreensoes, total }]
+    feed,               // últimos 20 eventos
+    efetivoTotal,       // { agentes, viaturas }
+    efetivoPorCidade,   // [{ id, nome, agentes, viaturas }]
+  });
+});app.get('/operacoes/:id/monitor', requireAdminOrGestor, async (req: Request, res: Response) => {
+  const id = Number(req.params.id);
+  const op = await db('operacoes').where({ id }).first();
+  if (!op) return res.status(404).send('Operação não encontrada.');
+
+  // ---- KPIs (totais por tipo)
+  type TotRow = { tipo: string; c: any };
+  const totRows = await db('operacao_eventos')
+    .where({ operacao_id: id })
+    .select('tipo')
+    .count<{ c: any }>('id as c')
+    .groupBy('tipo') as TotRow[];
+
+  const cards = { locais: 0, pessoas: 0, veiculos: 0, apreensoes: 0 };
+  for (const r of totRows) {
+    const n = Number(r.c) || 0;
+    if (r.tipo === 'fiscalizacao') cards.locais = n;
+    else if (r.tipo === 'pessoa')  cards.pessoas = n;
+    else if (r.tipo === 'veiculo') cards.veiculos = n;
+    else if (r.tipo === 'apreensao') cards.apreensoes = n;
+  }
+
+  // ---- Séries por cidade (contagem de eventos por tipo)
+  type CntRow = { cidade_id: number; cidade: string; tipo: string; cnt: any };
+  const grouped = await db('operacao_eventos as e')
+    .where('e.operacao_id', id)
+    .join('cidades as c', 'c.id', 'e.cidade_id')
+    .select('c.id as cidade_id', 'c.nome as cidade', 'e.tipo')
+    .count<{ cnt: any }>('e.id as cnt')
+    .groupBy('c.id', 'c.nome', 'e.tipo') as CntRow[];
+
+  const participantes = await db('operacao_cidades as oc')
+    .join('cidades as c', 'c.id', 'oc.cidade_id')
+    .where('oc.operacao_id', id)
+    .select('c.id', 'c.nome');
+
+  const byCity: Record<number, any> = {};
+  for (const p of participantes) {
+    byCity[p.id] = { cidade_id: p.id, cidade: p.nome, fiscalizacao: 0, pessoa: 0, veiculo: 0, apreensao: 0 };
+  }
+  for (const r of grouped) {
+    const row = byCity[r.cidade_id] || (byCity[r.cidade_id] = {
+      cidade_id: r.cidade_id, cidade: r.cidade, fiscalizacao: 0, pessoa: 0, veiculo: 0, apreensao: 0
+    });
+    const n = Number(r.cnt) || 0;
+    if (r.tipo === 'fiscalizacao') row.fiscalizacao = n;
+    else if (r.tipo === 'pessoa')  row.pessoa = n;
+    else if (r.tipo === 'veiculo') row.veiculo = n;
+    else if (r.tipo === 'apreensao') row.apreensao = n;
+  }
+  const seriesPorCidade = Object.values(byCity).sort((a: any, b: any) => a.cidade.localeCompare(b.cidade));
+
+  // ---- Feed (últimos 20)
+  const feed = await db('operacao_eventos as e')
+    .where('e.operacao_id', id)
+    .leftJoin('cidades as c', 'c.id', 'e.cidade_id')
+    .leftJoin('usuarios as u', 'u.id', 'e.user_id')
+    .select('e.id', 'e.ts', 'e.tipo', 'e.obs', 'c.nome as cidade', 'u.nome as user')
+    .orderBy('e.ts', 'desc')
+    .limit(20);
+
+  // ---- Efetivo total (linha "geral": cidade_id NULL)
+  const efTot = await db('operacao_efetivo')
+    .where({ operacao_id: id })
+    .whereNull('cidade_id')
+    .sum<{ agentes: any }>('total_agentes as agentes')
+    .sum<{ viaturas: any }>('total_viaturas as viaturas')
+    .first();
+
+  const efetivoTotal = {
+    total_agentes: Number(efTot?.agentes) || 0,
+    total_viaturas: Number(efTot?.viaturas) || 0
+  };
+
+  // ---- Efetivo por cidade (sempre array!)
+  type EfRow = { cidade_id: number; cidade: string; total_agentes: any; total_viaturas: any };
+
+  const subEf = db('operacao_efetivo')
+    .where('operacao_id', id)
+    .whereNotNull('cidade_id')
+    .select('cidade_id')
+    .sum({ agentes: 'total_agentes' })
+    .sum({ viaturas: 'total_viaturas' })
+    .groupBy('cidade_id')
+    .as('ef');
+
+  const efetivoPorCidadeRows = await db('operacao_cidades as oc')
+    .join('cidades as c', 'c.id', 'oc.cidade_id')
+    .leftJoin(subEf, 'ef.cidade_id', 'oc.cidade_id')
+    .where('oc.operacao_id', id)
+    .select(
+      'c.id as cidade_id',
+      'c.nome as cidade',
+      db.raw('COALESCE(ef.agentes, 0) as total_agentes'),
+      db.raw('COALESCE(ef.viaturas, 0) as total_viaturas')
+    )
+    .orderBy('c.nome') as EfRow[];
+
+  const efetivoByCity = efetivoPorCidadeRows.map(r => ({
+    cidade_id: r.cidade_id,
+    cidade: r.cidade,
+    total_agentes: Number(r.total_agentes) || 0,
+    total_viaturas: Number(r.total_viaturas) || 0
+  }));
+
+  const operacao = {
+    id: op.id,
+    nome: op.nome,
+    inicio_fmt: op.inicio_agendado ? new Date(op.inicio_agendado).toLocaleString('pt-BR') : null
+  };
+
+  res.render('operacoes-monitor', {
+    operacao,
+    cards,
+    seriesPorCidade,
+    feed,
+    efetivoByCity,
+    efetivoTotal
+  });
 });
+
+
 
 app.get('/operacoes/:id/metrics', requireAdminOrGestor, async (req, res) => {
   const id = Number(req.params.id);

@@ -3,109 +3,142 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Inserir efetivo — <%= operacao.nome %></title>
+  <title>Efetivo — <%= operacao.nome %></title>
   <style>
-    :root{ --bg:#0b1220; --panel:#0f172a; --panel2:#111827; --border:#1f2937; --text:#e5e7eb; --muted:#9ca3af; --blue:#2563eb; }
+    :root{ --bg:#0b1220; --panel:#0f172a; --panel2:#111827; --border:#1f2937; --text:#e5e7eb; --muted:#9ca3af; --ok:#10b981; --warn:#f59e0b; }
+    *{box-sizing:border-box}
     body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial}
-    .wrap{max-width:960px;margin:24px auto;padding:0 16px}
-    .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--border);border-radius:14px;padding:18px}
-    h1{font-size:20px;margin:0 0 12px}
-    .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-    .field{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
-    .field input[type=number]{padding:10px;border-radius:10px;border:1px solid var(--border);background:#0f172a;color:var(--text)}
-    .chk{display:flex;align-items:center;gap:8px;margin:10px 0 4px}
-    .hint{color:var(--muted);font-size:12px}
-    .btns{display:flex;gap:10px;margin-top:10px}
+    .container{max-width:960px;margin:24px auto;padding:0 16px}
+    .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--border);border-radius:14px;padding:16px}
+    .row{display:grid;gap:12px}
+    .row.cols-2{grid-template-columns:1fr 1fr}
+    .row.cols-3{grid-template-columns:1fr 1fr 1fr}
+    label{display:block;font-size:14px;color:var(--muted);margin-bottom:6px}
+    input[type="number"],select{width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:#0f1628;color:var(--text)}
+    .switch{display:flex;align-items:center;gap:8px;margin:6px 0 10px}
+    .muted{color:var(--muted)}
+    .btns{display:flex;gap:10px;margin-top:16px}
     .btn{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:#111826;color:var(--text);text-decoration:none}
-    .btn.primary{background:var(--blue);border-color:#1d4ed8}
+    .btn:hover{filter:brightness(1.08)}
+    .btn.primary{background:#1e293b;border-color:#334155}
+    .section-title{font-weight:700;margin:8px 0 6px}
+    .grid-box{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+    @media (max-width:720px){ .row.cols-2,.row.cols-3,.grid-box{grid-template-columns:1fr} }
+    .disabled{opacity:.6;pointer-events:none}
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="card">
-      <h1>Inserir efetivo — <%= operacao.nome %></h1>
+  <div class="container">
+    <h2 style="margin:0 0 12px">Efetivo — <span class="muted"><%= operacao.nome %></span></h2>
 
-      <form method="post" action="/operacoes/<%= operacao.id %>/efetivo">
-        <input type="hidden" name="_csrf" value="<%= csrfToken %>"/>
+    <form class="card" method="post" action="/operacoes/<%= operacao.id %>/efetivo">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>"/>
 
-        <div class="row">
-          <div class="field">
-            <label>Total de agentes empregados</label>
-            <input type="number" name="total_agentes" min="0" step="1" value="0" required>
-          </div>
-          <div class="field">
-            <label>Total de viaturas</label>
-            <input type="number" name="total_viaturas" min="0" step="1" value="0" required>
-          </div>
+      <!-- Cidade opcional -->
+      <div class="row">
+        <div>
+          <label>Cidade (opcional) — deixe “Geral” para efetivo total</label>
+          <select name="cidade_id">
+            <option value="">Geral (todas)</option>
+            <% (cidades || []).forEach(c => { %>
+              <option value="<%= c.id %>"><%= c.nome %></option>
+            <% }) %>
+          </select>
         </div>
+      </div>
 
-        <div class="field">
-          <label class="chk"><input type="checkbox" id="pc" name="pc"> Polícia Civil participou</label>
-          <div id="pc-box" style="display:none">
-            <div class="row">
-              <div class="field">
-                <label>PC — agentes</label>
-                <input type="number" name="pc_agentes" min="0" step="1" value="0">
-              </div>
-              <div class="field">
-                <label>PC — viaturas</label>
-                <input type="number" name="pc_viaturas" min="0" step="1" value="0">
-              </div>
-            </div>
-          </div>
+      <!-- Totais -->
+      <div class="row cols-2" style="margin-top:8px">
+        <div>
+          <label>Total de agentes (geral)</label>
+          <input type="number" min="0" name="total_agentes" value="0" required>
         </div>
-
-        <div class="field">
-          <label class="chk"><input type="checkbox" id="pm" name="pm"> Polícia Militar participou</label>
-          <div id="pm-box" style="display:none">
-            <div class="row">
-              <div class="field">
-                <label>PM — agentes</label>
-                <input type="number" name="pm_agentes" min="0" step="1" value="0">
-              </div>
-              <div class="field">
-                <label>PM — viaturas</label>
-                <input type="number" name="pm_viaturas" min="0" step="1" value="0">
-              </div>
-            </div>
-          </div>
+        <div>
+          <label>Total de viaturas (geral)</label>
+          <input type="number" min="0" name="total_viaturas" value="0" required>
         </div>
+      </div>
 
-        <div class="field">
-          <label class="chk"><input type="checkbox" id="outros" name="outros"> Outros órgãos participaram</label>
-          <div id="outros-box" style="display:none">
-            <div class="row">
-              <div class="field">
-                <label>Outros — agentes</label>
-                <input type="number" name="outros_agentes" min="0" step="1" value="0">
-              </div>
-              <div class="field">
-                <label>Outros — viaturas</label>
-                <input type="number" name="outros_viaturas" min="0" step="1" value="0">
-              </div>
-            </div>
-            <div class="hint">Se preferir detalhar por órgão no futuro, dá pra expandir esse modelo.</div>
+      <!-- Polícia Civil -->
+      <div style="margin-top:18px">
+        <div class="section-title">Polícia Civil</div>
+        <div class="switch">
+          <input id="sw-pc" type="checkbox" name="pc">
+          <label for="sw-pc" style="margin:0">Houve participação</label>
+        </div>
+        <div id="box-pc" class="grid-box disabled">
+          <div>
+            <label>Agentes (PC)</label>
+            <input type="number" min="0" name="pc_agentes" value="0" disabled>
+          </div>
+          <div>
+            <label>Viaturas (PC)</label>
+            <input type="number" min="0" name="pc_viaturas" value="0" disabled>
           </div>
         </div>
+      </div>
 
-        <div class="btns">
-          <button class="btn primary" type="submit">Salvar</button>
-          <a class="btn" href="/operacoes/<%= operacao.id %>">Cancelar</a>
+      <!-- Polícia Militar -->
+      <div style="margin-top:18px">
+        <div class="section-title">Polícia Militar</div>
+        <div class="switch">
+          <input id="sw-pm" type="checkbox" name="pm">
+          <label for="sw-pm" style="margin:0">Houve participação</label>
         </div>
-      </form>
-    </div>
+        <div id="box-pm" class="grid-box disabled">
+          <div>
+            <label>Agentes (PM)</label>
+            <input type="number" min="0" name="pm_agentes" value="0" disabled>
+          </div>
+          <div>
+            <label>Viaturas (PM)</label>
+            <input type="number" min="0" name="pm_viaturas" value="0" disabled>
+          </div>
+        </div>
+      </div>
+
+      <!-- Outros órgãos -->
+      <div style="margin-top:18px">
+        <div class="section-title">Outros órgãos</div>
+        <div class="switch">
+          <input id="sw-outros" type="checkbox" name="outros">
+          <label for="sw-outros" style="margin:0">Houve participação</label>
+        </div>
+        <div id="box-outros" class="grid-box disabled">
+          <div>
+            <label>Agentes (outros)</label>
+            <input type="number" min="0" name="outros_agentes" value="0" disabled>
+          </div>
+          <div>
+            <label>Viaturas (outros)</label>
+            <input type="number" min="0" name="outros_viaturas" value="0" disabled>
+          </div>
+        </div>
+      </div>
+
+      <div class="btns">
+        <a class="btn" href="/operacoes/<%= operacao.id %>">Cancelar</a>
+        <button class="btn primary" type="submit">Salvar efetivo</button>
+      </div>
+    </form>
   </div>
 
   <script>
-    const bindToggle = (id, boxId) => {
-      const chk = document.getElementById(id);
-      const box = document.getElementById(boxId);
-      const sync = () => box.style.display = chk.checked ? 'block' : 'none';
-      chk.addEventListener('change', sync); sync();
-    };
-    bindToggle('pc','pc-box');
-    bindToggle('pm','pm-box');
-    bindToggle('outros','outros-box');
+    function wireToggle(idSwitch, idBox){
+      const sw = document.getElementById(idSwitch);
+      const box = document.getElementById(idBox);
+      const inputs = () => box.querySelectorAll('input[type="number"]');
+      function apply(){
+        const on = sw.checked;
+        box.classList.toggle('disabled', !on);
+        inputs().forEach(i => i.disabled = !on);
+      }
+      sw.addEventListener('change', apply);
+      apply();
+    }
+    wireToggle('sw-pc', 'box-pc');
+    wireToggle('sw-pm', 'box-pm');
+    wireToggle('sw-outros', 'box-outros');
   </script>
 </body>
 </html>

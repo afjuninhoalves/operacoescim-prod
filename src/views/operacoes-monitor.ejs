@@ -1,201 +1,83 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-br">
-
 <head>
-  <meta charset="utf-8" />
-  <title>Monitor — <%= operacao.nome %>
-  </title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Monitor — <%= operacao.nome %></title>
   <style>
-    :root {
-      --bg: #0b1220;
-      --panel: #0f172a;
-      --panel2: #111827;
-      --border: #1f2937;
-      --text: #e5e7eb;
-      --muted: #9ca3af;
-      --brand: #60a5fa;
-      --accent: #22c55e;
-      --red: #ef4444;
-    }
-
-    * {
-      box-sizing: border-box
-    }
-
-    html,
-    body {
-      margin: 0;
-      background: var(--bg);
-      color: var(--text);
-      font-family: system-ui, -apple-system, Segoe UI, Roboto
-    }
-
-    .top {
-      position: sticky;
-      top: 0;
-      z-index: 5;
-      background: linear-gradient(to bottom, rgba(17, 24, 39, .9), rgba(17, 24, 39, .7));
-      border-bottom: 1px solid var(--border);
-      backdrop-filter: blur(6px)
-    }
-
-    .wrap {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 16px 20px
-    }
-
-    .row {
-      display: flex;
-      gap: 12px;
-      align-items: center;
-      flex-wrap: wrap
-    }
-
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 10px 14px;
-      border-radius: 10px;
-      border: 1px solid var(--border);
-      background: #111826;
-      color: var(--text);
-      text-decoration: none
-    }
-
-    .cards {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 14px
-    }
-
-    .card {
-      background: linear-gradient(180deg, var(--panel), var(--panel2));
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 16px
-    }
-
-    .card h3 {
-      margin: 0 0 6px;
-      font-size: 14px;
-      color: var(--muted)
-    }
-
-    .big {
-      font-size: 28px;
-      font-weight: 800
-    }
-
-    .grid {
-      display: grid;
-      grid-template-columns: 1.2fr .8fr;
-      gap: 16px;
-      margin-top: 16px
-    }
-
-    @media(max-width:1000px) {
-      .grid {
-        grid-template-columns: 1fr
-      }
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      background: linear-gradient(180deg, var(--panel), var(--panel2));
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      overflow: hidden
-    }
-
-    th,
-    td {
-      padding: 10px;
-      border-bottom: 1px solid var(--border);
-      text-align: left
-    }
-
-    th {
-      font-size: 13px;
-      color: var(--muted);
-      background: #0d1528
-    }
-
-    tr:last-child td {
-      border-bottom: none
-    }
-
-    .feed {
-      display: grid;
-      gap: 10px
-    }
-
-    .item {
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 10px;
-      background: #0d1528
-    }
-
-    .muted {
-      color: var(--muted)
-    }
+    :root{ --bg:#0b1220; --panel:#0f172a; --panel2:#111827; --border:#1f2937; --text:#e5e7eb; --muted:#9ca3af; --chip:#1f2937; }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial}
+    a{color:inherit;text-decoration:none}
+    .topbar{position:sticky;top:0;z-index:10;background:linear-gradient(to bottom,rgba(17,24,39,.92),rgba(17,24,39,.75));border-bottom:1px solid var(--border)}
+    .topbar-inner{max-width:1160px;margin:0 auto;padding:14px 20px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+    .btn{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:#111826}
+    .btn:hover{filter:brightness(1.08)}
+    .container{max-width:1160px;margin:0 auto;padding:20px}
+    .muted{color:var(--muted)}
+    .cards{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+    .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--border);border-radius:14px;padding:14px}
+    .kpi-title{font-size:13px;color:var(--muted)}
+    .kpi-value{font-size:28px;font-weight:700}
+    .grid{display:grid;grid-template-columns:1.2fr .8fr;gap:12px;margin-top:14px}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:10px;border-bottom:1px solid var(--border);text-align:center}
+    th:first-child, td:first-child{text-align:left}
+    .chip{display:inline-block;padding:3px 8px;border-radius:999px;background:var(--chip);font-size:12px}
+    @media (max-width:1100px){ .cards{grid-template-columns:repeat(2,1fr)} .grid{grid-template-columns:1fr} }
   </style>
 </head>
-
 <body>
-  <div class="top">
-    <div class="wrap row" style="justify-content:space-between">
+  <div class="topbar">
+    <div class="topbar-inner">
       <div>
-        <div style="font-weight:700">Monitor — <%= operacao.nome %>
-        </div>
-        <div class="muted">Agendada: <%= operacao.inicio_fmt || '-' %> · ID #<%= operacao.id %>
-        </div>
+        <div style="font-weight:700">Monitor — <%= operacao.nome %></div>
+        <div class="muted">Agendada: <%= operacao.inicio_fmt %> · ID #<%= operacao.id %></div>
       </div>
-      <div class="row" style="gap:10px">
+      <div style="display:flex;gap:10px">
         <a class="btn" href="/operacoes/<%= operacao.id %>">Voltar ao detalhe</a>
-
-        <!-- NOVO: botão para o mapa -->
         <a class="btn" href="/operacoes/<%= operacao.id %>/mapa">Mapa das fiscalizações</a>
-
         <a class="btn" href="/operacoes">Lista de operações</a>
       </div>
     </div>
   </div>
 
-  <div class="wrap" id="app">
-    <!-- CARDS -->
+  <div class="container">
+    <!-- KPIs -->
     <div class="cards">
       <div class="card">
-        <h3>Locais fiscalizados</h3>
-        <div class="big" id="kpi-fiscal">0</div>
+        <div class="kpi-title">Locais fiscalizados</div>
+        <div class="kpi-value"><%= (cards && cards.locais) || 0 %></div>
       </div>
       <div class="card">
-        <h3>Pessoas</h3>
-        <div class="big" id="kpi-pessoas">0</div>
+        <div class="kpi-title">Pessoas</div>
+        <div class="kpi-value"><%= (cards && cards.pessoas) || 0 %></div>
       </div>
       <div class="card">
-        <h3>Veículos</h3>
-        <div class="big" id="kpi-veiculos">0</div>
+        <div class="kpi-title">Veículos</div>
+        <div class="kpi-value"><%= (cards && cards.veiculos) || 0 %></div>
       </div>
       <div class="card">
-        <h3>Apreensões</h3>
-        <div class="big" id="kpi-apreensoes">0</div>
+        <div class="kpi-title">Apreensões</div>
+        <div class="kpi-value"><%= (cards && cards.apreensoes) || 0 %></div>
+      </div>
+      <div class="card">
+        <div class="kpi-title">Efetivo total</div>
+        <% 
+          const _efTotAg = (efetivoTotal && Number(efetivoTotal.total_agentes)) || (Array.isArray(efetivoByCity) ? efetivoByCity.reduce((a,c)=>a+(Number(c.total_agentes)||0),0) : 0);
+          const _efTotVt = (efetivoTotal && Number(efetivoTotal.total_viaturas)) || (Array.isArray(efetivoByCity) ? efetivoByCity.reduce((a,c)=>a+(Number(c.total_viaturas)||0),0) : 0);
+        %>
+        <div class="kpi-value"><%= _efTotAg %> ag.</div>
+        <div class="muted" style="font-size:12px;margin-top:4px"><%= _efTotVt %> viaturas</div>
       </div>
     </div>
 
     <div class="grid">
-      <div>
-        <div class="card" style="margin-bottom:16px">
-          <h3 style="margin:0 0 8px">Distribuição por cidade</h3>
-          <canvas id="barCities" height="170"></canvas>
-        </div>
-
-        <table id="tbl">
+      <!-- Tabela por cidade -->
+      <div class="card">
+        <div style="font-weight:700;margin-bottom:8px">Distribuição por cidade</div>
+        <% const efMap = new Map((efetivoByCity||[]).map(e => [e.cidade_id, e])); %>
+        <table>
           <thead>
             <tr>
               <th>Cidade</th>
@@ -203,134 +85,52 @@
               <th>Pessoas</th>
               <th>Veículos</th>
               <th>Apreensões</th>
-              <th>Total</th>
+              <th>Efetivo (ag.)</th>
+              <th>Viaturas</th>
+              <th>Total eventos</th>
             </tr>
           </thead>
-          <tbody></tbody>
+          <tbody>
+            <% (seriesPorCidade||[]).forEach(row => { 
+                 const ef = efMap.get(row.cidade_id) || { total_agentes:0, total_viaturas:0 };
+                 const totalEv = (row.fiscalizacao||0)+(row.pessoa||0)+(row.veiculo||0)+(row.apreensao||0);
+            %>
+              <tr>
+                <td><%= row.cidade %></td>
+                <td><%= row.fiscalizacao || 0 %></td>
+                <td><%= row.pessoa || 0 %></td>
+                <td><%= row.veiculo || 0 %></td>
+                <td><%= row.apreensao || 0 %></td>
+                <td><%= ef.total_agentes || 0 %></td>
+                <td><%= ef.total_viaturas || 0 %></td>
+                <td><%= totalEv %></td>
+              </tr>
+            <% }) %>
+          </tbody>
         </table>
-        <div class="muted" id="updated" style="margin-top:8px">—</div>
       </div>
 
-      <div>
-        <div class="card">
-          <h3 style="margin:0 0 8px">Feed (últimos 20)</h3>
-          <div class="feed" id="feed"></div>
+      <!-- Feed -->
+      <div class="card">
+        <div style="font-weight:700;margin-bottom:8px">Feed (últimos 20)</div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <% (feed||[]).forEach(f => { %>
+            <div style="padding:10px;border:1px solid var(--border);border-radius:10px">
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+                <span class="chip"><%= f.tipo %></span>
+                <span class="muted" style="font-size:12px"><%= new Date(f.ts).toLocaleString('pt-BR') %></span>
+              </div>
+              <div class="muted" style="margin-top:6px">
+                <%= f.cidade %><% if (f.cidade && f.user) { %> · <% } %><%= f.user %>
+              </div>
+              <% if (f.obs) { %>
+                <div style="margin-top:6px"><%= f.obs %></div>
+              <% } %>
+            </div>
+          <% }) %>
         </div>
       </div>
     </div>
   </div>
-
-  <script>
-    (function () {
-      const opId = <%= operacao.id %>;
-      const kFiscal = document.getElementById('kpi-fiscal');
-      const kPessoas = document.getElementById('kpi-pessoas');
-      const kVeiculos = document.getElementById('kpi-veiculos');
-      const kApre = document.getElementById('kpi-apreensoes');
-      const tblBody = document.querySelector('#tbl tbody');
-      const updatedEl = document.getElementById('updated');
-      const feedEl = document.getElementById('feed');
-
-      // Chart
-      let chart;
-      function ensureChart(labels, fiscal, pessoas, veiculos, apre) {
-        const ctx = document.getElementById('barCities').getContext('2d');
-        const ds = [
-          { label: 'Fiscalizações', data: fiscal },
-          { label: 'Pessoas', data: pessoas },
-          { label: 'Veículos', data: veiculos },
-          { label: 'Apreensões', data: apre }
-        ];
-        if (!chart) {
-          chart = new Chart(ctx, {
-            type: 'bar',
-            data: { labels, datasets: ds },
-            options: {
-              responsive: true,
-              plugins: { legend: { labels: { color: '#e5e7eb' } } },
-              scales: {
-                x: { ticks: { color: '#cbd5e1' }, grid: { color: '#1f2937' } },
-                y: { ticks: { color: '#cbd5e1' }, grid: { color: '#1f2937' }, beginAtZero: true, precision: 0 }
-              }
-            }
-          });
-        } else {
-          chart.data.labels = labels;
-          chart.data.datasets[0].data = fiscal;
-          chart.data.datasets[1].data = pessoas;
-          chart.data.datasets[2].data = veiculos;
-          chart.data.datasets[3].data = apre;
-          chart.update();
-        }
-      }
-
-      function renderTable(rows) {
-        tblBody.innerHTML = '';
-        rows.forEach(r => {
-          const total = (r.fiscalizacoes | 0) + (r.pessoas | 0) + (r.veiculos | 0) + (r.apreensoes | 0);
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-        <td>${r.cidade}</td>
-        <td>${r.fiscalizacoes || 0}</td>
-        <td>${r.pessoas || 0}</td>
-        <td>${r.veiculos || 0}</td>
-        <td>${r.apreensoes || 0}</td>
-        <td><strong>${total}</strong></td>
-      `;
-          tblBody.appendChild(tr);
-        });
-      }
-
-      function renderFeed(list) {
-        feedEl.innerHTML = '';
-        list.forEach(ev => {
-          const d = new Date(ev.ts);
-          const it = document.createElement('div');
-          it.className = 'item';
-          it.innerHTML = `
-        <div class="row" style="justify-content:space-between">
-          <div><strong>${ev.tipo}</strong> · <span class="muted">${ev.cidade || '—'}</span></div>
-          <div class="muted">${d.toLocaleString('pt-BR')}</div>
-        </div>
-        ${ev.usuario ? `<div class="muted">Por: ${ev.usuario}</div>` : ''}
-        ${ev.obs ? `<div style="margin-top:6px">${ev.obs}</div>` : ''}
-      `;
-          feedEl.appendChild(it);
-        });
-      }
-
-      async function load() {
-        const res = await fetch(`/operacoes/${opId}/metrics`);
-        if (!res.ok) return;
-        const j = await res.json();
-
-        // KPIs
-        kFiscal.textContent = j.totals.fiscalizacoes || 0;
-        kPessoas.textContent = j.totals.pessoas || 0;
-        kVeiculos.textContent = j.totals.veiculos || 0;
-        kApre.textContent = j.totals.apreensoes || 0;
-
-        // Tabela + gráfico
-        renderTable(j.perCity);
-        ensureChart(
-          j.perCity.map(x => x.cidade),
-          j.perCity.map(x => x.fiscalizacoes || 0),
-          j.perCity.map(x => x.pessoas || 0),
-          j.perCity.map(x => x.veiculos || 0),
-          j.perCity.map(x => x.apreensoes || 0)
-        );
-
-        // Feed
-        renderFeed(j.latest);
-
-        // Rodapé de atualização
-        updatedEl.textContent = `Atualizado: ${new Date(j.serverTime).toLocaleString('pt-BR')} · Status: ${j.op.status}`;
-      }
-
-      load();
-      setInterval(load, 5000); // 5s
-    })();
-  </script>
 </body>
-
 </html>
