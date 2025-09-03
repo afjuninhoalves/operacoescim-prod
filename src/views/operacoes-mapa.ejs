@@ -61,93 +61,94 @@
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script>
-    // dados do servidor (sem escape para manter HTML do popup)
-    const rawMarkers = <%- JSON.stringify(markers || []) %>;
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  // vindo do servidor
+  const rawMarkers = <%- JSON.stringify(markers || []) %>;
+  console.log('rawMarkers recebidos:', rawMarkers.length, rawMarkers.slice(0,3));
 
-    // helpers de número
-    const toNum = v => {
-      const n = Number(v);
-      return Number.isFinite(n) ? n : null;
-    };
-    const toMeters = v => {
-      const n = Number(v);
-      return Number.isFinite(n) && n > 0 ? n : 0;
-    };
+  // helpers numéricos
+  const toNum = v => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+  const toMeters = v => {
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  };
 
-    // normaliza os marcadores
-    const markersData = rawMarkers.map(m => ({
-      ...m,
-      lat: toNum(m.lat),
-      lng: toNum(m.lng),
-      accuracy: toMeters(m.accuracy)
-    }));
+  // normaliza marcadores
+  const markersData = rawMarkers.map(m => ({
+    ...m,
+    lat: toNum(m.lat),
+    lng: toNum(m.lng),
+    accuracy: toMeters(m.accuracy)
+  }));
+  console.log('markers normalizados:', markersData.length);
 
-    // mapa base
-    const map = L.map('map', { zoomControl: true });
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap',
-      maxZoom: 19
-    }).addTo(map);
+  // mapa base
+  const map = L.map('map', { zoomControl: true });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap',
+    maxZoom: 19
+  }).addTo(map);
 
-    // grupos por tipo
-    const gFis = L.layerGroup().addTo(map);
-    const gPes = L.layerGroup().addTo(map);
-    const gVei = L.layerGroup().addTo(map);
-    const gApr = L.layerGroup().addTo(map);
+  // grupos por tipo
+  const gFis = L.layerGroup().addTo(map);
+  const gPes = L.layerGroup().addTo(map);
+  const gVei = L.layerGroup().addTo(map);
+  const gApr = L.layerGroup().addTo(map);
 
-    function colorFor(tipo){
-      if (tipo === 'fiscalizacao') return '#60a5fa';
-      if (tipo === 'pessoa')       return '#f87171';
-      if (tipo === 'veiculo')      return '#34d399';
-      if (tipo === 'apreensao')    return '#fbbf24';
-      return '#a78bfa';
-    }
+  function colorFor(tipo){
+    if (tipo === 'fiscalizacao') return '#60a5fa';
+    if (tipo === 'pessoa')       return '#f87171';
+    if (tipo === 'veiculo')      return '#34d399';
+    if (tipo === 'apreensao')    return '#fbbf24';
+    return '#a78bfa';
+  }
 
-    const allLatLng = [];
-    markersData.forEach(m => {
-      if (m.lat === null || m.lng === null) return; // pula inválidos
+  const allLatLng = [];
+  markersData.forEach(m => {
+    if (m.lat === null || m.lng === null) return;
 
-      const circle = L.circleMarker([m.lat, m.lng], {
-        radius: 8,
-        weight: 2,
-        color: colorFor(m.tipo),
-        fillOpacity: .7
-      });
-      if (m.popup) circle.bindPopup(m.popup);
-
-      if (m.tipo === 'fiscalizacao') circle.addTo(gFis);
-      else if (m.tipo === 'pessoa')  circle.addTo(gPes);
-      else if (m.tipo === 'veiculo') circle.addTo(gVei);
-      else if (m.tipo === 'apreensao') circle.addTo(gApr);
-      else circle.addTo(map);
-
-      allLatLng.push([m.lat, m.lng]);
-
-      // raio de precisão (em metros), só se > 0
-      if (m.accuracy > 0) {
-        L.circle([m.lat, m.lng], {
-          radius: m.accuracy,
-          color: colorFor(m.tipo),
-          weight: 1,
-          opacity: .3,
-          fillOpacity: .05
-        }).addTo(map);
-      }
+    const circle = L.circleMarker([m.lat, m.lng], {
+      radius: 8,
+      weight: 2,
+      color: colorFor(m.tipo),
+      fillOpacity: .7
     });
+    if (m.popup) circle.bindPopup(m.popup);
 
-    if (allLatLng.length){
-      map.fitBounds(L.latLngBounds(allLatLng).pad(0.2));
-    } else {
-      // fallback Brasil
-      map.setView([-14.2350, -51.9253], 4);
+    if (m.tipo === 'fiscalizacao') circle.addTo(gFis);
+    else if (m.tipo === 'pessoa')  circle.addTo(gPes);
+    else if (m.tipo === 'veiculo') circle.addTo(gVei);
+    else if (m.tipo === 'apreensao') circle.addTo(gApr);
+    else circle.addTo(map);
+
+    allLatLng.push([m.lat, m.lng]);
+
+    if (m.accuracy > 0) {
+      L.circle([m.lat, m.lng], {
+        radius: m.accuracy,
+        color: colorFor(m.tipo),
+        weight: 1,
+        opacity: .3,
+        fillOpacity: .05
+      }).addTo(map);
     }
+  });
 
-    // toggles
-    document.getElementById('chk-fis').addEventListener('change', e => e.target.checked ? gFis.addTo(map) : map.removeLayer(gFis));
-    document.getElementById('chk-pes').addEventListener('change', e => e.target.checked ? gPes.addTo(map) : map.removeLayer(gPes));
-    document.getElementById('chk-vei').addEventListener('change', e => e.target.checked ? gVei.addTo(map) : map.removeLayer(gVei));
-    document.getElementById('chk-apr').addEventListener('change', e => e.target.checked ? gApr.addTo(map) : map.removeLayer(gApr));
-  </script>
+  if (allLatLng.length){
+    map.fitBounds(L.latLngBounds(allLatLng).pad(0.2));
+  } else {
+    map.setView([-14.2350, -51.9253], 4); // fallback Brasil
+  }
+
+  // toggles
+  document.getElementById('chk-fis').addEventListener('change', e => e.target.checked ? gFis.addTo(map) : map.removeLayer(gFis));
+  document.getElementById('chk-pes').addEventListener('change', e => e.target.checked ? gPes.addTo(map) : map.removeLayer(gPes));
+  document.getElementById('chk-vei').addEventListener('
+
+  
 </body>
 </html>

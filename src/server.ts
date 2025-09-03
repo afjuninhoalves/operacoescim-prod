@@ -2183,13 +2183,16 @@ app.get('/operacoes/:id/acoes/nova', requireAuth, csrfProtection, async (req, re
 // -----------------------------------------------------------------------------
 // MAPA DA OPERAÇÃO (usa geolocalização das fotos dos eventos)
 // -----------------------------------------------------------------------------
-app.get('/operacoes/:id/mapa', requireAuth, async (req, res) => {
+// /operacoes/:id/mapa  (substitua a rota atual por esta)
+app.get('/operacoes/:id/mapa', requireAuth, async (req: Request, res: Response) => {
   const user = (req.session as any).user;
   const id = Number(req.params.id);
+  if (!Number.isFinite(id)) return res.status(400).send('ID inválido');
 
   const op = await db('operacoes').where({ id }).first();
   if (!op) return res.status(404).send('Operação não encontrada.');
 
+  // permissão: admin/gestor vê tudo; demais, somente se sua cidade participa
   if (!['admin', 'gestor'].includes(user.role)) {
     const participa = await db('operacao_cidades')
       .where({ operacao_id: id, cidade_id: user.cidade_id })
@@ -2197,6 +2200,7 @@ app.get('/operacoes/:id/mapa', requireAuth, async (req, res) => {
     if (!participa) return res.status(403).send('Sem permissão.');
   }
 
+  // subquery: última foto COM geo por evento (pode não existir)
   const gsub = db('evento_fotos')
     .whereNotNull('lat').whereNotNull('lng')
     .select('evento_id')
@@ -2204,7 +2208,7 @@ app.get('/operacoes/:id/mapa', requireAuth, async (req, res) => {
     .groupBy('evento_id')
     .as('g');
 
-  // CAST explícito no PG para garantir number
+  // COALESCE(evento.geo, foto.geo) para não perder eventos sem foto
   const colLat = (DB_CLIENT === 'pg')
     ? db.raw('COALESCE(e.lat, ef.lat)::float as lat')
     : db.raw('COALESCE(e.lat, ef.lat) as lat');
@@ -2219,67 +2223,26 @@ app.get('/operacoes/:id/mapa', requireAuth, async (req, res) => {
     .where('e.operacao_id', id)
     .leftJoin(gsub, 'g.evento_id', 'e.id')
     .leftJoin('evento_fotos as ef', 'ef.id', 'g.max_id')
-    .leftJoin('cidades as c', 'c.id', 'e.cidade_id')
-    .leftJoin('usuarios as u', 'u.id', 'e.user_id')
-    .leftJoin('evento_fiscalizacao as f', 'f.evento_id', 'e.id')
-    .leftJoin('evento_pessoa as p', 'p.evento_id', 'e.id')
-    .leftJoin('evento_veiculo as v', 'v.evento_id', 'e.id')
-    .leftJoin('evento_apreensao as a', 'a.evento_id', 'e.id')
-    .select(
-      'e.id', 'e.tipo', 'e.ts', 'e.obs',
-      'c.nome as cidade',
-      'u.nome as usuario',
-      colLat, colLng, colAcc,
-      'f.tipo_local',
-      'p.nome as pessoa_nome', 'p.cpf as pessoa_cpf',
-      'v.tipo_veiculo', 'v.marca_modelo', 'v.placa',
-      'a.tipo as apreensao_tipo', 'a.quantidade', 'a.unidade'
-    )
-    .orderBy('e.ts', 'desc');
+    .select('e.id', 'e.tipo', 'e.ts', colLat, colLng, colAcc)
+    .orderBy('e.ts','desc')
+    .limit(300);
 
-  // Constrói markers já validados e convertidos p/ number
   const markers = rows
     .map((r: any) => {
-      const lat = Number(r.lat);
-      const lng = Number(r.lng);
-      const acc = (r.accuracy == null ? null : Number(r.accuracy));
-      const ok = Number.isFinite(lat) && Number.isFinite(lng)
-                 && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
-      if (!ok) return null;
-
-      let title = '';
-      if (r.tipo === 'fiscalizacao') {
-        title = `<strong>Fiscalização</strong><br>Local: ${r.tipo_local || '—'}`;
-      } else if (r.tipo === 'pessoa') {
-        title = `<strong>Pessoa</strong><br>Nome: ${r.pessoa_nome || '—'}<br>CPF: ${r.pessoa_cpf || '—'}`;
-      } else if (r.tipo === 'veiculo') {
-        title = `<strong>Veículo</strong><br>Tipo: ${r.tipo_veiculo || '—'}<br>Modelo: ${r.marca_modelo || '—'}<br>Placa: ${r.placa || '—'}`;
-      } else if (r.tipo === 'apreensao') {
-        title = `<strong>Apreensão</strong><br>Tipo: ${r.apreensao_tipo || '—'}<br>Qtd: ${r.quantidade ?? '—'} ${r.unidade || ''}`;
-      }
-      const when = new Date(r.ts).toLocaleString('pt-BR');
-      const rodape = `<div class="muted">Cidade: ${r.cidade || '—'} · ${when} · ${r.usuario || ''}</div>`;
-      const obs = r.obs ? `<div class="muted">${r.obs}</div>` : '';
-
-      return {
-        id: r.id,
-        tipo: r.tipo,
-        lat, lng,
-        accuracy: (acc != null && Number.isFinite(acc)) ? acc : null,
-        popup: `${title}${obs ? '<br>' + obs : ''}<br>${rodape}`
-      };
+      const lat = Number(r.lat), lng = Number(r.lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+      if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+      return { id: r.id, tipo: r.tipo, lat, lng, accuracy: r.accuracy == null ? null : Number(r.accuracy) };
     })
-    .filter(Boolean) as any[];
-
-  // Log no servidor para acompanhar
-  console.log(`[mapa] op=${id} rows=${rows.length} markers=${markers.length}`);
+    .filter(Boolean) as Array<{id:number; tipo:string; lat:number; lng:number; accuracy:number|null}>;
 
   return res.render('operacoes-mapa', {
-    user: (req.session as any).user,
+    user,
     operacao: { id: op.id, nome: op.nome, inicio_agendado: op.inicio_agendado, status: op.status },
     markers
   });
 });
+
 
 
 
