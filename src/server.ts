@@ -1787,12 +1787,12 @@ async function buildOperationMetrics(opId: number) {
 
   const totals = {
     fiscalizacoes: Number(locRow?.c) || 0,
-    pessoas:        Number(pvRow?.pessoas) || 0,
-    veiculos:       Number(pvRow?.veiculos) || 0,
-    apreensoes:     Number(aprRow?.c) || 0,
-    multados:       Number(flagsRow?.multados) || 0,
-    fechados:       Number(flagsRow?.fechados) || 0,
-    lacrados:       Number(flagsRow?.lacrados) || 0,
+    pessoas: Number(pvRow?.pessoas) || 0,
+    veiculos: Number(pvRow?.veiculos) || 0,
+    apreensoes: Number(aprRow?.c) || 0,
+    multados: Number(flagsRow?.multados) || 0,
+    fechados: Number(flagsRow?.fechados) || 0,
+    lacrados: Number(flagsRow?.lacrados) || 0,
   };
 
   // ===== Séries por cidade (com pessoas/veículos por fiscalização) =====
@@ -1912,13 +1912,13 @@ app.get('/operacoes/:id/monitor', requireAdminOrGestor, async (req, res) => {
 
   // Monte o objeto cards APÓS coletar tudo
   const cards = {
-    locais:     Number(k?.locais)    || 0,
-    pessoas:    Number(k?.pessoas)   || 0,
-    veiculos:   Number(k?.veiculos)  || 0,
-    apreensoes: Number(apr?.c)       || 0,
-    multados:   Number(flags?.multados) || 0,
-    fechados:   Number(flags?.fechados) || 0,
-    lacrados:   Number(flags?.lacrados) || 0,
+    locais: Number(k?.locais) || 0,
+    pessoas: Number(k?.pessoas) || 0,
+    veiculos: Number(k?.veiculos) || 0,
+    apreensoes: Number(apr?.c) || 0,
+    multados: Number(flags?.multados) || 0,
+    fechados: Number(flags?.fechados) || 0,
+    lacrados: Number(flags?.lacrados) || 0,
   };
 
   // ---- Efetivo total e quebras (PC/PM/Outros)
@@ -1935,13 +1935,13 @@ app.get('/operacoes/:id/monitor', requireAdminOrGestor, async (req, res) => {
     .first();
 
   const efetivo = {
-    total_agentes:   Number(ef?.agentes)         || 0,
-    total_viaturas:  Number(ef?.viaturas)        || 0,
-    pc_agentes:      Number(ef?.pc_agentes)      || 0,
-    pc_viaturas:     Number(ef?.pc_viaturas)     || 0,
-    pm_agentes:      Number(ef?.pm_agentes)      || 0,
-    pm_viaturas:     Number(ef?.pm_viaturas)     || 0,
-    outros_agentes:  Number(ef?.outros_agentes)  || 0,
+    total_agentes: Number(ef?.agentes) || 0,
+    total_viaturas: Number(ef?.viaturas) || 0,
+    pc_agentes: Number(ef?.pc_agentes) || 0,
+    pc_viaturas: Number(ef?.pc_viaturas) || 0,
+    pm_agentes: Number(ef?.pm_agentes) || 0,
+    pm_viaturas: Number(ef?.pm_viaturas) || 0,
+    outros_agentes: Number(ef?.outros_agentes) || 0,
     outros_viaturas: Number(ef?.outros_viaturas) || 0,
   };
 
@@ -1994,14 +1994,38 @@ app.get('/operacoes/:id/monitor', requireAdminOrGestor, async (req, res) => {
     nome: op.nome,
     inicio_fmt: op.inicio_agendado ? new Date(op.inicio_agendado).toLocaleString('pt-BR') : null
   };
+  // ---- Efetivo por cidade (sempre array)
+  const subEf = db('operacao_efetivo')
+    .where({ operacao_id: id })
+    .whereNotNull('cidade_id')
+    .select('cidade_id')
+    .sum({ total_agentes: 'total_agentes' })
+    .sum({ total_viaturas: 'total_viaturas' })
+    .groupBy('cidade_id')
+    .as('ef');
+
+  const efetivoByCity = await db('operacao_cidades as oc')
+    .join('cidades as c', 'c.id', 'oc.cidade_id')
+    .leftJoin(subEf, 'ef.cidade_id', 'oc.cidade_id')
+    .where('oc.operacao_id', id)
+    .select(
+      'c.id as cidade_id',
+      'c.nome as cidade',
+      db.raw('COALESCE(ef.total_agentes, 0)  as total_agentes'),
+      db.raw('COALESCE(ef.total_viaturas, 0) as total_viaturas'),
+    )
+    .orderBy('c.nome');
+
 
   res.render('operacoes-monitor', {
     operacao,
     cards,          // {locais,pessoas,veiculos,apreensoes,multados,fechados,lacrados}
     efetivo,        // total + PC/PM/Outros
     seriesPorCidade,
-    feed
+    feed,
+    efetivoByCity   // <-- ADICIONE ISTO
   });
+
 });
 
 
