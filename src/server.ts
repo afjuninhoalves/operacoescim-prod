@@ -1395,9 +1395,10 @@ app.post('/operacoes/:id/status', requireAdminOrGestor, csrfProtection, async (r
 
 // -----------------------------------------------------------------------------
 // Fiscalização
+// criar fiscalização (com contagens e flags) + opcionalmente uma apreensão vinculada
 app.post('/operacoes/:id/fiscalizacoes',
   requireAuth, uploadFotosFields, csrfProtection,
-  async (req, res) => {
+  async (req: Request, res: Response) => {
     const user = (req.session as any).user;
     const operacao_id = Number(req.params.id);
     const fallback = `/operacoes/${operacao_id}`;
@@ -1406,30 +1407,103 @@ app.post('/operacoes/:id/fiscalizacoes',
     if (!user?.cidade_id) return res.status(400).send('Usuário sem cidade vinculada.');
     if (!(await canUserPostOnOperation(operacao_id, user))) return res.status(403).send('Sem permissão.');
 
-    const tipo_local = String(req.body.tipo_local || '').trim();
-    const obs = String(req.body.obs || '').trim() || null;
-    if (!tipo_local) return res.redirect(go);
+    // ---------------------------
+    // Campos da fiscalização
+    // ---------------------------
+    const tipo_local = String(req.body.tipo_local || '').trim() || null;
+    const obs        = String(req.body.obs || '').trim() || null;
 
-    // ✅ calcule UMA vez
-    const geo = getGeoFromBody(req);
+    const toInt = (v:any) => {
+      if (v === '' || v == null) return 0;
+      const n = Number(v);
+      return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0;
+    };
+    const toBool = (v:any) => v === 'on' || v === 'true' || v === '1';
 
+    const pessoas_abordadas  = toInt(req.body.pessoas_abordadas);
+    const veiculos_abordados = toInt(req.body.veiculos_abordados);
+
+    const multado = toBool(req.body.multado);
+    const fechado = toBool(req.body.fechado);
+    const lacrado = toBool(req.body.lacrado);
+
+    // ---------------------------
+    // Evento base (com geo)
+    // ---------------------------
     const evento_id = await createEventoBase({
-      operacao_id, cidade_id: user.cidade_id, user_id: user.id, tipo: 'fiscalizacao', obs,
-      lat: geo.lat, lng: geo.lng, acc: geo.acc
+      operacao_id,
+      cidade_id: user.cidade_id,
+      user_id: user.id,
+      tipo: 'fiscalizacao',
+      obs
     });
 
-    await db('evento_fiscalizacao').insert({ evento_id, tipo_local });
+    // grava os detalhes da fiscalização (com novos campos)
+    await db('evento_fiscalizacao').insert({
+      evento_id,
+      tipo_local,
+      pessoas_abordadas,
+      veiculos_abordados,
+      multado,
+      fechado,
+      lacrado
+    });
 
+    // fotos + geo do body
     const files = fotosFromRequest(req);
+    const { lat, lng, acc } = getGeoFromBody(req);
     if (files.length) {
       await db('evento_fotos').insert(
         files.map(f => ({
           evento_id,
           path: `/uploads/fotos/${f.filename}`,
-          lat: geo.lat, lng: geo.lng, accuracy: geo.acc
+          lat, lng, accuracy: acc
         }))
       );
+    } else if (lat != null && lng != null) {
+      // sem foto mas com geo no body? armazena geo direto no evento (já temos essa coluna)
+      await db('operacao_eventos').where({ id: evento_id }).update({ lat, lng, accuracy: acc ?? null });
     }
+
+    // ---------------------------
+    // Apreensão opcional dentro do mesmo formulário
+    // ---------------------------
+    const apr_tipo = String(req.body.apr_tipo || '').trim();
+    const apr_qtd  = req.body.apr_quantidade === '' ? null : Number(req.body.apr_quantidade);
+    const apr_uni  = String(req.body.apr_unidade || '').trim() || null;
+    const apr_obs  = String(req.body.apr_obs || '').trim() || null;
+
+    if (apr_tipo) {
+      if (apr_qtd != null && !Number.isFinite(apr_qtd)) {
+        return res.status(400).send('Quantidade de apreensão inválida.');
+      }
+
+      // cria evento do tipo "apreensao" e vincula à fiscalização recem-criada
+      const apr_evento_id = await createEventoBase({
+        operacao_id,
+        cidade_id: user.cidade_id,
+        user_id: user.id,
+        tipo: 'apreensao',
+        obs: apr_obs
+      });
+
+      await db('evento_apreensao').insert({
+        evento_id: apr_evento_id,
+        tipo: apr_tipo || null,
+        quantidade: apr_qtd,
+        unidade: apr_uni,
+        fiscalizacao_evento_id: evento_id
+      });
+
+      // herda a mesma geo (se o evento principal tem geo ou foto com geo)
+      const ev = await db('operacao_eventos').where({ id: evento_id }).first();
+      if (ev?.lat != null && ev?.lng != null) {
+        await db('operacao_eventos').where({ id: apr_evento_id }).update({
+          lat: ev.lat, lng: ev.lng, accuracy: ev.accuracy ?? null
+        });
+      }
+    }
+
     return res.redirect(go);
   }
 );
