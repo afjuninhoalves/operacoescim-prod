@@ -173,183 +173,202 @@
 
   <div class="container">
     <!-- KPIs -->
-    <div class="cards">
-      <div class="card">
-        <div class="kpi-title">Locais fiscalizados</div>
-        <div class="kpi-value">
+    <div class="kpi-grid">
+      <div class="kpi card">
+        <div class="label">Locais fiscalizados</div>
+        <div class="value">
           <%= (cards && cards.locais) || 0 %>
         </div>
       </div>
-      <div class="card">
-        <div class="kpi-title">Pessoas</div>
-        <div class="kpi-value">
+
+      <div class="kpi card">
+        <div class="label">Pessoas abordadas</div>
+        <div class="value">
           <%= (cards && cards.pessoas) || 0 %>
         </div>
       </div>
-      <div class="card">
-        <div class="kpi-title">Veículos</div>
-        <div class="kpi-value">
+
+      <div class="kpi card">
+        <div class="label">Veículos abordados</div>
+        <div class="value">
           <%= (cards && cards.veiculos) || 0 %>
         </div>
       </div>
-      <div class="card">
-        <div class="kpi-title">Apreensões</div>
-        <div class="kpi-value">
+
+      <!-- RENOMEADO: era "Apreensões", agora mostra total de itens -->
+      <div class="kpi card">
+        <div class="label">Itens apreendidos</div>
+        <div class="value">
+          <%= (cards && cards.itensApreendidos) || 0 %>
+        </div>
+      </div>
+
+      <!-- NOVO CARD: 1 por fiscalização com ≥1 item -->
+      <div class="kpi card">
+        <div class="label">Apreensões</div>
+        <div class="value">
           <%= (cards && cards.apreensoes) || 0 %>
         </div>
       </div>
-      <div class="card">
-        <div class="kpi-title">Multados</div>
-        <div class="kpi-value">
+
+      <div class="kpi card">
+        <div class="label">Multados</div>
+        <div class="value">
           <%= (cards && cards.multados) || 0 %>
         </div>
       </div>
-      <div class="card">
-        <div class="kpi-title">Fechados</div>
-        <div class="kpi-value">
+
+      <div class="kpi card">
+        <div class="label">Fechados</div>
+        <div class="value">
           <%= (cards && cards.fechados) || 0 %>
         </div>
       </div>
-      <div class="card">
-        <div class="kpi-title">Lacrados</div>
-        <div class="kpi-value">
+
+      <div class="kpi card">
+        <div class="label">Lacrados</div>
+        <div class="value">
           <%= (cards && cards.lacrados) || 0 %>
         </div>
       </div>
+    </div>
 
 
-      <!-- Efetivo total -->
-      <div class="card">
-        <div class="kpi-title">Efetivo total de GCM´s</div>
-        <div class="kpi-value">
-          <%= (efetivo && Number(efetivo.total_agentes)) || 0 %> ag.
-        </div>
-        <div class="kpi-sub">
-          <%= (efetivo && Number(efetivo.total_viaturas)) || 0 %> viaturas
-        </div>
+
+    <!-- Efetivo total -->
+    <div class="card">
+      <div class="kpi-title">Efetivo total de GCM´s</div>
+      <div class="kpi-value">
+        <%= (efetivo && Number(efetivo.total_agentes)) || 0 %> ag.
       </div>
-
-      <!-- PC -->
-      <div class="card">
-        <div class="kpi-title">Polícia Civil</div>
-        <div class="kpi-value">
-          <%= (efetivo && Number(efetivo.pc_agentes)) || 0 %> ag.
-        </div>
-        <div class="kpi-sub">
-          <%= (efetivo && Number(efetivo.pc_viaturas)) || 0 %> viaturas
-        </div>
-      </div>
-
-      <!-- PM -->
-      <div class="card">
-        <div class="kpi-title">Polícia Militar</div>
-        <div class="kpi-value">
-          <%= (efetivo && Number(efetivo.pm_agentes)) || 0 %> ag.
-        </div>
-        <div class="kpi-sub">
-          <%= (efetivo && Number(efetivo.pm_viaturas)) || 0 %> viaturas
-        </div>
-      </div>
-
-      <!-- Outros -->
-      <div class="card">
-        <div class="kpi-title">Outros órgãos</div>
-        <div class="kpi-value">
-          <%= (efetivo && Number(efetivo.outros_agentes)) || 0 %> ag.
-        </div>
-        <div class="kpi-sub">
-          <%= (efetivo && Number(efetivo.outros_viaturas)) || 0 %> viaturas
-        </div>
+      <div class="kpi-sub">
+        <%= (efetivo && Number(efetivo.total_viaturas)) || 0 %> viaturas
       </div>
     </div>
 
-    <!-- Card do gráfico -->
-    <div class="card" style="margin-top:16px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-        <h3 style="margin:0">Distribuição por cidade</h3>
-        <div class="muted" style="font-size:13px">
-          <span
-            style="display:inline-block;width:10px;height:10px;background:#60a5fa;border-radius:50%;margin-right:6px"></span>Fiscalizações
-          &nbsp;&nbsp;<span
-            style="display:inline-block;width:10px;height:10px;background:#f87171;border-radius:50%;margin-right:6px"></span>Pessoas
-          &nbsp;&nbsp;<span
-            style="display:inline-block;width:10px;height:10px;background:#34d399;border-radius:50%;margin-right:6px"></span>Veículos
-          &nbsp;&nbsp;<span
-            style="display:inline-block;width:10px;height:10px;background:#fbbf24;border-radius:50%;margin-right:6px"></span>Apreensões
-        </div>
+    <!-- PC -->
+    <div class="card">
+      <div class="kpi-title">Polícia Civil</div>
+      <div class="kpi-value">
+        <%= (efetivo && Number(efetivo.pc_agentes)) || 0 %> ag.
       </div>
-
-      <div id="chartWrap" style="position:relative;height:340px">
-        <canvas id="byCityChart"></canvas>
-      </div>
-
-      <div id="noChartData" class="muted" style="display:none;margin-top:8px">
-        Sem dados suficientes para o gráfico.
+      <div class="kpi-sub">
+        <%= (efetivo && Number(efetivo.pc_viaturas)) || 0 %> viaturas
       </div>
     </div>
 
-    <!-- Chart.js (apenas UMA vez) -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-    <script>
-      // dados vindos do servidor
-      const series = <%- JSON.stringify(seriesPorCidade || []) %>;
+    <!-- PM -->
+    <div class="card">
+      <div class="kpi-title">Polícia Militar</div>
+      <div class="kpi-value">
+        <%= (efetivo && Number(efetivo.pm_agentes)) || 0 %> ag.
+      </div>
+      <div class="kpi-sub">
+        <%= (efetivo && Number(efetivo.pm_viaturas)) || 0 %> viaturas
+      </div>
+    </div>
 
-      function hasAnyValue(rows) {
-        return Array.isArray(rows) && rows.some(r =>
-          (Number(r.fiscalizacao) || 0) +
-          (Number(r.pessoa) || 0) +
-          (Number(r.veiculo) || 0) +
-          (Number(r.apreensao) || 0) > 0
-        );
+    <!-- Outros -->
+    <div class="card">
+      <div class="kpi-title">Outros órgãos</div>
+      <div class="kpi-value">
+        <%= (efetivo && Number(efetivo.outros_agentes)) || 0 %> ag.
+      </div>
+      <div class="kpi-sub">
+        <%= (efetivo && Number(efetivo.outros_viaturas)) || 0 %> viaturas
+      </div>
+    </div>
+  </div>
+
+  <!-- Card do gráfico -->
+  <div class="card" style="margin-top:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <h3 style="margin:0">Distribuição por cidade</h3>
+      <div class="muted" style="font-size:13px">
+        <span
+          style="display:inline-block;width:10px;height:10px;background:#60a5fa;border-radius:50%;margin-right:6px"></span>Fiscalizações
+        &nbsp;&nbsp;<span
+          style="display:inline-block;width:10px;height:10px;background:#f87171;border-radius:50%;margin-right:6px"></span>Pessoas
+        &nbsp;&nbsp;<span
+          style="display:inline-block;width:10px;height:10px;background:#34d399;border-radius:50%;margin-right:6px"></span>Veículos
+        &nbsp;&nbsp;<span
+          style="display:inline-block;width:10px;height:10px;background:#fbbf24;border-radius:50%;margin-right:6px"></span>Apreensões
+      </div>
+    </div>
+
+    <div id="chartWrap" style="position:relative;height:340px">
+      <canvas id="byCityChart"></canvas>
+    </div>
+
+    <div id="noChartData" class="muted" style="display:none;margin-top:8px">
+      Sem dados suficientes para o gráfico.
+    </div>
+  </div>
+
+  <!-- Chart.js (apenas UMA vez) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <script>
+    // dados vindos do servidor
+    const series = <%- JSON.stringify(seriesPorCidade || []) %>;
+
+    function hasAnyValue(rows) {
+      return Array.isArray(rows) && rows.some(r =>
+        (Number(r.fiscalizacao) || 0) +
+        (Number(r.pessoa) || 0) +
+        (Number(r.veiculo) || 0) +
+        (Number(r.apreensao) || 0) > 0
+      );
+    }
+
+    window.addEventListener('load', () => {
+      const canvas = document.getElementById('byCityChart');
+      const noData = document.getElementById('noChartData');
+
+      if (!hasAnyValue(series)) {
+        noData.style.display = 'block';
+        return;
       }
 
-      window.addEventListener('load', () => {
-        const canvas = document.getElementById('byCityChart');
-        const noData = document.getElementById('noChartData');
-
-        if (!hasAnyValue(series)) {
-          noData.style.display = 'block';
-          return;
-        }
-
-        const labels = series.map(r => r.cidade);
-        const mk = (k, label, color) => ({
-          label,
-          data: series.map(r => Number(r[k] || 0)),
-          backgroundColor: color,
-          borderColor: color,
-          borderWidth: 1,
-          borderRadius: 6,
-          maxBarThickness: 36
-        });
-
-        new Chart(canvas.getContext('2d'), {
-          type: 'bar',
-          data: {
-            labels,
-            datasets: [
-              mk('fiscalizacao', 'Fiscalizações', '#60a5fa'),
-              mk('pessoa', 'Pessoas', '#f87171'),
-              mk('veiculo', 'Veículos', '#34d399'),
-              mk('apreensao', 'Apreensões', '#fbbf24'),
-            ]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            animation: false,
-            scales: {
-              x: { ticks: { color: '#e5e7eb' }, grid: { display: false } },
-              y: { beginAtZero: true, ticks: { precision: 0, color: '#e5e7eb' }, grid: { color: 'rgba(229,231,235,0.1)' } }
-            },
-            plugins: { legend: { position: 'top', labels: { color: '#e5e7eb' } } }
-          }
-        });
+      const labels = series.map(r => r.cidade);
+      const mk = (k, label, color) => ({
+        label,
+        data: series.map(r => Number(r[k] || 0)),
+        backgroundColor: color,
+        borderColor: color,
+        borderWidth: 1,
+        borderRadius: 6,
+        maxBarThickness: 36
       });
-    </script>
+
+      new Chart(canvas.getContext('2d'), {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [
+            mk('fiscalizacao', 'Fiscalizações', '#60a5fa'),
+            mk('pessoa', 'Pessoas', '#f87171'),
+            mk('veiculo', 'Veículos', '#34d399'),
+            mk('apreensao', 'Apreensões', '#fbbf24'),
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: false,
+          scales: {
+            x: { ticks: { color: '#e5e7eb' }, grid: { display: false } },
+            y: { beginAtZero: true, ticks: { precision: 0, color: '#e5e7eb' }, grid: { color: 'rgba(229,231,235,0.1)' } }
+          },
+          plugins: { legend: { position: 'top', labels: { color: '#e5e7eb' } } }
+        }
+      });
+    });
+  </script>
 
 
 
+  <% const tot=(arr, key)=> (arr || []).reduce((s, it) => s + (Number(it?.[key]) || 0), 0);
+    %>
 
 
     <div class="grid">
@@ -371,88 +390,78 @@
                 <th>Fiscalizações</th>
                 <th>Pessoas</th>
                 <th>Veículos</th>
-                <th>Apreensões</th>
+                <th>Itens apreendidos</th> <!-- novo nome -->
+                <th>Apreensões</th> <!-- nova coluna -->
                 <th>Lacrados</th>
                 <th>Fechados</th>
                 <th>Multados</th>
-                <th>Efetivo (ag.)</th>
               </tr>
             </thead>
+
             <tbody>
-              <% (seriesPorCidade || []).forEach(row=> {
-                const fisc = Number(row.fiscalizacao || 0);
-                const pes = Number(row.pessoa || 0);
-                const vei = Number(row.veiculo || 0);
-                const apr = Number(row.apreensao || 0);
-                const lac = Number(row.lacrado || 0);
-                const fec = Number(row.fechado || 0);
-                const mul = Number(row.multado || 0);
-
-                const ef = efMapDist.get(row.cidade_id) || {};
-                const efAg = Number(ef.agentes || 0);
-
-                // totais
-                tFisc += fisc; tPes += pes; tVei += vei; tApr += apr;
-                tLac += lac; tFec += fec; tMul += mul; tEf += efAg;
-                %>
+              <% (seriesPorCidade || []).forEach(linha=> { %>
                 <tr>
                   <td>
-                    <%= row.cidade %>
+                    <%= linha.cidade %>
                   </td>
-                  <td>
-                    <%= fisc %>
+                  <td class="num">
+                    <%= linha.fiscalizacao || 0 %>
                   </td>
-                  <td>
-                    <%= pes %>
+                  <td class="num">
+                    <%= linha.pessoa || 0 %>
                   </td>
-                  <td>
-                    <%= vei %>
+                  <td class="num">
+                    <%= linha.veiculo || 0 %>
                   </td>
-                  <td>
-                    <%= apr %>
+                  <td class="num">
+                    <%= linha.itens_apreendidos || 0 %>
+                  </td> <!-- usa o campo novo -->
+                  <td class="num">
+                    <%= linha.apreensoes || 0 %>
+                  </td> <!-- usa o campo novo -->
+                  <td class="num">
+                    <%= linha.lacrado || 0 %>
                   </td>
-                  <td>
-                    <%= lac %>
+                  <td class="num">
+                    <%= linha.fechado || 0 %>
                   </td>
-                  <td>
-                    <%= fec %>
-                  </td>
-                  <td>
-                    <%= mul %>
-                  </td>
-                  <td>
-                    <%= efAg %>
+                  <td class="num">
+                    <%= linha.multado || 0 %>
                   </td>
                 </tr>
                 <% }) %>
-                  <tr>
-                    <th>Total</th>
-                    <th>
-                      <%= tFisc %>
-                    </th>
-                    <th>
-                      <%= tPes %>
-                    </th>
-                    <th>
-                      <%= tVei %>
-                    </th>
-                    <th>
-                      <%= tApr %>
-                    </th>
-                    <th>
-                      <%= tLac %>
-                    </th>
-                    <th>
-                      <%= tFec %>
-                    </th>
-                    <th>
-                      <%= tMul %>
-                    </th>
-                    <th>
-                      <%= tEf %>
-                    </th>
-                  </tr>
             </tbody>
+
+            <tfoot>
+              <tr>
+                <th>Total</th>
+                <th class="num">
+                  <%= tot(seriesPorCidade, 'fiscalizacao' ) %>
+                </th>
+                <th class="num">
+                  <%= tot(seriesPorCidade, 'pessoa' ) %>
+                </th>
+                <th class="num">
+                  <%= tot(seriesPorCidade, 'veiculo' ) %>
+                </th>
+                <th class="num">
+                  <%= tot(seriesPorCidade, 'itens_apreendidos' ) %>
+                </th>
+                <th class="num">
+                  <%= tot(seriesPorCidade, 'apreensoes' ) %>
+                </th>
+                <th class="num">
+                  <%= tot(seriesPorCidade, 'lacrado' ) %>
+                </th>
+                <th class="num">
+                  <%= tot(seriesPorCidade, 'fechado' ) %>
+                </th>
+                <th class="num">
+                  <%= tot(seriesPorCidade, 'multado' ) %>
+                </th>
+              </tr>
+            </tfoot>
+
           </table>
       </div>
     </div>
@@ -580,8 +589,8 @@
           <% }) %>
       </div>
     </div>
-  </div>
-  </div>
+    </div>
+    </div>
 </body>
 
 </html>

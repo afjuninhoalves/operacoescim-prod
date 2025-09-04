@@ -1733,6 +1733,7 @@ async function buildOperationMetrics(opId: number) {
   };
 }
 
+// rota pra monitor 
 
 
 app.get('/operacoes/:id/monitor', requireAdminOrGestor, async (req, res) => {
@@ -1740,7 +1741,7 @@ app.get('/operacoes/:id/monitor', requireAdminOrGestor, async (req, res) => {
   const op = await db('operacoes').where({ id }).first();
   if (!op) return res.status(404).send('Operação não encontrada.');
 
-  // ---- KPIs de fiscalizações / pessoas / veículos (saem de fiscalização)
+  // ==== KPIs: fiscalizações / pessoas / veículos (vindos de fiscalização)
   const k = await db('operacao_eventos as e')
     .leftJoin('evento_fiscalizacao as f', 'f.evento_id', 'e.id')
     .where('e.operacao_id', id)
@@ -1750,12 +1751,15 @@ app.get('/operacoes/:id/monitor', requireAdminOrGestor, async (req, res) => {
     .sum<{ veiculos: any }>({ veiculos: db.raw('COALESCE(f.veiculos_abordados,0)') })
     .first();
 
-  const apr = await db('operacao_eventos')
-    .where({ operacao_id: id, tipo: 'apreensao' })
-    .count<{ c: any }>('id as c')
+  // ==== Itens apreendidos (total de itens) e Apreensões (1 por fiscalização com ≥1 item)
+  const aggApr = await db('evento_apreensao as a')
+    .join('operacao_eventos as f', 'f.id', 'a.fiscalizacao_evento_id') // f = evento fiscalizacao (pai)
+    .where('f.operacao_id', id)
+    .count<{ itens_apreendidos: any }>({ itens_apreendidos: 'a.evento_id' })
+    .countDistinct<{ apreensoes: any }>({ apreensoes: 'a.fiscalizacao_evento_id' })
     .first();
 
-  // ---- Flags (multado/fechado/lacrado)
+  // ==== Flags (multado/fechado/lacrado)
   const flags = await db('evento_fiscalizacao as f')
     .join('operacao_eventos as e', 'e.id', 'f.evento_id')
     .where('e.operacao_id', id)
@@ -1767,16 +1771,18 @@ app.get('/operacoes/:id/monitor', requireAdminOrGestor, async (req, res) => {
     .first<{ multados: any; fechados: any; lacrados: any }>();
 
   const cards = {
-    locais: Number(k?.locais) || 0,
-    pessoas: Number(k?.pessoas) || 0,
+    locais:   Number(k?.locais)   || 0,
+    pessoas:  Number(k?.pessoas)  || 0,
     veiculos: Number(k?.veiculos) || 0,
-    apreensoes: Number(apr?.c) || 0,
+    // novos nomes/valores:
+    itensApreendidos: Number(aggApr?.itens_apreendidos) || 0,
+    apreensoes:       Number(aggApr?.apreensoes)       || 0,
     multados: Number(flags?.multados) || 0,
     fechados: Number(flags?.fechados) || 0,
     lacrados: Number(flags?.lacrados) || 0,
   };
 
-  // ---- Efetivo total e quebras (PC/PM/Outros)
+  // ==== Efetivo total + quebras
   const ef = await db('operacao_efetivo')
     .where({ operacao_id: id })
     .sum<{ agentes: any }>({ agentes: 'total_agentes' })
@@ -1790,17 +1796,18 @@ app.get('/operacoes/:id/monitor', requireAdminOrGestor, async (req, res) => {
     .first();
 
   const efetivo = {
-    total_agentes: Number(ef?.agentes) || 0,
-    total_viaturas: Number(ef?.viaturas) || 0,
-    pc_agentes: Number(ef?.pc_agentes) || 0,
-    pc_viaturas: Number(ef?.pc_viaturas) || 0,
-    pm_agentes: Number(ef?.pm_agentes) || 0,
-    pm_viaturas: Number(ef?.pm_viaturas) || 0,
-    outros_agentes: Number(ef?.outros_agentes) || 0,
+    total_agentes:   Number(ef?.agentes)         || 0,
+    total_viaturas:  Number(ef?.viaturas)        || 0,
+    pc_agentes:      Number(ef?.pc_agentes)      || 0,
+    pc_viaturas:     Number(ef?.pc_viaturas)     || 0,
+    pm_agentes:      Number(ef?.pm_agentes)      || 0,
+    pm_viaturas:     Number(ef?.pm_viaturas)     || 0,
+    outros_agentes:  Number(ef?.outros_agentes)  || 0,
     outros_viaturas: Number(ef?.outros_viaturas) || 0,
   };
 
-  // ---- Séries por cidade (contagem, somas e flags)
+  // ==== Séries por cidade (contagens/somas/flags) ====
+  // Subquery de fiscalização por cidade (conta + somas + flags)
   const subF = db('operacao_eventos as e')
     .join('evento_fiscalizacao as f', 'f.evento_id', 'e.id')
     .where('e.operacao_id', id)
@@ -1815,34 +1822,38 @@ app.get('/operacoes/:id/monitor', requireAdminOrGestor, async (req, res) => {
     .groupBy('e.cidade_id')
     .as('sf');
 
-  const subA = db('operacao_eventos as e')
-    .where('e.operacao_id', id)
-    .andWhere('e.tipo', 'apreensao')
-    .select('e.cidade_id')
-    .count({ apr_cnt: 'e.id' })
-    .groupBy('e.cidade_id')
+  // Subquery de apreensão por cidade baseada na FISCALIZAÇÃO (pai):
+  // - itens_apreendidos: total de itens (linhas em evento_apreensao)
+  // - apreensoes: DISTINCT fiscalizacao_evento_id com pelo menos 1 item
+  const subApr = db('operacao_eventos as f') // f = fiscalizacao
+    .leftJoin('evento_apreensao as a', 'a.fiscalizacao_evento_id', 'f.id')
+    .where({ 'f.operacao_id': id, 'f.tipo': 'fiscalizacao' })
+    .groupBy('f.cidade_id')
+    .select('f.cidade_id')
+    .count({ itens_apreendidos: 'a.evento_id' })
+    .countDistinct({ apreensoes: 'a.fiscalizacao_evento_id' })
     .as('sa');
 
   const seriesPorCidade = await db('operacao_cidades as oc')
     .join('cidades as c', 'c.id', 'oc.cidade_id')
-    .leftJoin(subF, 'sf.cidade_id', 'oc.cidade_id')
-    .leftJoin(subA, 'sa.cidade_id', 'oc.cidade_id')
+    .leftJoin(subF,  'sf.cidade_id', 'oc.cidade_id')
+    .leftJoin(subApr,'sa.cidade_id', 'oc.cidade_id')
     .where('oc.operacao_id', id)
     .select(
       'c.id as cidade_id',
       'c.nome as cidade',
-      db.raw('COALESCE(sf.fisc_cnt,0)  as fiscalizacao'),
-      db.raw('COALESCE(sf.pes_sum,0)   as pessoa'),
-      db.raw('COALESCE(sf.vei_sum,0)   as veiculo'),
-      db.raw('COALESCE(sa.apr_cnt,0)   as apreensao'),
-      db.raw('COALESCE(sf.lac_sum,0)   as lacrado'),
-      db.raw('COALESCE(sf.fec_sum,0)   as fechado'),
-      db.raw('COALESCE(sf.mult_sum,0)  as multado')
+      db.raw('COALESCE(sf.fisc_cnt,0)         as fiscalizacao'),
+      db.raw('COALESCE(sf.pes_sum,0)          as pessoa'),
+      db.raw('COALESCE(sf.vei_sum,0)          as veiculo'),
+      db.raw('COALESCE(sa.itens_apreendidos,0) as itens_apreendidos'), // <- novo nome
+      db.raw('COALESCE(sa.apreensoes,0)        as apreensoes'),        // <- novo nome
+      db.raw('COALESCE(sf.lac_sum,0)          as lacrado'),
+      db.raw('COALESCE(sf.fec_sum,0)          as fechado'),
+      db.raw('COALESCE(sf.mult_sum,0)         as multado')
     )
     .orderBy('c.nome');
 
-
-  // ---- Feed (últimos 20)
+  // ==== Feed (últimos 20)
   const feed = await db('operacao_eventos as e')
     .where('e.operacao_id', id)
     .leftJoin('cidades as c', 'c.id', 'e.cidade_id')
@@ -1851,13 +1862,7 @@ app.get('/operacoes/:id/monitor', requireAdminOrGestor, async (req, res) => {
     .orderBy('e.ts', 'desc')
     .limit(20);
 
-  const operacao = {
-    id: op.id,
-    nome: op.nome,
-    inicio_fmt: op.inicio_agendado ? new Date(op.inicio_agendado).toLocaleString('pt-BR') : null
-  };
-
-  // ---- Efetivo por cidade (agentes/viaturas + quebras PC/PM/Outros)
+  // ==== Efetivo por cidade (agentes/viaturas + quebras)
   const subEfCidades = db('operacao_efetivo')
     .where('operacao_id', id)
     .whereNotNull('cidade_id')
@@ -1891,6 +1896,13 @@ app.get('/operacoes/:id/monitor', requireAdminOrGestor, async (req, res) => {
     )
     .orderBy('c.nome');
 
+  const operacao = {
+    id: op.id,
+    nome: op.nome,
+    inicio_fmt: op.inicio_agendado
+      ? new Date(op.inicio_agendado).toLocaleString('pt-BR')
+      : null
+  };
 
   res.render('operacoes-monitor', {
     operacao,
@@ -1901,6 +1913,7 @@ app.get('/operacoes/:id/monitor', requireAdminOrGestor, async (req, res) => {
     efetivoByCity,
   });
 });
+
 
 
 
