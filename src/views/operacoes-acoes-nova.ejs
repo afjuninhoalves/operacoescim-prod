@@ -10,7 +10,7 @@
   <style>
     :root{
       --bg:#0b1220; --panel:#0f172a; --panel2:#111827; --border:#1f2937;
-      --muted:#9ca3af; --text:#e5e7eb; --blue:#2563eb; --green:#22c55e; --red:#ef4444; --amber:#f59e0b;
+      --muted:#9ca3af; --text:#e5e7eb; --blue:#2563eb; --green:#22c55e; --red:#ef4444;
       --radius:14px; --shadow:0 10px 30px rgba(0,0,0,.35);
     }
     *{box-sizing:border-box}
@@ -25,6 +25,7 @@
     .btn-primary{background:var(--blue);color:#fff;border-color:rgba(37,99,235,.5)}
     .btn-ghost{background:#0b1325}
     .btn-red{background:var(--red);color:#fff;border-color:#991b1b}
+    .btn[disabled]{opacity:.6;cursor:not-allowed}
     .container{max-width:1160px;margin:0 auto;padding:20px 16px 40px}
     .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px}
     .muted{color:var(--muted)}
@@ -116,7 +117,7 @@
     <div class="grid two" style="margin-top:16px">
 
       <!-- Form da FISCALIZAÇÃO -->
-      <form class="card" id="formFiscalizacao" method="post" action="/operacoes/<%= operacao.id %>/fiscalizacoes" enctype="multipart/form-data">
+      <form class="card" id="formFiscalizacao" method="post" action="/operacoes/<%= operacao.id %>/fiscalizacoes" enctype="multipart/form-data" autocomplete="off" novalidate>
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <input type="hidden" name="return_to" value="/operacoes/<%= operacao.id %>/acoes/nova">
         <!-- GEO -->
@@ -130,8 +131,8 @@
 
         <div class="row">
           <div class="col">
-            <label>Tipo de local</label>
-            <input type="text" name="tipo_local" placeholder="ex: bar, ferro-velho, baile">
+            <label>Tipo de local <span class="muted">(obrigatório)</span></label>
+            <input type="text" name="tipo_local" placeholder="ex: bar, ferro-velho, baile" required>
           </div>
           <div class="col">
             <label>Nome do local</label>
@@ -153,11 +154,11 @@
         <div class="row" style="margin-top:10px">
           <div class="col">
             <label>Pessoas abordadas</label>
-            <input type="number" min="0" name="pessoas_abordadas" value="0">
+            <input type="number" min="0" name="pessoas_abordadas" value="0" inputmode="numeric">
           </div>
           <div class="col">
             <label>Veículos abordados</label>
-            <input type="number" min="0" name="veiculos_abordados" value="0">
+            <input type="number" min="0" name="veiculos_abordados" value="0" inputmode="numeric">
           </div>
         </div>
 
@@ -169,7 +170,7 @@
 
         <div style="margin-top:12px">
           <label>Fotos (câmera ou galeria)</label>
-          <input type="file" name="fotos" accept="image/*" multiple>
+          <input type="file" name="fotos" accept="image/*" capture="environment" multiple>
         </div>
 
         <div class="muted geo-status" style="margin-top:6px">Localização: aguardando…</div>
@@ -183,7 +184,7 @@
 
         <div class="row" style="justify-content:space-between;margin-top:14px">
           <div class="muted geo-status">Localização: aguardando…</div>
-          <button class="btn btn-primary" type="submit">Salvar fiscalização</button>
+          <button class="btn btn-primary" id="btnSubmit" type="submit">Salvar fiscalização</button>
         </div>
       </form>
 
@@ -202,37 +203,39 @@
   </div>
 
   <!-- MODAL de Apreensão -->
-  <div class="modal-backdrop" id="aprModalBk">
-    <div class="modal">
+  <div class="modal-backdrop" id="aprModalBk" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true">
       <div class="modal-header">
         <div class="modal-title" id="aprModalTitle">Nova apreensão</div>
         <button class="btn btn-ghost" type="button" id="aprClose">Fechar</button>
       </div>
 
-      <div class="row">
-        <div class="col">
-          <label>Tipo</label>
-          <input type="text" id="apr_tipo" placeholder="ex: cigarro, bebida, droga">
+      <form id="aprForm" onsubmit="return false;">
+        <div class="row">
+          <div class="col">
+            <label>Tipo</label>
+            <input type="text" id="apr_tipo" placeholder="ex: cigarro, bebida, droga" required>
+          </div>
+          <div class="col">
+            <label>Quantidade</label>
+            <input type="number" min="0" step="any" id="apr_quantidade" placeholder="0" inputmode="decimal">
+          </div>
+          <div class="col">
+            <label>Unidade</label>
+            <input type="text" id="apr_unidade" placeholder="ex: pacotes, garrafas, kg">
+          </div>
         </div>
-        <div class="col">
-          <label>Quantidade</label>
-          <input type="number" min="0" id="apr_quantidade" placeholder="0">
-        </div>
-        <div class="col">
-          <label>Unidade</label>
-          <input type="text" id="apr_unidade" placeholder="ex: pacotes, garrafas, kg">
-        </div>
-      </div>
 
-      <div style="margin-top:10px">
-        <label>Observações</label>
-        <textarea id="apr_obs" rows="3" placeholder=""></textarea>
-      </div>
+        <div style="margin-top:10px">
+          <label>Observações</label>
+          <textarea id="apr_obs" rows="3" placeholder=""></textarea>
+        </div>
 
-      <div class="row" style="justify-content:flex-end;margin-top:12px">
-        <button class="btn btn-ghost" type="button" id="aprCancel">Cancelar</button>
-        <button class="btn btn-primary" type="button" id="aprSave">Salvar</button>
-      </div>
+        <div class="row" style="justify-content:flex-end;margin-top:12px">
+          <button class="btn btn-ghost" type="button" id="aprCancel">Cancelar</button>
+          <button class="btn btn-primary" type="submit" id="aprSave">Salvar</button>
+        </div>
+      </form>
     </div>
   </div>
 
@@ -365,6 +368,7 @@
       const mClose = $('#aprClose');
       const mCancel= $('#aprCancel');
       const mSave = $('#aprSave');
+      const mForm = $('#aprForm');
 
       function openModal(title, data = null, idx = -1){
         mTit.textContent = title;
@@ -379,11 +383,11 @@
       function closeModal(){ bk.style.display = 'none'; }
 
       $('#btnAddApr').addEventListener('click', () => openModal('Nova apreensão'));
-
       mClose.addEventListener('click', closeModal);
       mCancel.addEventListener('click', closeModal);
 
-      mSave.addEventListener('click', () => {
+      // Enter dentro do modal submete
+      mForm.addEventListener('submit', () => {
         const tipo = String(mTipo.value || '').trim();
         if (!tipo){ mTipo.focus(); return; }
         const rawQtd = mQtd.value;
@@ -393,7 +397,6 @@
         const obs = String(mObs.value || '').trim() || null;
 
         const item = { tipo, quantidade, unidade, obs };
-
         if (editingIndex >= 0) apreensoes[editingIndex] = item;
         else apreensoes.push(item);
 
@@ -414,9 +417,9 @@
           wrap.className = 'apr-item';
           wrap.innerHTML = `
             <div>
-              <div class="apr-kind">${escapeHtml(a.tipo)}</div>
+              <div class="apr-kind">${escapeHtml(a.tipo || '—')}</div>
               <div class="apr-meta">
-                ${a.quantidade != null ? escapeHtml(String(a.quantidade)) : '—'}
+                ${(a.quantidade != null && a.quantidade !== '') ? escapeHtml(String(a.quantidade)) : '—'}
                 ${a.unidade ? escapeHtml(a.unidade) : ''} 
                 ${a.obs ? ' · ' + escapeHtml(a.obs) : ''}
               </div>
@@ -430,7 +433,7 @@
         });
         aprCountEl.textContent = apreensoes.length + (apreensoes.length === 1 ? ' item' : ' itens');
         jsonInput.value = JSON.stringify(apreensoes);
-        // bind botões
+
         aprListEl.querySelectorAll('[data-ed]').forEach(b => b.addEventListener('click', (ev) => {
           const idx = Number(ev.currentTarget.getAttribute('data-ed'));
           openModal('Editar apreensão', apreensoes[idx], idx);
@@ -443,16 +446,26 @@
       }
 
       function escapeHtml(s){
-        return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[c]));
+        return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[c]));
       }
 
-      // garante JSON preenchido no submit
+      // garante JSON preenchido no submit + previne duplo submit
+      const submitBtn = $('#btnSubmit');
       $('#formFiscalizacao').addEventListener('submit', () => {
         jsonInput.value = JSON.stringify(apreensoes);
+        submitBtn.disabled = true;
+        setTimeout(() => submitBtn.disabled = false, 4000);
       });
 
-      // start vazio
+      // abrir modal automaticamente se vier ?open=apr
+      const params = new URLSearchParams(location.search);
+      if (params.get('open') === 'apr') {
+        document.getElementById('btnAddApr').click();
+      }
+
       renderApr();
+
+      /* ===== FIM IIFE ===== */
     })();
   </script>
 </body>
