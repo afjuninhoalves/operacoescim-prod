@@ -1365,19 +1365,19 @@ app.post(
     if (!(await canUserPostOnOperation(operacao_id, user))) return res.status(403).send('Sem permissão.');
 
     // ------------ campos da fiscalização ------------
-    const S = (v:any) => String(v ?? '').trim();
-    const N = (v:any) => {
+    const S = (v: any) => String(v ?? '').trim();
+    const N = (v: any) => {
       if (v === '' || v == null) return 0;
       const n = Number(v); return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0;
     };
-    const B = (v:any) => v === 'on' || v === 'true' || v === '1';
+    const B = (v: any) => v === 'on' || v === 'true' || v === '1';
 
-    const tipo_local       = S(req.body.tipo_local);            // obrigatório p/ sua tabela atual
-    const local_nome       = S(req.body.local_nome) || null;
-    const local_endereco   = S(req.body.local_endereco) || null;
-    const obs              = S(req.body.obs) || null;
+    const tipo_local = S(req.body.tipo_local);            // obrigatório p/ sua tabela atual
+    const local_nome = S(req.body.local_nome) || null;
+    const local_endereco = S(req.body.local_endereco) || null;
+    const obs = S(req.body.obs) || null;
 
-    const pessoas_abordadas  = N(req.body.pessoas_abordadas);
+    const pessoas_abordadas = N(req.body.pessoas_abordadas);
     const veiculos_abordados = N(req.body.veiculos_abordados);
 
     const multado = B(req.body.multado);
@@ -1427,15 +1427,15 @@ app.post(
     let itens: Array<any> = [];
     try {
       if (req.body.apreensoes_json) itens = JSON.parse(String(req.body.apreensoes_json));
-    } catch {}
+    } catch { }
 
     if (Array.isArray(itens) && itens.length) {
       const rows = itens.map(it => ({
         fiscalizacao_evento_id: evento_id,
-        tipo:       S(it.tipo) || null,
+        tipo: S(it.tipo) || null,
         quantidade: it.quantidade === '' || it.quantidade == null ? null : Number(it.quantidade),
-        unidade:    S(it.unidade) || null,
-        obs:        S(it.obs) || null,
+        unidade: S(it.unidade) || null,
+        obs: S(it.obs) || null,
       }));
       await db('fiscalizacao_apreensoes').insert(rows);
     }
@@ -1447,10 +1447,10 @@ app.post(
 
 // GET: formulário de edição do item filho
 app.get('/operacoes/:opId/fiscalizacoes/:fiscId/apreensoes/:aprId/editar',
-  requireAuth, csrfProtection, async (req,res) => {
+  requireAuth, csrfProtection, async (req, res) => {
     const user = (req.session as any).user;
-    const opId  = Number(req.params.opId);
-    const fiscId= Number(req.params.fiscId);
+    const opId = Number(req.params.opId);
+    const fiscId = Number(req.params.fiscId);
     const aprId = Number(req.params.aprId);
 
     // Permissão baseada no evento (fiscalização)
@@ -1467,14 +1467,14 @@ app.get('/operacoes/:opId/fiscalizacoes/:fiscId/apreensoes/:aprId/editar',
       csrfToken: (req as any).csrfToken(),
       user, operacao, fiscId, apr
     });
-});
+  });
 
 // POST: salvar alterações
 app.post('/operacoes/:opId/fiscalizacoes/:fiscId/apreensoes/:aprId/editar',
-  requireAuth, csrfProtection, async (req,res) => {
+  requireAuth, csrfProtection, async (req, res) => {
     const user = (req.session as any).user;
-    const opId  = Number(req.params.opId);
-    const fiscId= Number(req.params.fiscId);
+    const opId = Number(req.params.opId);
+    const fiscId = Number(req.params.fiscId);
     const aprId = Number(req.params.aprId);
 
     const ev = await db('operacao_eventos').where({ id: fiscId, operacao_id: opId }).first();
@@ -1482,8 +1482,8 @@ app.post('/operacoes/:opId/fiscalizacoes/:fiscId/apreensoes/:aprId/editar',
     const perm = await canEditEvento(user, opId, fiscId);
     if (!perm.ok) return res.status(perm.status || 403).send(perm.reason || 'Não autorizado.');
 
-    const S = (v:any) => String(v ?? '').trim();
-    const Q = (v:any) => (v === '' || v == null) ? null : Number(v);
+    const S = (v: any) => String(v ?? '').trim();
+    const Q = (v: any) => (v === '' || v == null) ? null : Number(v);
 
     await db('fiscalizacao_apreensoes')
       .where({ id: aprId, fiscalizacao_evento_id: fiscId })
@@ -1914,9 +1914,9 @@ app.get('/operacoes/:opId/fiscalizacoes/:eventoId/editar',
   requireAuth,
   csrfProtection,
   async (req, res) => {
-    const user   = (req.session as any).user;
-    const opId   = Number(req.params.opId);
-    const evId   = Number(req.params.eventoId);
+    const user = (req.session as any).user;
+    const opId = Number(req.params.opId);
+    const evId = Number(req.params.eventoId);
 
     // Permissão: o evento precisa existir e ser do tipo "fiscalizacao"
     const ev = await db('operacao_eventos').where({ id: evId, operacao_id: opId }).first();
@@ -1929,7 +1929,7 @@ app.get('/operacoes/:opId/fiscalizacoes/:eventoId/editar',
 
     // Detalhes da fiscalização
     const f = await db('evento_fiscalizacao as f')
-      .join('operacao_eventos as e','e.id','f.evento_id')
+      .join('operacao_eventos as e', 'e.id', 'f.evento_id')
       .select(
         'f.evento_id as id',
         'f.tipo_local',
@@ -1941,7 +1941,7 @@ app.get('/operacoes/:opId/fiscalizacoes/:eventoId/editar',
         'f.fechado',
         'f.lacrado',
         'e.obs',
-        'e.lat','e.lng','e.accuracy as acc'
+        'e.lat', 'e.lng', 'e.accuracy as acc'
       )
       .where('f.evento_id', evId)
       .first();
@@ -1950,7 +1950,7 @@ app.get('/operacoes/:opId/fiscalizacoes/:eventoId/editar',
 
     // Apreensões vinculadas a esta fiscalização
     const apreensoes = await db('evento_apreensao as a')
-      .join('operacao_eventos as e','e.id','a.evento_id')
+      .join('operacao_eventos as e', 'e.id', 'a.evento_id')
       .where('a.fiscalizacao_evento_id', evId)
       .select(
         'a.evento_id as id',
@@ -1959,16 +1959,16 @@ app.get('/operacoes/:opId/fiscalizacoes/:eventoId/editar',
         'a.unidade',
         'e.obs'
       )
-      .orderBy('a.evento_id','desc');
+      .orderBy('a.evento_id', 'desc');
 
     // Renderiza a MESMA página usada para criar, em modo edição
     return res.render('operacoes-acoes-nova', {
-      csrfToken: (req as any).csrfToken(),
+      csrfToken: req.csrfToken(),
       operacao,
       mode: 'edit',
       postAction: `/operacoes/${opId}/fiscalizacoes/${evId}/editar`,
-      fisc: f,
-      apreensoes      // <<< nome que o EJS espera
+      fisc: f,                     // dados da fiscalização
+      apreensoes                  // <- array de apreensões desta fiscalização
     });
   }
 );
@@ -1987,9 +1987,9 @@ app.post('/operacoes/:opId/fiscalizacoes/:eventoId/editar',
   uploadFotosFields,          // <<< precisa vir antes do csurf
   csrfProtection,
   async (req: Request, res: Response) => {
-    const user  = (req.session as any).user;
-    const opId  = Number(req.params.opId);
-    const evId  = Number(req.params.eventoId);
+    const user = (req.session as any).user;
+    const opId = Number(req.params.opId);
+    const evId = Number(req.params.eventoId);
 
     // Segurança básica
     const ev = await db('operacao_eventos').where({ id: evId, operacao_id: opId }).first();
@@ -1998,21 +1998,21 @@ app.post('/operacoes/:opId/fiscalizacoes/:eventoId/editar',
     if (!can.ok) return res.status(can.status || 403).send(can.reason || 'Não autorizado.');
 
     // Helpers
-    const toInt = (v:any) => (v === '' || v == null) ? 0 : Math.max(0, Math.floor(Number(v) || 0));
-    const toBool= (v:any) => v === 'on' || v === 'true' || v === '1';
+    const toInt = (v: any) => (v === '' || v == null) ? 0 : Math.max(0, Math.floor(Number(v) || 0));
+    const toBool = (v: any) => v === 'on' || v === 'true' || v === '1';
 
     // Campos
-    const tipo_local        = String(req.body.tipo_local || '').trim();
+    const tipo_local = String(req.body.tipo_local || '').trim();
     if (!tipo_local) return res.status(400).send('Informe o tipo de local.');
 
-    const local_nome        = String(req.body.local_nome || '').trim() || null;
-    const local_endereco    = String(req.body.local_endereco || '').trim() || null;
-    const obs               = String(req.body.obs || '').trim() || null;
+    const local_nome = String(req.body.local_nome || '').trim() || null;
+    const local_endereco = String(req.body.local_endereco || '').trim() || null;
+    const obs = String(req.body.obs || '').trim() || null;
     const pessoas_abordadas = toInt(req.body.pessoas_abordadas);
-    const veiculos_abordados= toInt(req.body.veiculos_abordados);
-    const multado           = toBool(req.body.multado);
-    const fechado           = toBool(req.body.fechado);
-    const lacrado           = toBool(req.body.lacrado);
+    const veiculos_abordados = toInt(req.body.veiculos_abordados);
+    const multado = toBool(req.body.multado);
+    const fechado = toBool(req.body.fechado);
+    const lacrado = toBool(req.body.lacrado);
 
     // Atualiza detalhes da fiscalização
     await db('evento_fiscalizacao')
@@ -2047,7 +2047,7 @@ app.post('/operacoes/:opId/fiscalizacoes/:eventoId/editar',
     }
 
     // ===== Apreensões (upsert + remoção do que saiu) =====
-    let itens:any[] = [];
+    let itens: any[] = [];
     try {
       itens = JSON.parse(String(req.body.apreensoes_json || '[]'));
       if (!Array.isArray(itens)) itens = [];
@@ -2065,7 +2065,7 @@ app.post('/operacoes/:opId/fiscalizacoes/:eventoId/editar',
       const tipo = String(it.tipo || '').trim();
       const quantidade = (it.quantidade === '' || it.quantidade == null) ? null : Number(it.quantidade);
       const unidade = String(it.unidade || '').trim() || null;
-      const aprObs  = String(it.obs || '').trim() || null;
+      const aprObs = String(it.obs || '').trim() || null;
 
       if (!tipo) continue;
 
@@ -2565,9 +2565,9 @@ app.get('/operacoes/:opId/apreensoes/:eventoId/editar',
     // Outras apreensões da mesma fiscalização (se existir vínculo)
     const aprList = apr.fiscalizacao_evento_id
       ? await db('evento_apreensao')
-          .where({ fiscalizacao_evento_id: apr.fiscalizacao_evento_id })
-          .select('evento_id as id', 'tipo', 'quantidade', 'unidade')
-          .orderBy('evento_id', 'desc')
+        .where({ fiscalizacao_evento_id: apr.fiscalizacao_evento_id })
+        .select('evento_id as id', 'tipo', 'quantidade', 'unidade')
+        .orderBy('evento_id', 'desc')
       : [];
 
     return res.render('apreensao-edit', {

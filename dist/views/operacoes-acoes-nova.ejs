@@ -1,9 +1,11 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title><%= (mode==='edit'?'Editar fiscalização — ':'Inserir ações — ') + operacao.nome %></title>
+  <title>
+    <%= (mode==='edit' ?'Editar fiscalização — ':' Inserir ações — ') + operacao.nome %></title>
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
 
@@ -68,7 +70,7 @@
         <span class="badge">CIM</span>
         <div>
           Operações CIM
-          <div class="muted"><%= (mode==='edit'?'Editar fiscalização — ':'Inserir ações — ') + operacao.nome %></div>
+          <div class="muted"><%= (mode===' edit'?'Editar fiscalização — ':' Inserir ações — ') + operacao.nome %></div>
         </div>
       </div>
       <div class="actions">
@@ -116,87 +118,89 @@
       <!-- Form da FISCALIZAÇÃO -->
       <form class="card" id="formFiscalizacao"
             method="post"
-            action="<%= postAction || ('/operacoes/' + operacao.id + '/fiscalizacoes') %>"
-            enctype="multipart/form-data" autocomplete="off" novalidate>
-        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-        <input type="hidden" name="return_to" value="/operacoes/<%= operacao.id %>/acoes/nova">
-        <!-- GEO -->
-        <input type="hidden" name="lat" class="geo-lat" value="<%= (fisc && fisc.lat)!=null ? fisc.lat : '' %>">
-        <input type="hidden" name="lng" class="geo-lng" value="<%= (fisc && fisc.lng)!=null ? fisc.lng : '' %>">
-        <input type="hidden" name="acc" class="geo-acc" value="<%= (fisc && fisc.acc)!=null ? fisc.acc : '' %>">
-        <!-- JSON com as N apreensões -->
-        <input type="hidden" name="apreensoes_json" id="apreensoes_json">
+            action="<%= postAction || (' /operacoes/' + operacao.id + '/fiscalizacoes' ) %>"
+      enctype="multipart/form-data" autocomplete="off" novalidate>
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <input type="hidden" name="return_to" value="/operacoes/<%= operacao.id %>/acoes/nova">
+      <!-- GEO -->
+      <input type="hidden" name="lat" class="geo-lat" value="<%= (fisc && fisc.lat)!=null ? fisc.lat : '' %>">
+      <input type="hidden" name="lng" class="geo-lng" value="<%= (fisc && fisc.lng)!=null ? fisc.lng : '' %>">
+      <input type="hidden" name="acc" class="geo-acc" value="<%= (fisc && fisc.acc)!=null ? fisc.acc : '' %>">
+      <!-- JSON com as N apreensões -->
+      <input type="hidden" name="apreensoes_json" id="apreensoes_json">
 
-        <h3 style="margin:0 0 10px">Fiscalização</h3>
+      <h3 style="margin:0 0 10px">Fiscalização</h3>
 
-        <div class="row">
-          <div class="col">
-            <label>Tipo de local <span class="muted">(obrigatório)</span></label>
-            <input type="text" name="tipo_local" placeholder="ex: bar, ferro-velho, baile" required
-                   value="<%= (fisc && fisc.tipo_local) || '' %>">
-          </div>
-          <div class="col">
-            <label>Nome do local</label>
-            <input type="text" name="local_nome" placeholder="ex: Bar do Zé"
-                   value ="<%= (fisc && fisc.local_nome) || '' %>">
-          </div>
+      <div class="row">
+        <div class="col">
+          <label>Tipo de local <span class="muted">(obrigatório)</span></label>
+          <input type="text" name="tipo_local" placeholder="ex: bar, ferro-velho, baile" required
+            value="<%= (fisc && fisc.tipo_local) || '' %>">
         </div>
-
-        <div class="row" style="margin-top:10px">
-          <div class="col">
-            <label>Endereço</label>
-            <input type="text" name="local_endereco" placeholder="ex: Rua X, 123 — Centro"
-                   value ="<%= (fisc && fisc.local_endereco) || '' %>">
-          </div>
-          <div class="col">
-            <label>Observações</label>
-            <textarea name="obs" rows="3" placeholder=""><%= (fisc && fisc.obs) || '' %></textarea>
-          </div>
+        <div class="col">
+          <label>Nome do local</label>
+          <input type="text" name="local_nome" placeholder="ex: Bar do Zé"
+            value="<%= (fisc && fisc.local_nome) || '' %>">
         </div>
+      </div>
 
-        <div class="row" style="margin-top:10px">
-          <div class="col">
-            <label>Pessoas abordadas</label>
-            <input type="number" min="0" name="pessoas_abordadas" inputmode="numeric"
-                   value ="<%= (fisc && fisc.pessoas_abordadas)!=null ? fisc.pessoas_abordadas : 0 %>">
-          </div>
-          <div class="col">
-            <label>Veículos abordados</label>
-            <input type="number" min="0" name="veiculos_abordados" inputmode="numeric"
-                   value ="<%= (fisc && fisc.veiculos_abordados)!=null ? fisc.veiculos_abordados : 0 %>">
-          </div>
+      <div class="row" style="margin-top:10px">
+        <div class="col">
+          <label>Endereço</label>
+          <input type="text" name="local_endereco" placeholder="ex: Rua X, 123 — Centro"
+            value="<%= (fisc && fisc.local_endereco) || '' %>">
         </div>
-
-        <div class="row" style="margin-top:10px">
-          <label style="display:flex;align-items:center;gap:8px">
-            <input type="checkbox" name="multado" <%= (fisc && fisc.multado)? 'checked' : '' %> > Multado
-          </label>
-          <label style="display:flex;align-items:center;gap:8px">
-            <input type="checkbox" name="fechado" <%= (fisc && fisc.fechado)? 'checked' : '' %> > Fechado
-          </label>
-          <label style="display:flex;align-items:center;gap:8px">
-            <input type="checkbox" name="lacrado" <%= (fisc && fisc.lacrado)? 'checked' : '' %> > Lacrado
-          </label>
+        <div class="col">
+          <label>Observações</label>
+          <textarea name="obs" rows="3" placeholder=""><%= (fisc && fisc.obs) || '' %></textarea>
         </div>
+      </div>
 
-        <div style="margin-top:12px">
-          <label>Fotos (câmera ou galeria)</label>
-          <input type="file" name="fotos" accept="image/*" capture="environment" multiple>
+      <div class="row" style="margin-top:10px">
+        <div class="col">
+          <label>Pessoas abordadas</label>
+          <input type="number" min="0" name="pessoas_abordadas" inputmode="numeric"
+            value="<%= (fisc && fisc.pessoas_abordadas)!=null ? fisc.pessoas_abordadas : 0 %>">
         </div>
-
-        <div class="muted geo-status" style="margin-top:6px">Localização: aguardando…</div>
-
-        <hr style="border-color:#1f2937; margin:14px 0">
-
-        <div class="row" style="justify-content:space-between;align-items:center">
-          <h4 style="margin:0">Apreensões</h4>
-          <button type="button" class="btn btn-primary" id="btnAddApr">Adicionar apreensão</button>
+        <div class="col">
+          <label>Veículos abordados</label>
+          <input type="number" min="0" name="veiculos_abordados" inputmode="numeric"
+            value="<%= (fisc && fisc.veiculos_abordados)!=null ? fisc.veiculos_abordados : 0 %>">
         </div>
+      </div>
 
-        <div class="row" style="justify-content:space-between;margin-top:14px">
-          <div class="muted geo-status">Localização: aguardando…</div>
-          <button class="btn btn-primary" id="btnSubmit" type="submit"><%= mode==='edit'?'Salvar alterações':'Salvar fiscalização' %></button>
-        </div>
+      <div class="row" style="margin-top:10px">
+        <label style="display:flex;align-items:center;gap:8px">
+          <input type="checkbox" name="multado" <%=(fisc && fisc.multado)? 'checked' : '' %> > Multado
+        </label>
+        <label style="display:flex;align-items:center;gap:8px">
+          <input type="checkbox" name="fechado" <%=(fisc && fisc.fechado)? 'checked' : '' %> > Fechado
+        </label>
+        <label style="display:flex;align-items:center;gap:8px">
+          <input type="checkbox" name="lacrado" <%=(fisc && fisc.lacrado)? 'checked' : '' %> > Lacrado
+        </label>
+      </div>
+
+      <div style="margin-top:12px">
+        <label>Fotos (câmera ou galeria)</label>
+        <input type="file" name="fotos" accept="image/*" capture="environment" multiple>
+      </div>
+
+      <div class="muted geo-status" style="margin-top:6px">Localização: aguardando…</div>
+
+      <hr style="border-color:#1f2937; margin:14px 0">
+
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <h4 style="margin:0">Apreensões</h4>
+        <button type="button" class="btn btn-primary" id="btnAddApr">Adicionar apreensão</button>
+      </div>
+
+      <div class="row" style="justify-content:space-between;margin-top:14px">
+        <div class="muted geo-status">Localização: aguardando…</div>
+        <button class="btn btn-primary" id="btnSubmit" type="submit">
+          <%= mode==='edit' ?'Salvar alterações':'Salvar fiscalização' %>
+        </button>
+      </div>
       </form>
 
       <!-- Painel direito: lista de apreensões -->
@@ -210,230 +214,230 @@
         </div>
       </div>
 
-    </div>
-  </div>
-
-  <!-- MODAL de Apreensão -->
-  <div class="modal-backdrop" id="aprModalBk" aria-hidden="true">
-    <div class="modal" role="dialog" aria-modal="true">
-      <div class="modal-header">
-        <div class="modal-title" id="aprModalTitle">Nova apreensão</div>
-        <button class="btn btn-ghost" type="button" id="aprClose">Fechar</button>
+      </div>
       </div>
 
-      <form id="aprForm" onsubmit="return false;">
-        <div class="row">
-          <div class="col">
-            <label>Tipo</label>
-            <input type="text" id="apr_tipo" placeholder="ex: cigarro, bebida, droga" required>
+      <!-- MODAL de Apreensão -->
+      <div class="modal-backdrop" id="aprModalBk" aria-hidden="true">
+        <div class="modal" role="dialog" aria-modal="true">
+          <div class="modal-header">
+            <div class="modal-title" id="aprModalTitle">Nova apreensão</div>
+            <button class="btn btn-ghost" type="button" id="aprClose">Fechar</button>
           </div>
-          <div class="col">
-            <label>Quantidade</label>
-            <input type="number" min="0" step="any" id="apr_quantidade" placeholder="0" inputmode="decimal">
-          </div>
-          <div class="col">
-            <label>Unidade</label>
-            <input type="text" id="apr_unidade" placeholder="ex: pacotes, garrafas, kg">
-          </div>
+
+          <form id="aprForm" onsubmit="return false;">
+            <div class="row">
+              <div class="col">
+                <label>Tipo</label>
+                <input type="text" id="apr_tipo" placeholder="ex: cigarro, bebida, droga" required>
+              </div>
+              <div class="col">
+                <label>Quantidade</label>
+                <input type="number" min="0" step="any" id="apr_quantidade" placeholder="0" inputmode="decimal">
+              </div>
+              <div class="col">
+                <label>Unidade</label>
+                <input type="text" id="apr_unidade" placeholder="ex: pacotes, garrafas, kg">
+              </div>
+            </div>
+
+            <div style="margin-top:10px">
+              <label>Observações</label>
+              <textarea id="apr_obs" rows="3" placeholder=""></textarea>
+            </div>
+
+            <div class="row" style="justify-content:flex-end;margin-top:12px">
+              <button class="btn btn-ghost" type="button" id="aprCancel">Cancelar</button>
+              <button class="btn btn-primary" type="submit" id="aprSave">Salvar</button>
+            </div>
+          </form>
         </div>
+      </div>
 
-        <div style="margin-top:10px">
-          <label>Observações</label>
-          <textarea id="apr_obs" rows="3" placeholder=""></textarea>
-        </div>
+      <!-- Bootstrap de dados para modo edição -->
+      <script>
+        window.INIT = {
+          mode: "<%= mode || 'create' %>",
+          postAction: "<%= postAction || ('/operacoes/' + operacao.id + '/fiscalizacoes') %>",
+          fisc: <%- JSON.stringify(fisc || {}) %>,
+          apreensoes: <%- JSON.stringify(apreensoes || []) %>
+  };
+      </script>
 
-        <div class="row" style="justify-content:flex-end;margin-top:12px">
-          <button class="btn btn-ghost" type="button" id="aprCancel">Cancelar</button>
-          <button class="btn btn-primary" type="submit" id="aprSave">Salvar</button>
-        </div>
-      </form>
-    </div>
-  </div>
+      <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+      <script>
+        (() => {
+          const $ = (s, r = document) => r.querySelector(s);
+          const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 
-  <!-- Bootstrap de dados para modo edição -->
-  <script>
-    window.INIT = {
-      mode: "<%= mode || 'create' %>",
-      postAction: "<%= postAction || ('/operacoes/' + operacao.id + '/fiscalizacoes') %>",
-      fisc: <%- JSON.stringify(fisc || {}) %>,
-      apreensoes: <%- JSON.stringify(apreensoes || []) %>
-    };
-  </script>
+          /* ===== GEO ===== */
+          const statusEl = $('#geoStatus');
+          const ckAttach = $('#ckAttach');
+          const btnGPS = $('#btnGPS');
+          const btnManual = $('#btnManual');
+          const mapWrap = $('#mapWrap');
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-  <script>
-    (() => {
-      const $  = (s, r=document) => r.querySelector(s);
-      const $$ = (s, r=document) => Array.from(r.querySelectorAll(s));
-
-      /* ===== GEO ===== */
-      const statusEl = $('#geoStatus');
-      const ckAttach = $('#ckAttach');
-      const btnGPS   = $('#btnGPS');
-      const btnManual= $('#btnManual');
-      const mapWrap  = $('#mapWrap');
-
-      function syncHidden(lat, lng, acc) {
-        $$('.geo-lat').forEach(i => i.value = (ckAttach.checked ? (lat ?? '') : ''));
-        $$('.geo-lng').forEach(i => i.value = (ckAttach.checked ? (lng ?? '') : ''));
-        $$('.geo-acc').forEach(i => i.value = (ckAttach.checked ? (acc ?? '') : ''));
-        $$('.geo-status').forEach(s => {
-          if (!s) return;
-          if (ckAttach.checked && lat && lng) {
-            s.textContent = 'Localização capturada';
-            s.classList.add('geo-ok'); s.classList.remove('geo-err');
-          } else if (!ckAttach.checked) {
-            s.textContent = 'Localização NÃO será anexada';
-            s.classList.remove('geo-ok'); s.classList.add('geo-err');
-          } else {
-            s.textContent = 'Aguardando localização…';
-            s.classList.remove('geo-ok','geo-err');
+          function syncHidden(lat, lng, acc) {
+            $$('.geo-lat').forEach(i => i.value = (ckAttach.checked ? (lat ?? '') : ''));
+            $$('.geo-lng').forEach(i => i.value = (ckAttach.checked ? (lng ?? '') : ''));
+            $$('.geo-acc').forEach(i => i.value = (ckAttach.checked ? (acc ?? '') : ''));
+            $$('.geo-status').forEach(s => {
+              if (!s) return;
+              if (ckAttach.checked && lat && lng) {
+                s.textContent = 'Localização capturada';
+                s.classList.add('geo-ok'); s.classList.remove('geo-err');
+              } else if (!ckAttach.checked) {
+                s.textContent = 'Localização NÃO será anexada';
+                s.classList.remove('geo-ok'); s.classList.add('geo-err');
+              } else {
+                s.textContent = 'Aguardando localização…';
+                s.classList.remove('geo-ok', 'geo-err');
+              }
+            });
           }
-        });
-      }
-      function setStatus(msg){ statusEl.textContent = msg; }
+          function setStatus(msg) { statusEl.textContent = msg; }
 
-      let map, marker, accuracyCircle;
-      const DEFAULT_VIEW = [-14.235004, -51.92528];
-      const DEFAULT_ZOOM = 4;
+          let map, marker, accuracyCircle;
+          const DEFAULT_VIEW = [-14.235004, -51.92528];
+          const DEFAULT_ZOOM = 4;
 
-      function ensureMap(){
-        if (map) return;
-        mapWrap.classList.remove('hide');
-        map = L.map('pickMap');
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19, attribution:'&copy; OpenStreetMap'}).addTo(map);
-        map.setView(DEFAULT_VIEW, DEFAULT_ZOOM);
-        map.on('click', (e) => { if (!ckAttach.checked) return; placeMarker(e.latlng.lat, e.latlng.lng, null, 'manual'); });
-      }
+          function ensureMap() {
+            if (map) return;
+            mapWrap.classList.remove('hide');
+            map = L.map('pickMap');
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap' }).addTo(map);
+            map.setView(DEFAULT_VIEW, DEFAULT_ZOOM);
+            map.on('click', (e) => { if (!ckAttach.checked) return; placeMarker(e.latlng.lat, e.latlng.lng, null, 'manual'); });
+          }
 
-      function placeMarker(lat, lng, acc, source){
-        if (!map) ensureMap();
-        const ll = L.latLng(lat, lng);
-        if (!marker){
-          marker = L.marker(ll, { draggable:true }).addTo(map);
-          marker.on('dragend', (ev) => {
-            const p = ev.target.getLatLng();
-            syncHidden(p.lat.toFixed(6), p.lng.toFixed(6), acc ?? '');
-            setStatus(`Local definido manualmente: ${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}`);
+          function placeMarker(lat, lng, acc, source) {
+            if (!map) ensureMap();
+            const ll = L.latLng(lat, lng);
+            if (!marker) {
+              marker = L.marker(ll, { draggable: true }).addTo(map);
+              marker.on('dragend', (ev) => {
+                const p = ev.target.getLatLng();
+                syncHidden(p.lat.toFixed(6), p.lng.toFixed(6), acc ?? '');
+                setStatus(`Local definido manualmente: ${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}`);
+              });
+            } else { marker.setLatLng(ll); }
+
+            if (accuracyCircle) { map.removeLayer(accuracyCircle); accuracyCircle = null; }
+            if (acc && acc > 0) { accuracyCircle = L.circle(ll, { radius: acc }).addTo(map); }
+
+            map.setView(ll, Math.max(map.getZoom(), 15));
+            syncHidden(lat.toFixed(6), lng.toFixed(6), acc ? Math.round(acc) : '');
+            setStatus(source === 'gps'
+              ? `GPS: ${lat.toFixed(6)}, ${lng.toFixed(6)} (±${acc ? Math.round(acc) : '?'}m)`
+              : `Local definido manualmente: ${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+
+            try { localStorage.setItem('ocim_last_geo', JSON.stringify({ lat, lng })); } catch { }
+          }
+
+          function useGPS() {
+            if (!('geolocation' in navigator)) { setStatus('GPS não suportado.'); return; }
+            ensureMap();
+            setStatus('Solicitando GPS…');
+            navigator.geolocation.getCurrentPosition(
+              (pos) => {
+                const { latitude, longitude, accuracy } = pos.coords || {};
+                if (!latitude || !longitude) { setStatus('Falha ao obter coordenadas.'); return; }
+                placeMarker(latitude, longitude, accuracy, 'gps');
+              },
+              (err) => {
+                let msg = 'Não foi possível obter o GPS.';
+                if (err && err.code === 1) msg = 'Permissão de localização negada.';
+                if (err && err.code === 2) msg = 'Posição indisponível.';
+                if (err && err.code === 3) msg = 'Tempo excedido.';
+                setStatus(msg + ' Você pode marcar no mapa.');
+              },
+              { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+            );
+          }
+
+          btnGPS.addEventListener('click', useGPS);
+          btnManual.addEventListener('click', () => {
+            ensureMap();
+            setStatus('Clique no mapa para definir a localização.');
+            try {
+              const last = JSON.parse(localStorage.getItem('ocim_last_geo') || 'null');
+              if (last && typeof last.lat === 'number' && typeof last.lng === 'number') {
+                map.setView([last.lat, last.lng], 15);
+              }
+            } catch { }
           });
-        } else { marker.setLatLng(ll); }
 
-        if (accuracyCircle){ map.removeLayer(accuracyCircle); accuracyCircle = null; }
-        if (acc && acc > 0){ accuracyCircle = L.circle(ll, { radius: acc }).addTo(map); }
+          ckAttach.addEventListener('change', () => {
+            if (!ckAttach.checked) { syncHidden('', '', ''); setStatus('Localização NÃO será anexada.'); }
+            else { setStatus('Anexar localização: ligado. Use GPS ou marque no mapa.'); }
+          });
 
-        map.setView(ll, Math.max(map.getZoom(), 15));
-        syncHidden(lat.toFixed(6), lng.toFixed(6), acc ? Math.round(acc) : '');
-        setStatus(source === 'gps'
-          ? `GPS: ${lat.toFixed(6)}, ${lng.toFixed(6)} (±${acc ? Math.round(acc) : '?'}m)`
-          : `Local definido manualmente: ${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+          const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+          if (isMobile) { useGPS(); } else { setStatus('Anexar localização: ligado. Use GPS ou marque no mapa.'); }
 
-        try{ localStorage.setItem('ocim_last_geo', JSON.stringify({ lat, lng })); }catch{}
-      }
+          /* ===== APREENSÕES (UI + JSON) ===== */
+          const apreensoes = [];
+          let editingIndex = -1;
 
-      function useGPS(){
-        if (!('geolocation' in navigator)){ setStatus('GPS não suportado.'); return; }
-        ensureMap();
-        setStatus('Solicitando GPS…');
-        navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            const { latitude, longitude, accuracy } = pos.coords || {};
-            if (!latitude || !longitude) { setStatus('Falha ao obter coordenadas.'); return; }
-            placeMarker(latitude, longitude, accuracy, 'gps');
-          },
-          (err) => {
-            let msg = 'Não foi possível obter o GPS.';
-            if (err && err.code === 1) msg = 'Permissão de localização negada.';
-            if (err && err.code === 2) msg = 'Posição indisponível.';
-            if (err && err.code === 3) msg = 'Tempo excedido.';
-            setStatus(msg + ' Você pode marcar no mapa.');
-          },
-          { enableHighAccuracy:true, timeout:15000, maximumAge:0 }
-        );
-      }
+          const aprListEl = $('#aprList');
+          const aprCountEl = $('#aprCount');
+          const jsonInput = $('#apreensoes_json');
 
-      btnGPS.addEventListener('click', useGPS);
-      btnManual.addEventListener('click', () => {
-        ensureMap();
-        setStatus('Clique no mapa para definir a localização.');
-        try{
-          const last = JSON.parse(localStorage.getItem('ocim_last_geo') || 'null');
-          if (last && typeof last.lat === 'number' && typeof last.lng === 'number'){
-            map.setView([last.lat, last.lng], 15);
+          const bk = $('#aprModalBk');
+          const mTit = $('#aprModalTitle');
+          const mTipo = $('#apr_tipo');
+          const mQtd = $('#apr_quantidade');
+          const mUni = $('#apr_unidade');
+          const mObs = $('#apr_obs');
+          const mClose = $('#aprClose');
+          const mCancel = $('#aprCancel');
+          const mForm = $('#aprForm');
+
+          function openModal(title, data = null, idx = -1) {
+            mTit.textContent = title;
+            editingIndex = idx;
+            mTipo.value = data?.tipo || '';
+            mQtd.value = (data?.quantidade ?? '') === null ? '' : (data?.quantidade ?? '');
+            mUni.value = data?.unidade || '';
+            mObs.value = data?.obs || '';
+            bk.style.display = 'flex';
+            mTipo.focus();
           }
-        }catch{}
-      });
+          function closeModal() { bk.style.display = 'none'; }
 
-      ckAttach.addEventListener('change', () => {
-        if (!ckAttach.checked){ syncHidden('', '', ''); setStatus('Localização NÃO será anexada.'); }
-        else { setStatus('Anexar localização: ligado. Use GPS ou marque no mapa.'); }
-      });
+          $('#btnAddApr').addEventListener('click', () => openModal('Nova apreensão'));
+          mClose.addEventListener('click', closeModal);
+          mCancel.addEventListener('click', closeModal);
 
-      const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-      if (isMobile) { useGPS(); } else { setStatus('Anexar localização: ligado. Use GPS ou marque no mapa.'); }
+          mForm.addEventListener('submit', () => {
+            const tipo = String(mTipo.value || '').trim();
+            if (!tipo) { mTipo.focus(); return; }
+            const rawQtd = mQtd.value;
+            const quantidade = rawQtd === '' ? null : Number(rawQtd);
+            if (quantidade !== null && !Number.isFinite(quantidade)) { mQtd.focus(); return; }
+            const unidade = String(mUni.value || '').trim() || null;
+            const obs = String(mObs.value || '').trim() || null;
 
-      /* ===== APREENSÕES (UI + JSON) ===== */
-      const apreensoes = [];
-      let editingIndex = -1;
+            const item = { tipo, quantidade, unidade, obs };
+            if (editingIndex >= 0) apreensoes[editingIndex] = { ...apreensoes[editingIndex], ...item };
+            else apreensoes.push(item);
 
-      const aprListEl   = $('#aprList');
-      const aprCountEl  = $('#aprCount');
-      const jsonInput   = $('#apreensoes_json');
+            renderApr();
+            closeModal();
+          });
 
-      const bk   = $('#aprModalBk');
-      const mTit = $('#aprModalTitle');
-      const mTipo= $('#apr_tipo');
-      const mQtd = $('#apr_quantidade');
-      const mUni = $('#apr_unidade');
-      const mObs = $('#apr_obs');
-      const mClose = $('#aprClose');
-      const mCancel= $('#aprCancel');
-      const mForm = $('#aprForm');
-
-      function openModal(title, data = null, idx = -1){
-        mTit.textContent = title;
-        editingIndex = idx;
-        mTipo.value = data?.tipo || '';
-        mQtd.value  = (data?.quantidade ?? '') === null ? '' : (data?.quantidade ?? '');
-        mUni.value  = data?.unidade || '';
-        mObs.value  = data?.obs || '';
-        bk.style.display = 'flex';
-        mTipo.focus();
-      }
-      function closeModal(){ bk.style.display = 'none'; }
-
-      $('#btnAddApr').addEventListener('click', () => openModal('Nova apreensão'));
-      mClose.addEventListener('click', closeModal);
-      mCancel.addEventListener('click', closeModal);
-
-      mForm.addEventListener('submit', () => {
-        const tipo = String(mTipo.value || '').trim();
-        if (!tipo){ mTipo.focus(); return; }
-        const rawQtd = mQtd.value;
-        const quantidade = rawQtd === '' ? null : Number(rawQtd);
-        if (quantidade !== null && !Number.isFinite(quantidade)){ mQtd.focus(); return; }
-        const unidade = String(mUni.value || '').trim() || null;
-        const obs = String(mObs.value || '').trim() || null;
-
-        const item = { tipo, quantidade, unidade, obs };
-        if (editingIndex >= 0) apreensoes[editingIndex] = { ...apreensoes[editingIndex], ...item };
-        else apreensoes.push(item);
-
-        renderApr();
-        closeModal();
-      });
-
-      function renderApr(){
-        aprListEl.innerHTML = '';
-        if (!apreensoes.length){
-          aprListEl.innerHTML = '<div class="empty">Nenhuma apreensão adicionada. Clique em <strong>Adicionar apreensão</strong>.</div>';
-          aprCountEl.textContent = '0 itens';
-          jsonInput.value = '[]';
-          return;
-        }
-        apreensoes.forEach((a, i) => {
-          const wrap = document.createElement('div');
-          wrap.className = 'apr-item';
-          wrap.innerHTML = `
+          function renderApr() {
+            aprListEl.innerHTML = '';
+            if (!apreensoes.length) {
+              aprListEl.innerHTML = '<div class="empty">Nenhuma apreensão adicionada. Clique em <strong>Adicionar apreensão</strong>.</div>';
+              aprCountEl.textContent = '0 itens';
+              jsonInput.value = '[]';
+              return;
+            }
+            apreensoes.forEach((a, i) => {
+              const wrap = document.createElement('div');
+              wrap.className = 'apr-item';
+              wrap.innerHTML = `
             <div>
               <div class="apr-kind">${escapeHtml(a.tipo || '—')}</div>
               <div class="apr-meta">
@@ -447,75 +451,60 @@
               <button type="button" class="btn btn-red" data-del="${i}">Excluir</button>
             </div>
           `;
-          aprListEl.appendChild(wrap);
-        });
-        aprCountEl.textContent = apreensoes.length + (apreensoes.length === 1 ? ' item' : ' itens');
-        jsonInput.value = JSON.stringify(apreensoes);
+              aprListEl.appendChild(wrap);
+            });
+            aprCountEl.textContent = apreensoes.length + (apreensoes.length === 1 ? ' item' : ' itens');
+            jsonInput.value = JSON.stringify(apreensoes);
 
-        aprListEl.querySelectorAll('[data-ed]').forEach(b => b.addEventListener('click', (ev) => {
-          const idx = Number(ev.currentTarget.getAttribute('data-ed'));
-          openModal('Editar apreensão', apreensoes[idx], idx);
-        }));
-        aprListEl.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', (ev) => {
-          const idx = Number(ev.currentTarget.getAttribute('data-del'));
-          apreensoes.splice(idx, 1);
-          renderApr();
-        }));
-      }
+            aprListEl.querySelectorAll('[data-ed]').forEach(b => b.addEventListener('click', (ev) => {
+              const idx = Number(ev.currentTarget.getAttribute('data-ed'));
+              openModal('Editar apreensão', apreensoes[idx], idx);
+            }));
+            aprListEl.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', (ev) => {
+              const idx = Number(ev.currentTarget.getAttribute('data-del'));
+              apreensoes.splice(idx, 1);
+              renderApr();
+            }));
+          }
 
-      function escapeHtml(s){
-        return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[c]));
-      }
+          function escapeHtml(s) {
+            return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": "&#39;" }[c]));
+          }
 
-      const submitBtn = $('#btnSubmit');
-      $('#formFiscalizacao').addEventListener('submit', () => {
-        jsonInput.value = JSON.stringify(apreensoes);
-        submitBtn.disabled = true;
-        setTimeout(() => submitBtn.disabled = false, 4000);
-      });
-
-      const params = new URLSearchParams(location.search);
-      if (params.get('open') === 'apr') { document.getElementById('btnAddApr').click(); }
-
-      // ======== MODO EDIÇÃO: preencher tudo ========
-      const INIT = window.INIT || {};
-      if (INIT.mode === 'edit') {
-        // garante action correto (caso o SSR não tenha setado)
-        document.getElementById('formFiscalizacao').action = INIT.postAction || document.getElementById('formFiscalizacao').action;
-
-        const f = INIT.fisc || {};
-        const set = (name, val) => { const el = document.querySelector(`[name="${name}"]`); if (el) el.value = (val ?? ''); };
-        const setCk = (name, on) => { const el = document.querySelector(`[name="${name}"]`); if (el) el.checked = !!on; };
-
-        set('tipo_local', f.tipo_local);
-        set('local_nome', f.local_nome);
-        set('local_endereco', f.local_endereco);
-        set('obs', f.obs);
-        set('pessoas_abordadas', (f.pessoas_abordadas!=null? f.pessoas_abordadas : 0));
-        set('veiculos_abordados', (f.veiculos_abordados!=null? f.veiculos_abordados : 0));
-        setCk('multado', f.multado);
-        setCk('fechado', f.fechado);
-        setCk('lacrado', f.lacrado);
-
-        if (f.lat != null && f.lng != null) {
-          ensureMap();
-          placeMarker(Number(f.lat), Number(f.lng), f.acc != null ? Number(f.acc) : null, 'manual');
-        }
-
-        // carrega apreensões existentes (preserva id para o POST fazer update)
-        (INIT.apreensoes || []).forEach(a => {
-          apreensoes.push({
-            id: a.id, // importante para o upsert no backend
-            tipo: a.tipo || '',
-            quantidade: a.quantidade ?? null,
-            unidade: a.unidade || null,
-            obs: a.obs || null
+          const submitBtn = $('#btnSubmit');
+          $('#formFiscalizacao').addEventListener('submit', () => {
+            jsonInput.value = JSON.stringify(apreensoes);
+            submitBtn.disabled = true;
+            setTimeout(() => submitBtn.disabled = false, 4000);
           });
-        });
-      }
 
-      renderApr();
-    })();
-  </script>
-</body>
+          const params = new URLSearchParams(location.search);
+          if (params.get('open') === 'apr') { document.getElementById('btnAddApr').click(); }
+
+          // ======== MODO EDIÇÃO: preencher tudo ========
+          const INIT = window.INIT || {};
+if (INIT.mode === 'edit') {
+  // preenche o form:
+  const f = INIT.fisc || {};
+  document.querySelector('[name="tipo_local"]').value       = f.tipo_local || '';
+  document.querySelector('[name="local_nome"]').value       = f.local_nome || '';
+  document.querySelector('[name="local_endereco"]').value   = f.local_endereco || '';
+  document.querySelector('[name="pessoas_abordadas"]').value= f.pessoas_abordadas ?? 0;
+  document.querySelector('[name="veiculos_abordados"]').value= f.veiculos_abordados ?? 0;
+  document.querySelector('[name="multado"]').checked        = !!f.multado;
+  document.querySelector('[name="fechado"]').checked        = !!f.fechado;
+  document.querySelector('[name="lacrado"]').checked        = !!f.lacrado;
+  document.querySelector('[name="obs"]').value              = f.obs || '';
+
+  // carrega as apreensões no painel direito:
+  apreensoes.splice(0, apreensoes.length, ...(INIT.apreensoes || []));
+  renderApr();
+}
+
+
+          renderApr();
+        })();
+      </script>
+      </body>
+
 </html>

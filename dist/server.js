@@ -1700,8 +1700,8 @@ app.get('/operacoes/:opId/fiscalizacoes/:eventoId/editar', requireAuth, csrfProt
         operacao,
         mode: 'edit',
         postAction: `/operacoes/${opId}/fiscalizacoes/${evId}/editar`,
-        fisc: f,
-        apreensoes // <<< nome que o EJS espera
+        fisc: f, // dados da fiscalização
+        apreensoes // <- array de apreensões desta fiscalização
     });
 });
 // POST: salvar alterações na fiscalização + (opcional) anexar novas fotos
