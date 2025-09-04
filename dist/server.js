@@ -1706,6 +1706,92 @@ app.get('/operacoes/:id/metrics', requireAdminOrGestor, async (req, res) => {
 });
 app.get('/usuarios', requireAdmin, (_req, res) => res.redirect('/admin/usuarios'));
 app.get('/usuarios/novo', requireAdmin, (_req, res) => res.redirect('/admin/usuarios/novo'));
+// rota pra atualizar sozinho
+// JSON de atualização do monitor (KPIs, gráfico, tabela e feed)
+app.get('/operacoes/:id/monitor/data', requireAdminOrGestor, async (req, res) => {
+    const id = Number(req.params.id);
+    const op = await db('operacoes').where({ id }).first();
+    if (!op)
+        return res.status(404).json({ error: 'Operação não encontrada.' });
+    // Evita cache no navegador
+    res.set('Cache-Control', 'no-store');
+    // === KPIs base (fiscalizações/pessoas/veículos)
+    const k = await db('operacao_eventos as e')
+        .leftJoin('evento_fiscalizacao as f', 'f.evento_id', 'e.id')
+        .where('e.operacao_id', id)
+        .andWhere('e.tipo', 'fiscalizacao')
+        .count({ locais: 'e.id' })
+        .sum({ pessoas: db.raw('COALESCE(f.pessoas_abordadas,0)') })
+        .sum({ veiculos: db.raw('COALESCE(f.veiculos_abordados,0)') })
+        .first();
+    // Itens apreendidos (linhas) e Apreensões (1 por fiscalização com ≥1 item)
+    const aggApr = await db('evento_apreensao as a')
+        .join('operacao_eventos as f', 'f.id', 'a.fiscalizacao_evento_id')
+        .where('f.operacao_id', id)
+        .count({ itens_apreendidos: 'a.evento_id' })
+        .countDistinct({ apreensoes: 'a.fiscalizacao_evento_id' })
+        .first();
+    // Flags
+    const flags = await db('evento_fiscalizacao as f')
+        .join('operacao_eventos as e', 'e.id', 'f.evento_id')
+        .where('e.operacao_id', id)
+        .select(db.raw('SUM(CASE WHEN f.multado THEN 1 ELSE 0 END)  AS multados'), db.raw('SUM(CASE WHEN f.fechado THEN 1 ELSE 0 END)  AS fechados'), db.raw('SUM(CASE WHEN f.lacrado THEN 1 ELSE 0 END)  AS lacrados'))
+        .first();
+    const cards = {
+        locais: Number(k?.locais) || 0,
+        pessoas: Number(k?.pessoas) || 0,
+        veiculos: Number(k?.veiculos) || 0,
+        itensApreendidos: Number(aggApr?.itens_apreendidos) || 0,
+        apreensoes: Number(aggApr?.apreensoes) || 0,
+        multados: Number(flags?.multados) || 0,
+        fechados: Number(flags?.fechados) || 0,
+        lacrados: Number(flags?.lacrados) || 0,
+    };
+    // Subquery: fiscalização por cidade
+    const subF = db('operacao_eventos as e')
+        .join('evento_fiscalizacao as f', 'f.evento_id', 'e.id')
+        .where('e.operacao_id', id)
+        .andWhere('e.tipo', 'fiscalizacao')
+        .select('e.cidade_id')
+        .count({ fisc_cnt: 'e.id' })
+        .sum({ pes_sum: db.raw('COALESCE(f.pessoas_abordadas,0)') })
+        .sum({ vei_sum: db.raw('COALESCE(f.veiculos_abordados,0)') })
+        .sum({ lac_sum: db.raw('CASE WHEN f.lacrado THEN 1 ELSE 0 END') })
+        .sum({ fec_sum: db.raw('CASE WHEN f.fechado THEN 1 ELSE 0 END') })
+        .sum({ mult_sum: db.raw('CASE WHEN f.multado THEN 1 ELSE 0 END') })
+        .groupBy('e.cidade_id')
+        .as('sf');
+    // Subquery: apreensões por cidade (baseado na fiscalização-pai)
+    const subApr = db('operacao_eventos as f') // f = fiscalização
+        .leftJoin('evento_apreensao as a', 'a.fiscalizacao_evento_id', 'f.id')
+        .where({ 'f.operacao_id': id, 'f.tipo': 'fiscalizacao' })
+        .groupBy('f.cidade_id')
+        .select('f.cidade_id')
+        .count({ itens_apreendidos: 'a.evento_id' })
+        .countDistinct({ apreensoes: 'a.fiscalizacao_evento_id' })
+        .as('sa');
+    const seriesPorCidade = await db('operacao_cidades as oc')
+        .join('cidades as c', 'c.id', 'oc.cidade_id')
+        .leftJoin(subF, 'sf.cidade_id', 'oc.cidade_id')
+        .leftJoin(subApr, 'sa.cidade_id', 'oc.cidade_id')
+        .where('oc.operacao_id', id)
+        .select('c.id as cidade_id', 'c.nome as cidade', db.raw('COALESCE(sf.fisc_cnt,0)           as fiscalizacao'), db.raw('COALESCE(sf.pes_sum,0)            as pessoa'), db.raw('COALESCE(sf.vei_sum,0)            as veiculo'), db.raw('COALESCE(sa.itens_apreendidos,0)  as itens_apreendidos'), db.raw('COALESCE(sa.apreensoes,0)         as apreensoes'), db.raw('COALESCE(sf.lac_sum,0)            as lacrado'), db.raw('COALESCE(sf.fec_sum,0)            as fechado'), db.raw('COALESCE(sf.mult_sum,0)           as multado'))
+        .orderBy('c.nome');
+    // Feed (últimos 20)
+    const feed = await db('operacao_eventos as e')
+        .where('e.operacao_id', id)
+        .leftJoin('cidades as c', 'c.id', 'e.cidade_id')
+        .leftJoin('usuarios as u', 'u.id', 'e.user_id')
+        .select('e.id', 'e.ts', 'e.tipo', 'e.obs', 'c.nome as cidade', 'u.nome as user')
+        .orderBy('e.ts', 'desc')
+        .limit(20);
+    res.json({
+        cards,
+        seriesPorCidade,
+        feed,
+        serverTime: new Date().toISOString()
+    });
+});
 // =============================================================================
 // FISCALIZAÇÃO: EDITAR + GERENCIAR FOTOS
 // =============================================================================
