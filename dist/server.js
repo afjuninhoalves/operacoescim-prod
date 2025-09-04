@@ -1671,196 +1671,161 @@ app.get('/usuarios/novo', requireAdmin, (_req, res) => res.redirect('/admin/usua
 app.get('/operacoes/:opId/fiscalizacoes/:eventoId/editar', requireAuth, csrfProtection, async (req, res) => {
     const user = req.session.user;
     const opId = Number(req.params.opId);
-    const eventoId = Number(req.params.eventoId);
-    if (!Number.isFinite(opId) || !Number.isFinite(eventoId)) {
-        return res.status(400).send('Parâmetros inválidos.');
-    }
-    // Permissão + carrega o evento base
-    const perm = await canEditEvento(user, opId, eventoId);
-    if (!perm.ok)
-        return res.status(perm.status || 403).send(perm.reason || 'Não autorizado.');
-    const operacao = await db('operacoes').where({ id: opId }).first();
-    if (!operacao)
-        return res.status(404).send('Operação não encontrada.');
-    const base = await db('operacao_eventos')
-        .where({ id: eventoId, operacao_id: opId, tipo: 'fiscalizacao' })
-        .first();
-    if (!base)
+    const evId = Number(req.params.eventoId);
+    // Permissão: o evento precisa existir e ser do tipo "fiscalizacao"
+    const ev = await db('operacao_eventos').where({ id: evId, operacao_id: opId }).first();
+    if (!ev || ev.tipo !== 'fiscalizacao')
         return res.status(404).send('Fiscalização não encontrada.');
-    const det = await db('evento_fiscalizacao').where({ evento_id: eventoId }).first();
-    // Apreensões vinculadas a essa fiscalização
+    const can = await canEditEvento(user, opId, evId);
+    if (!can.ok)
+        return res.status(can.status || 403).send(can.reason || 'Não autorizado.');
+    const operacao = await db('operacoes').where({ id: opId }).first();
+    // Detalhes da fiscalização
+    const f = await db('evento_fiscalizacao as f')
+        .join('operacao_eventos as e', 'e.id', 'f.evento_id')
+        .select('f.evento_id as id', 'f.tipo_local', 'f.local_nome', 'f.local_endereco', 'f.pessoas_abordadas', 'f.veiculos_abordados', 'f.multado', 'f.fechado', 'f.lacrado', 'e.obs', 'e.lat', 'e.lng', 'e.accuracy as acc')
+        .where('f.evento_id', evId)
+        .first();
+    if (!f)
+        return res.status(404).send('Fiscalização não encontrada.');
+    // Apreensões vinculadas a esta fiscalização
     const apreensoes = await db('evento_apreensao as a')
         .join('operacao_eventos as e', 'e.id', 'a.evento_id')
-        .where('a.fiscalizacao_evento_id', eventoId)
+        .where('a.fiscalizacao_evento_id', evId)
         .select('a.evento_id as id', 'a.tipo', 'a.quantidade', 'a.unidade', 'e.obs')
         .orderBy('a.evento_id', 'desc');
-    // Monta objeto para o formulário
-    const fisc = {
-        id: eventoId,
-        tipo_local: det?.tipo_local ?? '',
-        local_nome: det?.local_nome ?? '',
-        local_endereco: det?.local_endereco ?? '',
-        pessoas_abordadas: det?.pessoas_abordadas ?? 0,
-        veiculos_abordados: det?.veiculos_abordados ?? 0,
-        multado: !!det?.multado,
-        fechado: !!det?.fechado,
-        lacrado: !!det?.lacrado,
-        obs: base?.obs ?? '',
-        lat: base?.lat ?? null,
-        lng: base?.lng ?? null,
-        acc: base?.accuracy ?? null,
-    };
+    // Renderiza a MESMA página usada para criar, em modo edição
     return res.render('operacoes-acoes-nova', {
         csrfToken: req.csrfToken(),
-        user,
         operacao,
         mode: 'edit',
-        postAction: `/operacoes/${opId}/fiscalizacoes/${eventoId}/editar`,
-        fisc,
-        apreensoes, // array [{id, tipo, quantidade, unidade, obs}]
+        postAction: `/operacoes/${opId}/fiscalizacoes/${evId}/editar`,
+        fisc: f,
+        apreensoes // <<< nome que o EJS espera
     });
 });
 // POST: salvar alterações na fiscalização + (opcional) anexar novas fotos
 // Aceita campos: tipo_local, obs e (opcional) fotos[] / foto
-app.post('/operacoes/:opId/fiscalizacoes/:eventoId/editar', requireAuth, csrfProtection, async (req, res) => {
+app.post('/operacoes/:opId/fiscalizacoes/:eventoId/editar', requireAuth, uploadFotosFields, // <<< precisa vir antes do csurf
+csrfProtection, async (req, res) => {
     const user = req.session.user;
     const opId = Number(req.params.opId);
-    const eventoId = Number(req.params.eventoId);
-    const perm = await canEditEvento(user, opId, eventoId);
-    if (!perm.ok)
-        return res.status(perm.status || 403).send(perm.reason || 'Não autorizado.');
+    const evId = Number(req.params.eventoId);
+    // Segurança básica
+    const ev = await db('operacao_eventos').where({ id: evId, operacao_id: opId }).first();
+    if (!ev || ev.tipo !== 'fiscalizacao')
+        return res.status(404).send('Fiscalização não encontrada.');
+    const can = await canEditEvento(user, opId, evId);
+    if (!can.ok)
+        return res.status(can.status || 403).send(can.reason || 'Não autorizado.');
+    // Helpers
+    const toInt = (v) => (v === '' || v == null) ? 0 : Math.max(0, Math.floor(Number(v) || 0));
+    const toBool = (v) => v === 'on' || v === 'true' || v === '1';
+    // Campos
     const tipo_local = String(req.body.tipo_local || '').trim();
-    const obs = String(req.body.obs || '').trim() || null;
     if (!tipo_local)
         return res.status(400).send('Informe o tipo de local.');
-    await db('evento_fiscalizacao').where({ evento_id: eventoId }).update({ tipo_local });
-    await db('operacao_eventos').where({ id: eventoId }).update({ obs });
-    return res.redirect(`/operacoes/${opId}/fiscalizacoes/${eventoId}/editar`);
-});
-app.post('/operacoes/:opId/fiscalizacoes/:eventoId/editar', requireAuth, uploadFotosFields, csrfProtection, async (req, res) => {
-    const user = req.session.user;
-    const opId = Number(req.params.opId);
-    const eventoId = Number(req.params.eventoId);
-    const perm = await canEditEvento(user, opId, eventoId);
-    if (!perm.ok)
-        return res.status(perm.status || 403).send(perm.reason || 'Não autorizado.');
-    const toInt = (v) => { if (v === '' || v == null)
-        return 0; const n = Number(v); return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0; };
-    const toBool = (v) => v === 'on' || v === 'true' || v === '1';
-    const s = (v) => (String(v || '').trim() || null);
-    // Fiscalização (obriga tipo_local)
-    const tipo_local = String(req.body.tipo_local || '').trim();
-    if (!tipo_local)
-        return res.status(400).send('Tipo de local é obrigatório.');
-    const payloadFisc = {
-        tipo_local,
-        local_nome: s(req.body.local_nome),
-        local_endereco: s(req.body.local_endereco),
-        pessoas_abordadas: toInt(req.body.pessoas_abordadas),
-        veiculos_abordados: toInt(req.body.veiculos_abordados),
-        multado: toBool(req.body.multado),
-        fechado: toBool(req.body.fechado),
-        lacrado: toBool(req.body.lacrado),
-    };
-    const obs = s(req.body.obs);
-    const files = fotosFromRequest(req);
+    const local_nome = String(req.body.local_nome || '').trim() || null;
+    const local_endereco = String(req.body.local_endereco || '').trim() || null;
+    const obs = String(req.body.obs || '').trim() || null;
+    const pessoas_abordadas = toInt(req.body.pessoas_abordadas);
+    const veiculos_abordados = toInt(req.body.veiculos_abordados);
+    const multado = toBool(req.body.multado);
+    const fechado = toBool(req.body.fechado);
+    const lacrado = toBool(req.body.lacrado);
+    // Atualiza detalhes da fiscalização
+    await db('evento_fiscalizacao')
+        .where({ evento_id: evId })
+        .update({
+        tipo_local, local_nome, local_endereco,
+        pessoas_abordadas, veiculos_abordados,
+        multado, fechado, lacrado
+    });
+    // Atualiza obs/geo do evento base
     const { lat, lng, acc } = getGeoFromBody(req);
-    let items = [];
-    try {
-        items = JSON.parse(req.body.apreensoes_json || '[]');
-    }
-    catch { }
-    // helper para criar evento dentro da mesma transação
-    async function createEventoBaseTrx(trx, p) {
-        const [idRow] = await trx('operacao_eventos')
-            .insert({
-            operacao_id: p.operacao_id,
-            cidade_id: p.cidade_id,
-            user_id: p.user_id,
-            tipo: p.tipo,
-            obs: p.obs,
-        })
-            .returning('id');
-        return typeof idRow === 'object' ? idRow.id : idRow;
-    }
-    await db.transaction(async (trx) => {
-        // Atualiza fiscalização + evento base (obs/geo)
-        await trx('evento_fiscalizacao').where({ evento_id: eventoId }).update(payloadFisc);
-        await trx('operacao_eventos').where({ id: eventoId }).update({
-            obs,
+    await db('operacao_eventos').where({ id: evId }).update({
+        obs,
+        lat: lat ?? null,
+        lng: lng ?? null,
+        accuracy: (acc ?? null)
+    });
+    // Fotos novas (se houver)
+    const files = fotosFromRequest(req);
+    if (files.length) {
+        await db('evento_fotos').insert(files.map(f => ({
+            evento_id: evId,
+            path: `/uploads/fotos/${f.filename}`,
             lat: lat ?? null,
             lng: lng ?? null,
-            accuracy: acc ?? null,
-        });
-        // Fotos novas (se enviadas no mesmo POST)
-        if (files.length) {
-            await trx('evento_fotos').insert(files.map((f) => ({
-                evento_id: eventoId,
-                path: `/uploads/fotos/${f.filename}`,
-                lat: lat ?? null,
-                lng: lng ?? null,
-                accuracy: acc ?? null,
-            })));
+            accuracy: acc ?? null
+        })));
+    }
+    // ===== Apreensões (upsert + remoção do que saiu) =====
+    let itens = [];
+    try {
+        itens = JSON.parse(String(req.body.apreensoes_json || '[]'));
+        if (!Array.isArray(itens))
+            itens = [];
+    }
+    catch {
+        itens = [];
+    }
+    // existentes no banco
+    const existentes = await db('evento_apreensao')
+        .where({ fiscalizacao_evento_id: evId })
+        .select('evento_id');
+    const idsExist = new Set(existentes.map(x => x.evento_id));
+    const idsMantidos = new Set();
+    for (const it of itens) {
+        const tipo = String(it.tipo || '').trim();
+        const quantidade = (it.quantidade === '' || it.quantidade == null) ? null : Number(it.quantidade);
+        const unidade = String(it.unidade || '').trim() || null;
+        const aprObs = String(it.obs || '').trim() || null;
+        if (!tipo)
+            continue;
+        if (it.id && idsExist.has(it.id)) {
+            // update
+            await db('evento_apreensao').where({ evento_id: it.id }).update({
+                tipo, quantidade, unidade
+            });
+            await db('operacao_eventos').where({ id: it.id }).update({ obs: aprObs });
+            idsMantidos.add(it.id);
         }
-        // Upsert de apreensões
-        const existentes = await trx('evento_apreensao')
-            .where({ fiscalizacao_evento_id: eventoId })
-            .pluck('evento_id');
-        const mantidos = new Set();
-        for (const it of items) {
-            const tipo = String(it?.tipo || '').trim();
-            const quantidade = it?.quantidade === '' || it?.quantidade == null
-                ? null
-                : Number(it.quantidade);
-            if (quantidade !== null && !Number.isFinite(quantidade)) {
-                throw new Error('Quantidade inválida em apreensão.');
-            }
-            const unidade = s(it?.unidade);
-            const aObs = s(it?.obs);
-            if (it?.id) {
-                // update existente
-                mantidos.add(Number(it.id));
-                await trx('evento_apreensao').where({ evento_id: it.id }).update({
-                    tipo: tipo || null,
-                    quantidade,
-                    unidade,
-                    fiscalizacao_evento_id: eventoId,
+        else {
+            // insert
+            const apr_evento_id = await createEventoBase({
+                operacao_id: opId,
+                cidade_id: ev.cidade_id,
+                user_id: user.id,
+                tipo: 'apreensao',
+                obs: aprObs
+            });
+            await db('evento_apreensao').insert({
+                evento_id: apr_evento_id,
+                tipo, quantidade, unidade,
+                fiscalizacao_evento_id: evId
+            });
+            // herda geo da fiscalização
+            const base = await db('operacao_eventos').where({ id: evId }).first();
+            if (base?.lat != null && base?.lng != null) {
+                await db('operacao_eventos').where({ id: apr_evento_id }).update({
+                    lat: base.lat, lng: base.lng, accuracy: base.accuracy ?? null
                 });
-                await trx('operacao_eventos').where({ id: it.id }).update({ obs: aObs });
             }
-            else {
-                // cria nova
-                const aprId = await createEventoBaseTrx(trx, {
-                    operacao_id: opId,
-                    cidade_id: perm.evento.cidade_id,
-                    user_id: user.id,
-                    tipo: 'apreensao',
-                    obs: aObs,
-                });
-                await trx('evento_apreensao').insert({
-                    evento_id: aprId,
-                    tipo: tipo || null,
-                    quantidade,
-                    unidade,
-                    fiscalizacao_evento_id: eventoId,
-                });
-                // herda geo da fiscalização
-                if (lat != null && lng != null) {
-                    await trx('operacao_eventos').where({ id: aprId }).update({
-                        lat, lng, accuracy: acc ?? null,
-                    });
-                }
-            }
+            idsMantidos.add(apr_evento_id);
         }
-        // Deletar as que saíram da lista
-        const remover = existentes.filter((id) => !mantidos.has(id));
-        if (remover.length) {
-            await trx('evento_fotos').whereIn('evento_id', remover).del();
-            await trx('evento_apreensao').whereIn('evento_id', remover).del();
-            await trx('operacao_eventos').whereIn('id', remover).del();
-        }
-    });
-    return res.redirect(pickReturnTo(req, `/operacoes/${opId}`));
+    }
+    // remove apreensões que saíram da lista
+    const apagar = existentes
+        .filter(x => !idsMantidos.has(x.evento_id))
+        .map(x => x.evento_id);
+    if (apagar.length) {
+        await db('evento_fotos').whereIn('evento_id', apagar).del();
+        await db('evento_apreensao').whereIn('evento_id', apagar).del();
+        await db('operacao_eventos').whereIn('id', apagar).del();
+    }
+    const go = pickReturnTo(req, `/operacoes/${opId}/fiscalizacoes/${evId}/editar`);
+    return res.redirect(go);
 });
 app.post('/operacoes/:opId/fiscalizacoes/:eventoId/fotos', requireAuth, uploadFotosFields, // << primeiro o multer (lê o body)
 csrfProtection, // << depois valida o _csrf
