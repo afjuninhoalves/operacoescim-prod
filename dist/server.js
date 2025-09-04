@@ -430,19 +430,15 @@ app.use((0, compression_1.default)());
 app.use((0, morgan_1.default)('combined'));
 app.use(express_1.default.json({ limit: '1mb' }));
 app.use(express_1.default.urlencoded({ extended: true, limit: '1mb' }));
-app.use((0, cookie_parser_1.default)());
+app.use((0, cookie_parser_1.default)(process.env.COOKIE_SECRET));
 // Sessão
 app.use((0, express_session_1.default)({
-    secret: process.env.SESSION_SECRET || 'secretkey',
+    secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
-    name: IN_PROD ? '__Host-operacoescim.sid' : 'operacoescim.sid',
     cookie: {
-        httpOnly: true,
         sameSite: 'lax',
-        secure: IN_PROD, // só HTTPS em produção
-        path: '/',
-        maxAge: 1000 * 60 * 60 * 8
+        secure: process.env.NODE_ENV === 'production'
     }
 }));
 // Views e estáticos
@@ -1668,11 +1664,11 @@ app.get('/usuarios/novo', requireAdmin, (_req, res) => res.redirect('/admin/usua
 // FISCALIZAÇÃO: EDITAR + GERENCIAR FOTOS
 // =============================================================================
 // GET editar fiscalização
-app.get('/operacoes/:opId/fiscalizacoes/:eventoId/editar', requireAuth, csrfProtection, async (req, res) => {
+app.get('/operacoes/:opId/fiscalizacoes/:eventoId/editar', requireAuth, csrfProtection, // precisa vir ANTES do render
+async (req, res) => {
     const user = req.session.user;
     const opId = Number(req.params.opId);
     const evId = Number(req.params.eventoId);
-    // Permissão: o evento precisa existir e ser do tipo "fiscalizacao"
     const ev = await db('operacao_eventos').where({ id: evId, operacao_id: opId }).first();
     if (!ev || ev.tipo !== 'fiscalizacao')
         return res.status(404).send('Fiscalização não encontrada.');
@@ -1680,7 +1676,6 @@ app.get('/operacoes/:opId/fiscalizacoes/:eventoId/editar', requireAuth, csrfProt
     if (!can.ok)
         return res.status(can.status || 403).send(can.reason || 'Não autorizado.');
     const operacao = await db('operacoes').where({ id: opId }).first();
-    // Detalhes da fiscalização
     const f = await db('evento_fiscalizacao as f')
         .join('operacao_eventos as e', 'e.id', 'f.evento_id')
         .select('f.evento_id as id', 'f.tipo_local', 'f.local_nome', 'f.local_endereco', 'f.pessoas_abordadas', 'f.veiculos_abordados', 'f.multado', 'f.fechado', 'f.lacrado', 'e.obs', 'e.lat', 'e.lng', 'e.accuracy as acc')
@@ -1688,18 +1683,15 @@ app.get('/operacoes/:opId/fiscalizacoes/:eventoId/editar', requireAuth, csrfProt
         .first();
     if (!f)
         return res.status(404).send('Fiscalização não encontrada.');
-    // Apreensões vinculadas a esta fiscalização
     const apreensoes = await db('evento_apreensao as a')
         .join('operacao_eventos as e', 'e.id', 'a.evento_id')
         .where('a.fiscalizacao_evento_id', evId)
-        .select('a.evento_id as id', 'a.tipo', 'a.quantidade', 'a.unidade', db.raw('e.obs as obs') // 👈 garante o nome
-    )
+        .select('a.evento_id as id', 'a.tipo', 'a.quantidade', 'a.unidade', db.raw('e.obs as obs'))
         .orderBy('a.evento_id', 'asc');
-    // Renderiza a MESMA página usada para criar, em modo edição
-    return res
-        .cookie('XSRF-TOKEN', req.csrfToken(), { sameSite: 'lax', secure: true })
-        .render('operacoes-acoes-nova', {
-        csrfToken: req.csrfToken(),
+    // Evita token velho por cache do navegador
+    res.set('Cache-Control', 'no-store');
+    return res.render('operacoes-acoes-nova', {
+        csrfToken: req.csrfToken(), // <input name="_csrf" ...>
         operacao,
         mode: 'edit',
         postAction: `/operacoes/${opId}/fiscalizacoes/${evId}/editar`,
@@ -1709,23 +1701,20 @@ app.get('/operacoes/:opId/fiscalizacoes/:eventoId/editar', requireAuth, csrfProt
 });
 // POST: salvar alterações na fiscalização + (opcional) anexar novas fotos
 // Aceita campos: tipo_local, obs e (opcional) fotos[] / foto
-app.post('/operacoes/:opId/fiscalizacoes/:eventoId/editar', requireAuth, uploadFotosFields, // multer primeiro
-csrfProtection, // depois CSRF
+app.post('/operacoes/:opId/fiscalizacoes/:eventoId/editar', requireAuth, uploadFotosFields, // multer primeiro (lê multipart e popula req.body)
+csrfProtection, // csurf depois (lê req.body._csrf)
 async (req, res) => {
     const user = req.session.user;
     const opId = Number(req.params.opId);
     const evId = Number(req.params.eventoId);
-    // Segurança básica
     const ev = await db('operacao_eventos').where({ id: evId, operacao_id: opId }).first();
     if (!ev || ev.tipo !== 'fiscalizacao')
         return res.status(404).send('Fiscalização não encontrada.');
     const can = await canEditEvento(user, opId, evId);
     if (!can.ok)
         return res.status(can.status || 403).send(can.reason || 'Não autorizado.');
-    // Helpers
     const toInt = (v) => (v === '' || v == null) ? 0 : Math.max(0, Math.floor(Number(v) || 0));
     const toBool = (v) => v === 'on' || v === 'true' || v === '1';
-    // Campos
     const tipo_local = String(req.body.tipo_local || '').trim();
     if (!tipo_local)
         return res.status(400).send('Informe o tipo de local.');
@@ -1737,7 +1726,6 @@ async (req, res) => {
     const multado = toBool(req.body.multado);
     const fechado = toBool(req.body.fechado);
     const lacrado = toBool(req.body.lacrado);
-    // Atualiza detalhes da fiscalização
     await db('evento_fiscalizacao')
         .where({ evento_id: evId })
         .update({
@@ -1745,15 +1733,13 @@ async (req, res) => {
         pessoas_abordadas, veiculos_abordados,
         multado, fechado, lacrado
     });
-    // Atualiza obs/geo do evento base
     const { lat, lng, acc } = getGeoFromBody(req);
     await db('operacao_eventos').where({ id: evId }).update({
         obs,
         lat: lat ?? null,
         lng: lng ?? null,
-        accuracy: (acc ?? null)
+        accuracy: acc ?? null
     });
-    // Fotos novas (se houver)
     const files = fotosFromRequest(req);
     if (files.length) {
         await db('evento_fotos').insert(files.map(f => ({
@@ -1764,7 +1750,7 @@ async (req, res) => {
             accuracy: acc ?? null
         })));
     }
-    // ===== Apreensões (upsert + remoção do que saiu) =====
+    // ---- Apreensões (upsert + remoção) ----
     let itens = [];
     try {
         itens = JSON.parse(String(req.body.apreensoes_json || '[]'));
@@ -1774,7 +1760,6 @@ async (req, res) => {
     catch {
         itens = [];
     }
-    // existentes no banco
     const existentes = await db('evento_apreensao')
         .where({ fiscalizacao_evento_id: evId })
         .select('evento_id');
@@ -1782,13 +1767,17 @@ async (req, res) => {
     const idsMantidos = new Set();
     for (const it of itens) {
         const tipo = String(it.tipo || '').trim();
+        // Se sua coluna 'quantidade' for NOT NULL, defina 0 aqui:
+        // const quantidade = (it.quantidade === '' || it.quantidade == null) ? 0 : Number(it.quantidade);
+        // Se puder ser NULL, use:
         const quantidade = (it.quantidade === '' || it.quantidade == null) ? null : Number(it.quantidade);
+        if (quantidade !== null && !Number.isFinite(quantidade))
+            continue;
         const unidade = String(it.unidade || '').trim() || null;
         const aprObs = String(it.obs || '').trim() || null;
         if (!tipo)
             continue;
         if (it.id && idsExist.has(it.id)) {
-            // update
             await db('evento_apreensao').where({ evento_id: it.id }).update({
                 tipo, quantidade, unidade
             });
@@ -1796,7 +1785,6 @@ async (req, res) => {
             idsMantidos.add(it.id);
         }
         else {
-            // insert
             const apr_evento_id = await createEventoBase({
                 operacao_id: opId,
                 cidade_id: ev.cidade_id,
@@ -1809,7 +1797,6 @@ async (req, res) => {
                 tipo, quantidade, unidade,
                 fiscalizacao_evento_id: evId
             });
-            // herda geo da fiscalização
             const base = await db('operacao_eventos').where({ id: evId }).first();
             if (base?.lat != null && base?.lng != null) {
                 await db('operacao_eventos').where({ id: apr_evento_id }).update({
@@ -1819,7 +1806,6 @@ async (req, res) => {
             idsMantidos.add(apr_evento_id);
         }
     }
-    // remove apreensões que saíram da lista
     const apagar = existentes
         .filter(x => !idsMantidos.has(x.evento_id))
         .map(x => x.evento_id);
@@ -1830,21 +1816,6 @@ async (req, res) => {
     }
     const go = pickReturnTo(req, `/operacoes/${opId}/fiscalizacoes/${evId}/editar`);
     return res.redirect(go);
-});
-app.post('/operacoes/:opId/fiscalizacoes/:eventoId/fotos', requireAuth, uploadFotosFields, // << primeiro o multer (lê o body)
-csrfProtection, // << depois valida o _csrf
-async (req, res) => {
-    const user = req.session.user;
-    const opId = Number(req.params.opId);
-    const eventoId = Number(req.params.eventoId);
-    const perm = await canEditEvento(user, opId, eventoId);
-    if (!perm.ok)
-        return res.status(perm.status || 403).send(perm.reason || 'Não autorizado.');
-    const files = fotosFromRequest(req); // aceita "foto" e/ou "fotos[]"
-    if (files.length) {
-        await db('evento_fotos').insert(files.map(f => ({ evento_id: eventoId, path: `/uploads/fotos/${f.filename}` })));
-    }
-    return res.redirect(`/operacoes/${opId}/fiscalizacoes/${eventoId}/editar`);
 });
 // POST: remover UMA foto da fiscalização
 app.post('/operacoes/:opId/fiscalizacoes/:eventoId/fotos/:fotoId/delete', requireAuth, csrfProtection, async (req, res) => {
