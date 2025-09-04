@@ -1234,6 +1234,18 @@ app.post('/operacoes/:id/status', requireAdminOrGestor, csrfProtection, async (r
 app.post('/operacoes/:opId/fiscalizacoes', requireAuth, uploadFotosFields, csrfProtection, async (req, res) => {
     const user = req.session.user;
     const opId = Number(req.params.opId);
+    // 0) Descobrir cidade_id válido para esta operação
+    const allowed = await db('operacao_cidades') // <— nome da sua tabela de vínculo
+        .where({ operacao_id: opId })
+        .pluck('cidade_id'); // [1, 2, 3...]
+    let cidade_id = Number(req.body.cidade_id) ||
+        Number(req.query.cidade_id) ||
+        (user?.cidade_id && allowed.includes(user.cidade_id) ? user.cidade_id : 0);
+    if (!cidade_id)
+        cidade_id = allowed[0]; // fallback para a 1ª cidade da operação
+    if (!cidade_id)
+        return res.status(400).send('Operação sem cidades vinculadas.');
+    // helpers…
     const toInt = (v) => (v === '' || v == null) ? 0 : Math.max(0, Math.floor(Number(v) || 0));
     const toBool = (v) => v === 'on' || v === 'true' || v === '1';
     const tipo_local = String(req.body.tipo_local || '').trim();
@@ -1249,31 +1261,24 @@ app.post('/operacoes/:opId/fiscalizacoes', requireAuth, uploadFotosFields, csrfP
     const lacrado = toBool(req.body.lacrado);
     const { lat, lng, acc } = getGeoFromBody(req);
     await db.transaction(async (trx) => {
-        // 1) cria evento base da FISCALIZAÇÃO
-        const retFisc = await trx('operacao_eventos')
-            .insert({
+        // 1) evento base da fiscalização
+        const retFisc = await trx('operacao_eventos').insert({
             operacao_id: opId,
-            cidade_id: null, // ajuste se sua coluna exigir valor
+            cidade_id, // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
             user_id: user.id,
             tipo: 'fiscalizacao',
             obs,
             lat: lat ?? null,
             lng: lng ?? null,
             accuracy: acc ?? null
-        })
-            .returning('id');
+        }).returning('id');
         const fisc_evento_id = Array.isArray(retFisc) ? (retFisc[0]?.id ?? retFisc[0]) : retFisc;
-        // 2) detalhes da fiscalização
+        // 2) detalhes
         await trx('evento_fiscalizacao').insert({
             evento_id: fisc_evento_id,
-            tipo_local,
-            local_nome,
-            local_endereco,
-            pessoas_abordadas,
-            veiculos_abordados,
-            multado,
-            fechado,
-            lacrado
+            tipo_local, local_nome, local_endereco,
+            pessoas_abordadas, veiculos_abordados,
+            multado, fechado, lacrado
         });
         // 3) fotos
         const files = fotosFromRequest(req);
@@ -1281,9 +1286,7 @@ app.post('/operacoes/:opId/fiscalizacoes', requireAuth, uploadFotosFields, csrfP
             await trx('evento_fotos').insert(files.map(f => ({
                 evento_id: fisc_evento_id,
                 path: `/uploads/fotos/${f.filename}`,
-                lat: lat ?? null,
-                lng: lng ?? null,
-                accuracy: acc ?? null
+                lat: lat ?? null, lng: lng ?? null, accuracy: acc ?? null
             })));
         }
         // 4) apreensões do JSON
@@ -1300,29 +1303,25 @@ app.post('/operacoes/:opId/fiscalizacoes', requireAuth, uploadFotosFields, csrfP
             const tipo = String(it.tipo || '').trim();
             if (!tipo)
                 continue;
-            // Se a coluna quantidade for NOT NULL, troque para 0 quando vier vazia
-            const quantidade = (it.quantidade === '' || it.quantidade == null) ? null : Number(it.quantidade);
+            // se a coluna for NOT NULL mude para 0 quando vazio
+            const quantidade = (it.quantidade === '' || it.quantidade == null)
+                ? null : Number(it.quantidade);
             const unidade = String(it.unidade || '').trim() || null;
             const aprObs = String(it.obs || '').trim() || null;
-            // evento base da APREENSÃO
-            const retApr = await trx('operacao_eventos')
-                .insert({
+            const retApr = await trx('operacao_eventos').insert({
                 operacao_id: opId,
-                cidade_id: null, // ajuste se necessário
+                cidade_id, // <<<<<<<<<<<<<<<<< mesma cidade da fiscalização
                 user_id: user.id,
                 tipo: 'apreensao',
                 obs: aprObs,
                 lat: lat ?? null,
                 lng: lng ?? null,
                 accuracy: acc ?? null
-            })
-                .returning('id');
+            }).returning('id');
             const apr_evento_id = Array.isArray(retApr) ? (retApr[0]?.id ?? retApr[0]) : retApr;
             await trx('evento_apreensao').insert({
                 evento_id: apr_evento_id,
-                tipo,
-                quantidade,
-                unidade,
+                tipo, quantidade, unidade,
                 fiscalizacao_evento_id: fisc_evento_id
             });
         }
@@ -2240,18 +2239,12 @@ app.get('/operacoes/:id/acoes/nova', requireAuth, csrfProtection, async (req, re
     const op = await db('operacoes').where({ id }).first();
     if (!op)
         return res.status(404).send('Operação não encontrada.');
-    // Pode lançar? (em andamento + cidade participante)
+    // (opcional) checar permissão
     const podeLancar = await canUserPostOnOperation(id, user);
-    // Fiscalizações da MINHA CIDADE para relacionar nos outros formulários
-    let fiscalizacoes = [];
-    if (user?.cidade_id) {
-        fiscalizacoes = await db('operacao_eventos as e')
-            .where({ 'e.operacao_id': id, 'e.cidade_id': user.cidade_id, 'e.tipo': 'fiscalizacao' })
-            .join('evento_fiscalizacao as f', 'f.evento_id', 'e.id')
-            .select('e.id', 'f.tipo_local', 'e.ts')
-            .orderBy('e.ts', 'desc');
+    if (!podeLancar) {
+        return res.status(403).send('Sem permissão para lançar ações nesta operação.');
     }
-    // cidades participantes (pra mostrar)
+    // Cidades participantes (para header e para escolher o default)
     const cidades = await db('operacao_cidades')
         .where({ operacao_id: id })
         .join('cidades', 'cidades.id', 'operacao_cidades.cidade_id')
@@ -2259,16 +2252,31 @@ app.get('/operacoes/:id/acoes/nova', requireAuth, csrfProtection, async (req, re
         .orderBy('cidades.nome');
     const operacao = {
         ...op,
-        inicio_fmt: op.inicio_agendado ? new Date(op.inicio_agendado).toLocaleString('pt-BR') : null,
+        inicio_fmt: op.inicio_agendado
+            ? new Date(op.inicio_agendado).toLocaleString('pt-BR')
+            : null,
         cidades_str: cidades.map((c) => c.nome).join(', ')
     };
-    res.render('operacoes-acoes-nova', {
+    // Descobrir um cidadeId padrão válido para **esta operação**
+    const opCidadeIds = cidades.map((c) => c.id);
+    const cidadeIdQuery = Number(req.query.cidade_id);
+    let cidadeId = (Number.isFinite(cidadeIdQuery) && opCidadeIds.includes(cidadeIdQuery))
+        ? cidadeIdQuery
+        : (user?.cidade_id && opCidadeIds.includes(user.cidade_id))
+            ? user.cidade_id
+            : (opCidadeIds[0] ?? null);
+    // Render da MESMA página usada no create/edit
+    // Enviamos os sinais que seu EJS espera
+    return res.render('operacoes-acoes-nova', {
         csrfToken: req.csrfToken(),
         user,
         operacao,
-        cidades,
-        fiscalizacoes,
-        podeLancar
+        cidades, // usado para montar "cidades_str" no header
+        mode: 'create', // <- para o guard do EJS (MODE)
+        postAction: `/operacoes/${id}/fiscalizacoes`,
+        fisc: null, // <- nada a preencher no form
+        apreensoes: [], // <- painel começa vazio
+        cidadeId // <- será usado no <input hidden name="cidade_id">
     });
 });
 // -----------------------------------------------------------------------------
