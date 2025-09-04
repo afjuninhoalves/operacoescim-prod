@@ -67,19 +67,19 @@
   <div class="container">
     <!-- KPIs -->
     <div class="kpi-grid">
-      <div class="kpi card"><div class="label">Locais fiscalizados</div><div class="value"><%= (cards&&cards.locais)||0 %></div></div>
-      <div class="kpi card"><div class="label">Pessoas abordadas</div><div class="value"><%= (cards&&cards.pessoas)||0 %></div></div>
-      <div class="kpi card"><div class="label">Veículos abordados</div><div class="value"><%= (cards&&cards.veiculos)||0 %></div></div>
+      <div class="kpi card"><div class="label">Locais fiscalizados</div><div class="value" data-kpi="locais"><%= (cards&&cards.locais)||0 %></div></div>
+      <div class="kpi card"><div class="label">Pessoas abordadas</div><div class="value" data-kpi="pessoas"><%= (cards&&cards.pessoas)||0 %></div></div>
+      <div class="kpi card"><div class="label">Veículos abordados</div><div class="value" data-kpi="veiculos"><%= (cards&&cards.veiculos)||0 %></div></div>
 
       <!-- RENOMEADO: total de itens (linhas em evento_apreensao) -->
-      <div class="kpi card"><div class="label">Itens apreendidos</div><div class="value"><%= (cards&&cards.itensApreendidos)||0 %></div></div>
+      <div class="kpi card"><div class="label">Itens apreendidos</div><div class="value" data-kpi="itensApreendidos"><%= (cards&&cards.itensApreendidos)||0 %></div></div>
 
       <!-- NOVO: 1 por fiscalização com >=1 item -->
-      <div class="kpi card"><div class="label">Apreensões</div><div class="value"><%= (cards&&cards.apreensoes)||0 %></div></div>
+      <div class="kpi card"><div class="label">Apreensões</div><div class="value" data-kpi="apreensoes"><%= (cards&&cards.apreensoes)||0 %></div></div>
 
-      <div class="kpi card"><div class="label">Multados</div><div class="value"><%= (cards&&cards.multados)||0 %></div></div>
-      <div class="kpi card"><div class="label">Fechados</div><div class="value"><%= (cards&&cards.fechados)||0 %></div></div>
-      <div class="kpi card"><div class="label">Lacrados</div><div class="value"><%= (cards&&cards.lacrados)||0 %></div></div>
+      <div class="kpi card"><div class="label">Multados</div><div class="value" data-kpi="multados"><%= (cards&&cards.multados)||0 %></div></div>
+      <div class="kpi card"><div class="label">Fechados</div><div class="value" data-kpi="fechados"><%= (cards&&cards.fechados)||0 %></div></div>
+      <div class="kpi card"><div class="label">Lacrados</div><div class="value" data-kpi="lacrados"><%= (cards&&cards.lacrados)||0 %></div></div>
     </div>
 
     <!-- Efetivo total (mini cards) -->
@@ -131,7 +131,9 @@
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
     <script>
+      const OP_ID  = <%= operacao.id %>;
       const series = <%- JSON.stringify(seriesPorCidade || []) %>;
+      let chart;
 
       function hasAnyValue(rows){
         return Array.isArray(rows) && rows.some(r =>
@@ -143,19 +145,19 @@
         );
       }
 
-      window.addEventListener('load', () => {
+      function buildChart(rows){
         const canvas = document.getElementById('byCityChart');
         const noData = document.getElementById('noChartData');
 
-        if(!hasAnyValue(series)){ noData.style.display='block'; return; }
+        if(!hasAnyValue(rows)){ noData.style.display='block'; return; }
 
-        const labels = series.map(r => r.cidade);
+        const labels = rows.map(r => r.cidade);
         const mk = (k,label,color)=>({
-          label, data: series.map(r => Number(r[k]||0)),
+          label, data: rows.map(r => Number(r[k]||0)),
           backgroundColor: color, borderColor: color, borderWidth:1, borderRadius:6, maxBarThickness:36
         });
 
-        new Chart(canvas.getContext('2d'), {
+        chart = new Chart(canvas.getContext('2d'), {
           type:'bar',
           data:{
             labels,
@@ -176,7 +178,21 @@
             plugins:{legend:{position:'top', labels:{color:'#e5e7eb'}}}
           }
         });
-      });
+      }
+
+      function updateChart(rows){
+        if(!chart){ buildChart(rows); return; }
+        chart.data.labels = rows.map(r => r.cidade);
+        const get = k => rows.map(r => Number(r[k]||0));
+        chart.data.datasets[0].data = get('fiscalizacao');
+        chart.data.datasets[1].data = get('pessoa');
+        chart.data.datasets[2].data = get('veiculo');
+        chart.data.datasets[3].data = get('itens_apreendidos');
+        chart.data.datasets[4].data = get('apreensoes');
+        chart.update();
+      }
+
+      window.addEventListener('load', () => buildChart(series));
     </script>
 
     <% const tot = (arr,key) => (arr||[]).reduce((s,it)=> s + (Number(it?.[key])||0), 0); %>
@@ -199,7 +215,7 @@
               <th>Multados</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody id="dist-body">
             <% (seriesPorCidade||[]).forEach(linha => { %>
               <tr>
                 <td><%= linha.cidade %></td>
@@ -214,7 +230,7 @@
               </tr>
             <% }) %>
           </tbody>
-          <tfoot>
+          <tfoot id="dist-foot">
             <tr>
               <th>Total</th>
               <th class="num"><%= tot(seriesPorCidade,'fiscalizacao') %></th>
@@ -292,7 +308,7 @@
     <!-- Feed -->
     <div class="card" style="margin-top:12px">
       <div style="font-weight:700;margin-bottom:8px">Feed (últimos 20)</div>
-      <div style="display:flex;flex-direction:column;gap:10px">
+      <div id="feedWrap" style="display:flex;flex-direction:column;gap:10px">
         <% (feed||[]).forEach(f => { %>
           <div style="padding:10px;border:1px solid var(--border);border-radius:10px">
             <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
@@ -308,5 +324,93 @@
       </div>
     </div>
   </div>
+
+  <!-- Auto-refresh -->
+  <script>
+    const $k = (name) => document.querySelector(`[data-kpi="${name}"]`);
+
+    function updateKPIs(cards){
+      if(!cards) return;
+      $k('locais').textContent           = cards.locais ?? 0;
+      $k('pessoas').textContent          = cards.pessoas ?? 0;
+      $k('veiculos').textContent         = cards.veiculos ?? 0;
+      $k('itensApreendidos').textContent = cards.itensApreendidos ?? 0;
+      $k('apreensoes').textContent       = cards.apreensoes ?? 0;
+      $k('multados').textContent         = cards.multados ?? 0;
+      $k('fechados').textContent         = cards.fechados ?? 0;
+      $k('lacrados').textContent         = cards.lacrados ?? 0;
+    }
+
+    function renderDistTable(rows){
+      const tbody = document.getElementById('dist-body');
+      const tfoot = document.getElementById('dist-foot');
+      const tot = (k) => (rows||[]).reduce((s,r)=> s + (+r[k]||0), 0);
+
+      tbody.innerHTML = (rows||[]).map(r => `
+        <tr>
+          <td>${r.cidade}</td>
+          <td class="num">${r.fiscalizacao || 0}</td>
+          <td class="num">${r.pessoa || 0}</td>
+          <td class="num">${r.veiculo || 0}</td>
+          <td class="num">${r.itens_apreendidos || 0}</td>
+          <td class="num">${r.apreensoes || 0}</td>
+          <td class="num">${r.lacrado || 0}</td>
+          <td class="num">${r.fechado || 0}</td>
+          <td class="num">${r.multado || 0}</td>
+        </tr>
+      `).join('');
+
+      tfoot.innerHTML = `
+        <tr>
+          <th>Total</th>
+          <th class="num">${tot('fiscalizacao')}</th>
+          <th class="num">${tot('pessoa')}</th>
+          <th class="num">${tot('veiculo')}</th>
+          <th class="num">${tot('itens_apreendidos')}</th>
+          <th class="num">${tot('apreensoes')}</th>
+          <th class="num">${tot('lacrado')}</th>
+          <th class="num">${tot('fechado')}</th>
+          <th class="num">${tot('multado')}</th>
+        </tr>
+      `;
+    }
+
+    function renderFeed(feed){
+      const wrap = document.getElementById('feedWrap');
+      if(!wrap) return;
+      wrap.innerHTML = (feed||[]).map(f => `
+        <div style="padding:10px;border:1px solid var(--border);border-radius:10px">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+            <span class="chip">${f.tipo}</span>
+            <span class="muted" style="font-size:12px">${new Date(f.ts).toLocaleString('pt-BR')}</span>
+          </div>
+          <div class="muted" style="margin-top:6px">
+            ${f.cidade || ''}${(f.cidade && f.user) ? ' · ' : ''}${f.user || ''}
+          </div>
+          ${f.obs ? `<div style="margin-top:6px">${f.obs}</div>` : ''}
+        </div>
+      `).join('');
+    }
+
+    async function refresh(){
+      try{
+        const res  = await fetch(`/operacoes/${OP_ID}/monitor/data`, { cache: 'no-store' });
+        if(!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        updateKPIs(data.cards);
+        updateChart(data.seriesPorCidade);
+        renderDistTable(data.seriesPorCidade);
+        renderFeed(data.feed);
+      }catch(err){
+        console.error('Monitor refresh failed:', err);
+      }
+    }
+
+    // primeira atualização + polling
+    refresh();
+    setInterval(refresh, 3000);
+    document.addEventListener('visibilitychange', () => { if(!document.hidden) refresh(); });
+  </script>
 </body>
 </html>
