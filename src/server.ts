@@ -1346,8 +1346,8 @@ app.post('/operacoes/:id/status', requireAdminOrGestor, csrfProtection, async (r
 // Fiscalização
 // criar fiscalização (com contagens e flags) + opcionalmente uma apreensão vinculada
 // POST /operacoes/:id/fiscalizacoes
-app.post(
-  '/operacoes/:id/fiscalizacoes',
+// CRIAR fiscalização + fotos + apreensões (a partir do JSON do formulário)
+app.post('/operacoes/:opId/fiscalizacoes',
   requireAuth,
   uploadFotosFields,     // multer primeiro
   csrfProtection,        // depois CSRF
@@ -1466,42 +1466,6 @@ app.post(
   }
 );
 
-    // ------------ fotos (vinculadas à fiscalização) ------------
-    const files = fotosFromRequest(req);
-    const { lat, lng, acc } = getGeoFromBody(req);
-    if (files.length) {
-      await db('evento_fotos').insert(
-        files.map(f => ({
-          evento_id,
-          path: `/uploads/fotos/${f.filename}`,
-          lat, lng, accuracy: acc
-        }))
-      );
-    } else if (lat != null && lng != null) {
-      await db('operacao_eventos').where({ id: evento_id }).update({ lat, lng, accuracy: acc ?? null });
-    }
-
-    // ------------ apreensões (filhas) ------------
-    // Vem como JSON (string) do hidden "apreensoes_json"
-    let itens: Array<any> = [];
-    try {
-      if (req.body.apreensoes_json) itens = JSON.parse(String(req.body.apreensoes_json));
-    } catch { }
-
-    if (Array.isArray(itens) && itens.length) {
-      const rows = itens.map(it => ({
-        fiscalizacao_evento_id: evento_id,
-        tipo: S(it.tipo) || null,
-        quantidade: it.quantidade === '' || it.quantidade == null ? null : Number(it.quantidade),
-        unidade: S(it.unidade) || null,
-        obs: S(it.obs) || null,
-      }));
-      await db('fiscalizacao_apreensoes').insert(rows);
-    }
-
-    return res.redirect(go);
-  }
-);
 
 
 // GET: formulário de edição do item filho
