@@ -1825,10 +1825,12 @@ app.get('/operacoes/:opId/fiscalizacoes/:fiscId/editar', requireAuth, csrfProtec
         .where({ evento_id: fiscId })
         .first();
     // Apreensões (filhas) ligadas a esta fiscalização
-    // 🔁 Troque 'evento_apreensao' se o seu nome for diferente:
-    const aprs = await db('evento_apreensao')
-        .where({ fiscalizacao_evento_id: fiscId })
-        .select({ id: 'evento_id' }, 'tipo', 'quantidade', 'unidade', 'obs');
+    const aprs = await db('evento_apreensao as ea')
+        .leftJoin('operacao_eventos as oe', 'oe.id', 'ea.evento_id')
+        .where('ea.fiscalizacao_evento_id', fiscId)
+        .select({ id: 'ea.evento_id' }, // mantém apr.id funcionando no EJS
+    'ea.tipo', 'ea.quantidade', 'ea.unidade', { obs: 'oe.obs' } // obs vem do evento pai da apreensão
+    );
     // Monta o objeto para o EJS (o seu EJS já espera essas chaves)
     const fiscForView = {
         id: fiscId,
