@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Inserir ações — <%= operacao.nome %></title>
+  <title><%= (mode==='edit'?'Editar fiscalização — ':'Inserir ações — ') + operacao.nome %></title>
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
 
@@ -48,14 +48,12 @@
     .geo-ok{color:#22c55e;font-weight:600}
     .geo-err{color:#ef4444;font-weight:600}
 
-    /* Lista de apreensões (painel direito) */
     .apr-item{border:1px solid var(--border);border-radius:12px;padding:10px;display:flex;justify-content:space-between;gap:10px}
     .apr-kind{font-weight:600}
     .apr-meta{font-size:12px;color:var(--muted)}
     .apr-actions{display:flex;gap:8px}
     .empty{border:1px dashed var(--border);border-radius:12px;padding:12px;text-align:center;color:var(--muted)}
 
-    /* Modal */
     .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:50}
     .modal{width:min(560px,92vw);background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow);padding:16px}
     .modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
@@ -70,7 +68,7 @@
         <span class="badge">CIM</span>
         <div>
           Operações CIM
-          <div class="muted">Inserir ações — <%= operacao.nome %></div>
+          <div class="muted"><%= (mode==='edit'?'Editar fiscalização — ':'Inserir ações — ') + operacao.nome %></div>
         </div>
       </div>
       <div class="actions">
@@ -82,7 +80,6 @@
   </div>
 
   <div class="container">
-    <!-- Cabeçalho -->
     <div class="card">
       <div class="row" style="justify-content:space-between">
         <div>
@@ -117,13 +114,16 @@
     <div class="grid two" style="margin-top:16px">
 
       <!-- Form da FISCALIZAÇÃO -->
-      <form class="card" id="formFiscalizacao" method="post" action="/operacoes/<%= operacao.id %>/fiscalizacoes" enctype="multipart/form-data" autocomplete="off" novalidate>
+      <form class="card" id="formFiscalizacao"
+            method="post"
+            action="<%= postAction || ('/operacoes/' + operacao.id + '/fiscalizacoes') %>"
+            enctype="multipart/form-data" autocomplete="off" novalidate>
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <input type="hidden" name="return_to" value="/operacoes/<%= operacao.id %>/acoes/nova">
         <!-- GEO -->
-        <input type="hidden" name="lat" class="geo-lat">
-        <input type="hidden" name="lng" class="geo-lng">
-        <input type="hidden" name="acc" class="geo-acc">
+        <input type="hidden" name="lat" class="geo-lat" value="<%= (fisc && fisc.lat)!=null ? fisc.lat : '' %>">
+        <input type="hidden" name="lng" class="geo-lng" value="<%= (fisc && fisc.lng)!=null ? fisc.lng : '' %>">
+        <input type="hidden" name="acc" class="geo-acc" value="<%= (fisc && fisc.acc)!=null ? fisc.acc : '' %>">
         <!-- JSON com as N apreensões -->
         <input type="hidden" name="apreensoes_json" id="apreensoes_json">
 
@@ -132,40 +132,51 @@
         <div class="row">
           <div class="col">
             <label>Tipo de local <span class="muted">(obrigatório)</span></label>
-            <input type="text" name="tipo_local" placeholder="ex: bar, ferro-velho, baile" required>
+            <input type="text" name="tipo_local" placeholder="ex: bar, ferro-velho, baile" required
+                   value="<%= (fisc && fisc.tipo_local) || '' %>">
           </div>
           <div class="col">
             <label>Nome do local</label>
-            <input type="text" name="local_nome" placeholder="ex: Bar do Zé">
+            <input type="text" name="local_nome" placeholder="ex: Bar do Zé"
+                   value ="<%= (fisc && fisc.local_nome) || '' %>">
           </div>
         </div>
 
         <div class="row" style="margin-top:10px">
           <div class="col">
             <label>Endereço</label>
-            <input type="text" name="local_endereco" placeholder="ex: Rua X, 123 — Centro">
+            <input type="text" name="local_endereco" placeholder="ex: Rua X, 123 — Centro"
+                   value ="<%= (fisc && fisc.local_endereco) || '' %>">
           </div>
           <div class="col">
             <label>Observações</label>
-            <textarea name="obs" rows="3" placeholder=""></textarea>
+            <textarea name="obs" rows="3" placeholder=""><%= (fisc && fisc.obs) || '' %></textarea>
           </div>
         </div>
 
         <div class="row" style="margin-top:10px">
           <div class="col">
             <label>Pessoas abordadas</label>
-            <input type="number" min="0" name="pessoas_abordadas" value="0" inputmode="numeric">
+            <input type="number" min="0" name="pessoas_abordadas" inputmode="numeric"
+                   value ="<%= (fisc && fisc.pessoas_abordadas)!=null ? fisc.pessoas_abordadas : 0 %>">
           </div>
           <div class="col">
             <label>Veículos abordados</label>
-            <input type="number" min="0" name="veiculos_abordados" value="0" inputmode="numeric">
+            <input type="number" min="0" name="veiculos_abordados" inputmode="numeric"
+                   value ="<%= (fisc && fisc.veiculos_abordados)!=null ? fisc.veiculos_abordados : 0 %>">
           </div>
         </div>
 
         <div class="row" style="margin-top:10px">
-          <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" name="multado"> Multado</label>
-          <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" name="fechado"> Fechado</label>
-          <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" name="lacrado"> Lacrado</label>
+          <label style="display:flex;align-items:center;gap:8px">
+            <input type="checkbox" name="multado" <%= (fisc && fisc.multado)? 'checked' : '' %> > Multado
+          </label>
+          <label style="display:flex;align-items:center;gap:8px">
+            <input type="checkbox" name="fechado" <%= (fisc && fisc.fechado)? 'checked' : '' %> > Fechado
+          </label>
+          <label style="display:flex;align-items:center;gap:8px">
+            <input type="checkbox" name="lacrado" <%= (fisc && fisc.lacrado)? 'checked' : '' %> > Lacrado
+          </label>
         </div>
 
         <div style="margin-top:12px">
@@ -184,11 +195,11 @@
 
         <div class="row" style="justify-content:space-between;margin-top:14px">
           <div class="muted geo-status">Localização: aguardando…</div>
-          <button class="btn btn-primary" id="btnSubmit" type="submit">Salvar fiscalização</button>
+          <button class="btn btn-primary" id="btnSubmit" type="submit"><%= mode==='edit'?'Salvar alterações':'Salvar fiscalização' %></button>
         </div>
       </form>
 
-      <!-- Painel direito: lista de apreensões desta fiscalização (em memória) -->
+      <!-- Painel direito: lista de apreensões -->
       <div class="card">
         <div class="row" style="justify-content:space-between;align-items:center">
           <h3 style="margin:0">Apreensões desta fiscalização</h3>
@@ -239,7 +250,16 @@
     </div>
   </div>
 
-  <!-- Leaflet + JS -->
+  <!-- Bootstrap de dados para modo edição -->
+  <script>
+    window.INIT = {
+      mode: "<%= mode || 'create' %>",
+      postAction: "<%= postAction || ('/operacoes/' + operacao.id + '/fiscalizacoes') %>",
+      fisc: <%- JSON.stringify(fisc || {}) %>,
+      apreensoes: <%- JSON.stringify(apreensoes || []) %>
+    };
+  </script>
+
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <script>
     (() => {
@@ -367,7 +387,6 @@
       const mObs = $('#apr_obs');
       const mClose = $('#aprClose');
       const mCancel= $('#aprCancel');
-      const mSave = $('#aprSave');
       const mForm = $('#aprForm');
 
       function openModal(title, data = null, idx = -1){
@@ -386,7 +405,6 @@
       mClose.addEventListener('click', closeModal);
       mCancel.addEventListener('click', closeModal);
 
-      // Enter dentro do modal submete
       mForm.addEventListener('submit', () => {
         const tipo = String(mTipo.value || '').trim();
         if (!tipo){ mTipo.focus(); return; }
@@ -397,7 +415,7 @@
         const obs = String(mObs.value || '').trim() || null;
 
         const item = { tipo, quantidade, unidade, obs };
-        if (editingIndex >= 0) apreensoes[editingIndex] = item;
+        if (editingIndex >= 0) apreensoes[editingIndex] = { ...apreensoes[editingIndex], ...item };
         else apreensoes.push(item);
 
         renderApr();
@@ -420,7 +438,7 @@
               <div class="apr-kind">${escapeHtml(a.tipo || '—')}</div>
               <div class="apr-meta">
                 ${(a.quantidade != null && a.quantidade !== '') ? escapeHtml(String(a.quantidade)) : '—'}
-                ${a.unidade ? escapeHtml(a.unidade) : ''} 
+                ${a.unidade ? escapeHtml(a.unidade) : ''}
                 ${a.obs ? ' · ' + escapeHtml(a.obs) : ''}
               </div>
             </div>
@@ -449,7 +467,6 @@
         return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[c]));
       }
 
-      // garante JSON preenchido no submit + previne duplo submit
       const submitBtn = $('#btnSubmit');
       $('#formFiscalizacao').addEventListener('submit', () => {
         jsonInput.value = JSON.stringify(apreensoes);
@@ -457,15 +474,47 @@
         setTimeout(() => submitBtn.disabled = false, 4000);
       });
 
-      // abrir modal automaticamente se vier ?open=apr
       const params = new URLSearchParams(location.search);
-      if (params.get('open') === 'apr') {
-        document.getElementById('btnAddApr').click();
+      if (params.get('open') === 'apr') { document.getElementById('btnAddApr').click(); }
+
+      // ======== MODO EDIÇÃO: preencher tudo ========
+      const INIT = window.INIT || {};
+      if (INIT.mode === 'edit') {
+        // garante action correto (caso o SSR não tenha setado)
+        document.getElementById('formFiscalizacao').action = INIT.postAction || document.getElementById('formFiscalizacao').action;
+
+        const f = INIT.fisc || {};
+        const set = (name, val) => { const el = document.querySelector(`[name="${name}"]`); if (el) el.value = (val ?? ''); };
+        const setCk = (name, on) => { const el = document.querySelector(`[name="${name}"]`); if (el) el.checked = !!on; };
+
+        set('tipo_local', f.tipo_local);
+        set('local_nome', f.local_nome);
+        set('local_endereco', f.local_endereco);
+        set('obs', f.obs);
+        set('pessoas_abordadas', (f.pessoas_abordadas!=null? f.pessoas_abordadas : 0));
+        set('veiculos_abordados', (f.veiculos_abordados!=null? f.veiculos_abordados : 0));
+        setCk('multado', f.multado);
+        setCk('fechado', f.fechado);
+        setCk('lacrado', f.lacrado);
+
+        if (f.lat != null && f.lng != null) {
+          ensureMap();
+          placeMarker(Number(f.lat), Number(f.lng), f.acc != null ? Number(f.acc) : null, 'manual');
+        }
+
+        // carrega apreensões existentes (preserva id para o POST fazer update)
+        (INIT.apreensoes || []).forEach(a => {
+          apreensoes.push({
+            id: a.id, // importante para o upsert no backend
+            tipo: a.tipo || '',
+            quantidade: a.quantidade ?? null,
+            unidade: a.unidade || null,
+            obs: a.obs || null
+          });
+        });
       }
 
       renderApr();
-
-      /* ===== FIM IIFE ===== */
     })();
   </script>
 </body>

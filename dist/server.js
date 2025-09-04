@@ -1672,20 +1672,52 @@ app.get('/operacoes/:opId/fiscalizacoes/:eventoId/editar', requireAuth, csrfProt
     const user = req.session.user;
     const opId = Number(req.params.opId);
     const eventoId = Number(req.params.eventoId);
+    if (!Number.isFinite(opId) || !Number.isFinite(eventoId)) {
+        return res.status(400).send('Parâmetros inválidos.');
+    }
+    // Permissão + carrega o evento base
     const perm = await canEditEvento(user, opId, eventoId);
     if (!perm.ok)
         return res.status(perm.status || 403).send(perm.reason || 'Não autorizado.');
-    const op = await db('operacoes').where({ id: opId }).first();
-    const f = await db('evento_fiscalizacao').where({ evento_id: eventoId }).first();
-    const fotos = await db('evento_fotos').where({ evento_id: eventoId }).orderBy('id', 'desc');
-    return res.render('fiscalizacao-edit', {
+    const operacao = await db('operacoes').where({ id: opId }).first();
+    if (!operacao)
+        return res.status(404).send('Operação não encontrada.');
+    const base = await db('operacao_eventos')
+        .where({ id: eventoId, operacao_id: opId, tipo: 'fiscalizacao' })
+        .first();
+    if (!base)
+        return res.status(404).send('Fiscalização não encontrada.');
+    const det = await db('evento_fiscalizacao').where({ evento_id: eventoId }).first();
+    // Apreensões vinculadas a essa fiscalização
+    const apreensoes = await db('evento_apreensao as a')
+        .join('operacao_eventos as e', 'e.id', 'a.evento_id')
+        .where('a.fiscalizacao_evento_id', eventoId)
+        .select('a.evento_id as id', 'a.tipo', 'a.quantidade', 'a.unidade', 'e.obs')
+        .orderBy('a.evento_id', 'desc');
+    // Monta objeto para o formulário
+    const fisc = {
+        id: eventoId,
+        tipo_local: det?.tipo_local ?? '',
+        local_nome: det?.local_nome ?? '',
+        local_endereco: det?.local_endereco ?? '',
+        pessoas_abordadas: det?.pessoas_abordadas ?? 0,
+        veiculos_abordados: det?.veiculos_abordados ?? 0,
+        multado: !!det?.multado,
+        fechado: !!det?.fechado,
+        lacrado: !!det?.lacrado,
+        obs: base?.obs ?? '',
+        lat: base?.lat ?? null,
+        lng: base?.lng ?? null,
+        acc: base?.accuracy ?? null,
+    };
+    return res.render('operacoes-acoes-nova', {
         csrfToken: req.csrfToken(),
         user,
-        operacao: op,
-        operacaoId: opId,
-        eventoId,
-        values: { tipo_local: f?.tipo_local || '', obs: perm.evento?.obs || '' },
-        fotos
+        operacao,
+        mode: 'edit',
+        postAction: `/operacoes/${opId}/fiscalizacoes/${eventoId}/editar`,
+        fisc,
+        apreensoes, // array [{id, tipo, quantidade, unidade, obs}]
     });
 });
 // POST: salvar alterações na fiscalização + (opcional) anexar novas fotos
@@ -1704,6 +1736,131 @@ app.post('/operacoes/:opId/fiscalizacoes/:eventoId/editar', requireAuth, csrfPro
     await db('evento_fiscalizacao').where({ evento_id: eventoId }).update({ tipo_local });
     await db('operacao_eventos').where({ id: eventoId }).update({ obs });
     return res.redirect(`/operacoes/${opId}/fiscalizacoes/${eventoId}/editar`);
+});
+app.post('/operacoes/:opId/fiscalizacoes/:eventoId/editar', requireAuth, uploadFotosFields, csrfProtection, async (req, res) => {
+    const user = req.session.user;
+    const opId = Number(req.params.opId);
+    const eventoId = Number(req.params.eventoId);
+    const perm = await canEditEvento(user, opId, eventoId);
+    if (!perm.ok)
+        return res.status(perm.status || 403).send(perm.reason || 'Não autorizado.');
+    const toInt = (v) => { if (v === '' || v == null)
+        return 0; const n = Number(v); return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0; };
+    const toBool = (v) => v === 'on' || v === 'true' || v === '1';
+    const s = (v) => (String(v || '').trim() || null);
+    // Fiscalização (obriga tipo_local)
+    const tipo_local = String(req.body.tipo_local || '').trim();
+    if (!tipo_local)
+        return res.status(400).send('Tipo de local é obrigatório.');
+    const payloadFisc = {
+        tipo_local,
+        local_nome: s(req.body.local_nome),
+        local_endereco: s(req.body.local_endereco),
+        pessoas_abordadas: toInt(req.body.pessoas_abordadas),
+        veiculos_abordados: toInt(req.body.veiculos_abordados),
+        multado: toBool(req.body.multado),
+        fechado: toBool(req.body.fechado),
+        lacrado: toBool(req.body.lacrado),
+    };
+    const obs = s(req.body.obs);
+    const files = fotosFromRequest(req);
+    const { lat, lng, acc } = getGeoFromBody(req);
+    let items = [];
+    try {
+        items = JSON.parse(req.body.apreensoes_json || '[]');
+    }
+    catch { }
+    // helper para criar evento dentro da mesma transação
+    async function createEventoBaseTrx(trx, p) {
+        const [idRow] = await trx('operacao_eventos')
+            .insert({
+            operacao_id: p.operacao_id,
+            cidade_id: p.cidade_id,
+            user_id: p.user_id,
+            tipo: p.tipo,
+            obs: p.obs,
+        })
+            .returning('id');
+        return typeof idRow === 'object' ? idRow.id : idRow;
+    }
+    await db.transaction(async (trx) => {
+        // Atualiza fiscalização + evento base (obs/geo)
+        await trx('evento_fiscalizacao').where({ evento_id: eventoId }).update(payloadFisc);
+        await trx('operacao_eventos').where({ id: eventoId }).update({
+            obs,
+            lat: lat ?? null,
+            lng: lng ?? null,
+            accuracy: acc ?? null,
+        });
+        // Fotos novas (se enviadas no mesmo POST)
+        if (files.length) {
+            await trx('evento_fotos').insert(files.map((f) => ({
+                evento_id: eventoId,
+                path: `/uploads/fotos/${f.filename}`,
+                lat: lat ?? null,
+                lng: lng ?? null,
+                accuracy: acc ?? null,
+            })));
+        }
+        // Upsert de apreensões
+        const existentes = await trx('evento_apreensao')
+            .where({ fiscalizacao_evento_id: eventoId })
+            .pluck('evento_id');
+        const mantidos = new Set();
+        for (const it of items) {
+            const tipo = String(it?.tipo || '').trim();
+            const quantidade = it?.quantidade === '' || it?.quantidade == null
+                ? null
+                : Number(it.quantidade);
+            if (quantidade !== null && !Number.isFinite(quantidade)) {
+                throw new Error('Quantidade inválida em apreensão.');
+            }
+            const unidade = s(it?.unidade);
+            const aObs = s(it?.obs);
+            if (it?.id) {
+                // update existente
+                mantidos.add(Number(it.id));
+                await trx('evento_apreensao').where({ evento_id: it.id }).update({
+                    tipo: tipo || null,
+                    quantidade,
+                    unidade,
+                    fiscalizacao_evento_id: eventoId,
+                });
+                await trx('operacao_eventos').where({ id: it.id }).update({ obs: aObs });
+            }
+            else {
+                // cria nova
+                const aprId = await createEventoBaseTrx(trx, {
+                    operacao_id: opId,
+                    cidade_id: perm.evento.cidade_id,
+                    user_id: user.id,
+                    tipo: 'apreensao',
+                    obs: aObs,
+                });
+                await trx('evento_apreensao').insert({
+                    evento_id: aprId,
+                    tipo: tipo || null,
+                    quantidade,
+                    unidade,
+                    fiscalizacao_evento_id: eventoId,
+                });
+                // herda geo da fiscalização
+                if (lat != null && lng != null) {
+                    await trx('operacao_eventos').where({ id: aprId }).update({
+                        lat, lng, accuracy: acc ?? null,
+                    });
+                }
+            }
+        }
+        // Deletar as que saíram da lista
+        const remover = existentes.filter((id) => !mantidos.has(id));
+        if (remover.length) {
+            await trx('evento_fotos').whereIn('evento_id', remover).del();
+            await trx('evento_apreensao').whereIn('evento_id', remover).del();
+            await trx('operacao_eventos').whereIn('id', remover).del();
+        }
+    });
+    return res.redirect(pickReturnTo(req, `/operacoes/${opId}`));
 });
 app.post('/operacoes/:opId/fiscalizacoes/:eventoId/fotos', requireAuth, uploadFotosFields, // << primeiro o multer (lê o body)
 csrfProtection, // << depois valida o _csrf
