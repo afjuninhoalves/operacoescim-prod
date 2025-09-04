@@ -1380,12 +1380,12 @@ app.post(
       // ---------------------------
       // Campos da fiscalização
       // ---------------------------
-      const tipo_local       = s(req.body.tipo_local);
-      const local_nome       = s(req.body.local_nome);       // NOVO
-      const local_endereco   = s(req.body.local_endereco);   // NOVO
-      const obs              = s(req.body.obs);
+      const tipo_local = s(req.body.tipo_local);
+      const local_nome = s(req.body.local_nome);       // NOVO
+      const local_endereco = s(req.body.local_endereco);   // NOVO
+      const obs = s(req.body.obs);
 
-      const pessoas_abordadas  = toInt(req.body.pessoas_abordadas);
+      const pessoas_abordadas = toInt(req.body.pessoas_abordadas);
       const veiculos_abordados = toInt(req.body.veiculos_abordados);
 
       const multado = toBool(req.body.multado);
@@ -1397,7 +1397,7 @@ app.post(
       const { lat, lng, acc } = getGeoFromBody(req);
 
       // Apreensões (novo formato: JSON) + fallback legado
-      let apreArr: Array<{tipo?: string; quantidade?: any; unidade?: string; obs?: string}> = [];
+      let apreArr: Array<{ tipo?: string; quantidade?: any; unidade?: string; obs?: string }> = [];
       if (req.body.apreensoes_json) {
         try {
           const parsed = JSON.parse(req.body.apreensoes_json);
@@ -1408,9 +1408,9 @@ app.post(
       } else {
         // compat: 1 apreensão “inline” no mesmo form
         const apr_tipo = s(req.body.apr_tipo);
-        const apr_qtd  = req.body.apr_quantidade === '' ? null : Number(req.body.apr_quantidade);
-        const apr_uni  = s(req.body.apr_unidade);
-        const apr_obs  = s(req.body.apr_obs);
+        const apr_qtd = req.body.apr_quantidade === '' ? null : Number(req.body.apr_quantidade);
+        const apr_uni = s(req.body.apr_unidade);
+        const apr_obs = s(req.body.apr_obs);
         if (apr_tipo) {
           if (apr_qtd != null && !Number.isFinite(apr_qtd)) {
             return res.status(400).send('Quantidade de apreensão inválida.');
@@ -1481,7 +1481,7 @@ app.post(
               throw new Error('Quantidade de apreensão inválida.');
             }
             const unidade = s(a.unidade);
-            const aobs    = s(a.obs);
+            const aobs = s(a.obs);
 
             // 4.1) cria evento "apreensao", com vínculo ao pai (fiscalização)
             const [aprRow] = await trx('operacao_eventos')
@@ -2317,10 +2317,15 @@ app.get('/operacoes/:opId/pessoas/:eventoId/editar',
 
     // fiscalizações da MESMA cidade deste evento (para vincular)
     const fiscList = await db('operacao_eventos as e')
-      .join('evento_fiscalizacao as f', 'f.evento_id', 'e.id')
-      .where({ 'e.operacao_id': opId, 'e.cidade_id': perm.evento!.cidade_id, 'e.tipo': 'fiscalizacao' })
-      .select('e.id', 'f.tipo_local')
+      .leftJoin('evento_fiscalizacao as f', 'f.evento_id', 'e.id')
+      .where({ 'e.operacao_id': opId, 'e.tipo': 'fiscalizacao' })
+      .modify(q => { if (perm.evento?.cidade_id) q.andWhere('e.cidade_id', perm.evento.cidade_id); })
+      .select(
+        'e.id',
+        db.raw(`COALESCE(NULLIF(f.tipo_local,''), 'Fiscalização #' || e.id) as nome`)
+      )
       .orderBy('e.ts', 'desc');
+
 
     return res.render('pessoa-edit', {
       csrfToken: (req as any).csrfToken(),

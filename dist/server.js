@@ -1976,9 +1976,11 @@ app.get('/operacoes/:opId/pessoas/:eventoId/editar', requireAuth, csrfProtection
     const fotos = await db('evento_fotos').where({ evento_id: eventoId }).orderBy('id', 'desc');
     // fiscalizações da MESMA cidade deste evento (para vincular)
     const fiscList = await db('operacao_eventos as e')
-        .join('evento_fiscalizacao as f', 'f.evento_id', 'e.id')
-        .where({ 'e.operacao_id': opId, 'e.cidade_id': perm.evento.cidade_id, 'e.tipo': 'fiscalizacao' })
-        .select('e.id', 'f.tipo_local')
+        .leftJoin('evento_fiscalizacao as f', 'f.evento_id', 'e.id')
+        .where({ 'e.operacao_id': opId, 'e.tipo': 'fiscalizacao' })
+        .modify(q => { if (perm.evento?.cidade_id)
+        q.andWhere('e.cidade_id', perm.evento.cidade_id); })
+        .select('e.id', db.raw(`COALESCE(NULLIF(f.tipo_local,''), 'Fiscalização #' || e.id) as nome`))
         .orderBy('e.ts', 'desc');
     return res.render('pessoa-edit', {
         csrfToken: req.csrfToken(),
