@@ -1,16 +1,23 @@
-<% // Guardas para evitar ReferenceError quando as variáveis não vierem do render const MODE=(typeof mode==='string' ) ?
-  mode : 'create' ; const POST_ACTION=(typeof postAction==='string' ) ? postAction : ('/operacoes/' + operacao.id
-  + '/fiscalizacoes' ); const FISC=(typeof fisc !=='undefined' && fisc && typeof fisc==='object' ) ? fisc : null; const
-  APR_LIST=(typeof apreensoes !=='undefined' && Array.isArray(apreensoes)) ? apreensoes : []; %>
+<%
+  // Guardas seguras para prod
+  const MODE        = (typeof mode === 'string') ? mode : 'create';
+  const POST_ACTION = (typeof postAction === 'string')
+    ? postAction
+    : ('/operacoes/' + (operacao?.id ?? '') + '/fiscalizacoes');
+
+  const FISC     = (typeof fisc       !== 'undefined' && fisc && typeof fisc === 'object') ? fisc : null;
+  const APR_LIST = (typeof apreensoes !== 'undefined' && Array.isArray(apreensoes)) ? apreensoes : [];
+%>
+
+  
+  
   <!DOCTYPE html>
   <html lang="pt-BR">
 
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>
-      <%= (MODE==='edit' ? 'Editar fiscalização — ' : 'Inserir ações — ' ) + operacao.nome %>
-    </title>
+    <title><%= (MODE==='edit' ? 'Editar fiscalização — ' : 'Inserir ações — ') + operacao.nome %></title>
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
 
@@ -517,7 +524,7 @@
       window.INIT = {
         mode: "<%= MODE %>",
         postAction: "<%= POST_ACTION %>",
-        fisc: <% - JSON.stringify(FISC || {}) %>,
+        fisc: <%- JSON.stringify(FISC || {}) %>,
         apreensoes: <%- JSON.stringify(APR_LIST) %>
     };
     </script>

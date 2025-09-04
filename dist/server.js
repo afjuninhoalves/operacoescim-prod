@@ -1803,7 +1803,7 @@ app.get('/operacoes/:id/monitor/data', requireAdminOrGestor, async (req, res) =>
     });
 });
 // =============================================================================
-// FISCALIZAÇÃO: EDITAR + GERENCIAR FOTOS
+//       EDIÇÃO DE INSERIR ACÇOES 
 // =============================================================================
 // GET editar fiscalização
 app.get('/operacoes/:opId/fiscalizacoes/:fiscId/editar', requireAuth, csrfProtection, async (req, res) => {
@@ -1828,7 +1828,7 @@ app.get('/operacoes/:opId/fiscalizacoes/:fiscId/editar', requireAuth, csrfProtec
     // 🔁 Troque 'evento_apreensao' se o seu nome for diferente:
     const aprs = await db('evento_apreensao')
         .where({ fiscalizacao_evento_id: fiscId })
-        .select('id', 'tipo', 'quantidade', 'unidade', 'obs');
+        .select({ id: 'evento_id' }, 'tipo', 'quantidade', 'unidade', 'obs');
     // Monta o objeto para o EJS (o seu EJS já espera essas chaves)
     const fiscForView = {
         id: fiscId,
@@ -1852,10 +1852,10 @@ app.get('/operacoes/:opId/fiscalizacoes/:fiscId/editar', requireAuth, csrfProtec
         csrfToken: req.csrfToken(),
         user,
         operacao,
-        mode: 'edit',
-        postAction: `/operacoes/${opId}/fiscalizacoes/${fiscId}/editar`, // <- usado no form
-        fisc: fiscForView, // INIT.fisc
-        apreensoes: aprs || [] // INIT.apreensoes
+        mode: 'edit', // <-- IMPORTANTE
+        postAction: `/operacoes/${opId}/fiscalizacoes/${fiscId}/editar`, // <-- IMPORTANTE
+        fisc: fiscForView,
+        apreensoes: aprs || []
     });
 });
 // Aceita campos: tipo_local, obs e (opcional) fotos[] / foto

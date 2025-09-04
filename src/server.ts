@@ -1367,24 +1367,24 @@ app.post('/operacoes/:opId/fiscalizacoes',
     if (!cidade_id) return res.status(400).send('Operação sem cidades vinculadas.');
 
     // helpers…
-    const toInt  = (v:any) => (v === '' || v == null) ? 0 : Math.max(0, Math.floor(Number(v) || 0));
-    const toBool = (v:any) => v === 'on' || v === 'true' || v === '1';
+    const toInt = (v: any) => (v === '' || v == null) ? 0 : Math.max(0, Math.floor(Number(v) || 0));
+    const toBool = (v: any) => v === 'on' || v === 'true' || v === '1';
 
-    const tipo_local         = String(req.body.tipo_local || '').trim();
+    const tipo_local = String(req.body.tipo_local || '').trim();
     if (!tipo_local) return res.status(400).send('Informe o tipo de local.');
 
-    const local_nome         = String(req.body.local_nome || '').trim() || null;
-    const local_endereco     = String(req.body.local_endereco || '').trim() || null;
-    const obs                = String(req.body.obs || '').trim() || null;
-    const pessoas_abordadas  = toInt(req.body.pessoas_abordadas);
+    const local_nome = String(req.body.local_nome || '').trim() || null;
+    const local_endereco = String(req.body.local_endereco || '').trim() || null;
+    const obs = String(req.body.obs || '').trim() || null;
+    const pessoas_abordadas = toInt(req.body.pessoas_abordadas);
     const veiculos_abordados = toInt(req.body.veiculos_abordados);
-    const multado            = toBool(req.body.multado);
-    const fechado            = toBool(req.body.fechado);
-    const lacrado            = toBool(req.body.lacrado);
+    const multado = toBool(req.body.multado);
+    const fechado = toBool(req.body.fechado);
+    const lacrado = toBool(req.body.lacrado);
 
     // >>> NOVO: campos de detidos
     const pessoas_detidas_flag = toBool(req.body.pessoas_detidas_flag);
-    const pessoas_detidas_qtd  = toInt(req.body.pessoas_detidas_qtd);
+    const pessoas_detidas_qtd = toInt(req.body.pessoas_detidas_qtd);
     // <<<
 
     const { lat, lng, acc } = getGeoFromBody(req);
@@ -1394,12 +1394,12 @@ app.post('/operacoes/:opId/fiscalizacoes',
       const retFisc = await trx('operacao_eventos').insert({
         operacao_id: opId,
         cidade_id,
-        user_id:     user.id,
-        tipo:        'fiscalizacao',
+        user_id: user.id,
+        tipo: 'fiscalizacao',
         obs,
-        lat:         lat ?? null,
-        lng:         lng ?? null,
-        accuracy:    acc ?? null
+        lat: lat ?? null,
+        lng: lng ?? null,
+        accuracy: acc ?? null
       }).returning('id');
 
       const fisc_evento_id = Array.isArray(retFisc) ? (retFisc[0]?.id ?? retFisc[0]) : retFisc;
@@ -1434,7 +1434,7 @@ app.post('/operacoes/:opId/fiscalizacoes',
       }
 
       // 4) apreensões do JSON
-      let itens:any[] = [];
+      let itens: any[] = [];
       try {
         itens = JSON.parse(String(req.body.apreensoes_json || '[]'));
         if (!Array.isArray(itens)) itens = [];
@@ -1447,17 +1447,17 @@ app.post('/operacoes/:opId/fiscalizacoes',
         const quantidade = (it.quantidade === '' || it.quantidade == null)
           ? null : Number(it.quantidade);
         const unidade = String(it.unidade || '').trim() || null;
-        const aprObs  = String(it.obs || '').trim() || null;
+        const aprObs = String(it.obs || '').trim() || null;
 
         const retApr = await trx('operacao_eventos').insert({
           operacao_id: opId,
           cidade_id,
-          user_id:     user.id,
-          tipo:        'apreensao',
-          obs:         aprObs,
-          lat:         lat ?? null,
-          lng:         lng ?? null,
-          accuracy:    acc ?? null
+          user_id: user.id,
+          tipo: 'apreensao',
+          obs: aprObs,
+          lat: lat ?? null,
+          lng: lng ?? null,
+          accuracy: acc ?? null
         }).returning('id');
 
         const apr_evento_id = Array.isArray(retApr) ? (retApr[0]?.id ?? retApr[0]) : retApr;
@@ -1785,11 +1785,11 @@ async function buildMonitorData(id: number) {
     .first<{ multados: any; fechados: any; lacrados: any }>();
 
   const cards = {
-    locais:   Number(k?.locais)   || 0,
-    pessoas:  Number(k?.pessoas)  || 0,
+    locais: Number(k?.locais) || 0,
+    pessoas: Number(k?.pessoas) || 0,
     veiculos: Number(k?.veiculos) || 0,
     itensApreendidos: Number(aggApr?.itens_apreendidos) || 0,
-    apreensoes:       Number(aggApr?.apreensoes)       || 0,
+    apreensoes: Number(aggApr?.apreensoes) || 0,
     multados: Number(flags?.multados) || 0,
     fechados: Number(flags?.fechados) || 0,
     lacrados: Number(flags?.lacrados) || 0,
@@ -1821,8 +1821,8 @@ async function buildMonitorData(id: number) {
 
   const seriesPorCidade = await db('operacao_cidades as oc')
     .join('cidades as c', 'c.id', 'oc.cidade_id')
-    .leftJoin(subF,  'sf.cidade_id', 'oc.cidade_id')
-    .leftJoin(subApr,'sa.cidade_id', 'oc.cidade_id')
+    .leftJoin(subF, 'sf.cidade_id', 'oc.cidade_id')
+    .leftJoin(subApr, 'sa.cidade_id', 'oc.cidade_id')
     .where('oc.operacao_id', id)
     .select(
       'c.id as cidade_id',
@@ -1852,13 +1852,13 @@ async function buildMonitorData(id: number) {
     .first();
 
   const efetivo = {
-    total_agentes:   Number(ef?.agentes)         || 0,
-    total_viaturas:  Number(ef?.viaturas)        || 0,
-    pc_agentes:      Number(ef?.pc_agentes)      || 0,
-    pc_viaturas:     Number(ef?.pc_viaturas)     || 0,
-    pm_agentes:      Number(ef?.pm_agentes)      || 0,
-    pm_viaturas:     Number(ef?.pm_viaturas)     || 0,
-    outros_agentes:  Number(ef?.outros_agentes)  || 0,
+    total_agentes: Number(ef?.agentes) || 0,
+    total_viaturas: Number(ef?.viaturas) || 0,
+    pc_agentes: Number(ef?.pc_agentes) || 0,
+    pc_viaturas: Number(ef?.pc_viaturas) || 0,
+    pm_agentes: Number(ef?.pm_agentes) || 0,
+    pm_viaturas: Number(ef?.pm_viaturas) || 0,
+    outros_agentes: Number(ef?.outros_agentes) || 0,
     outros_viaturas: Number(ef?.outros_viaturas) || 0,
   };
 
@@ -2009,14 +2009,14 @@ app.get('/operacoes/:id/monitor/data', requireAdminOrGestor, async (req, res) =>
     .first<{ multados: any; fechados: any; lacrados: any }>();
 
   const cards = {
-    locais:             Number(k?.locais) || 0,
-    pessoas:            Number(k?.pessoas) || 0,
-    veiculos:           Number(k?.veiculos) || 0,
-    itensApreendidos:   Number(aggApr?.itens_apreendidos) || 0,
-    apreensoes:         Number(aggApr?.apreensoes) || 0,
-    multados:           Number(flags?.multados) || 0,
-    fechados:           Number(flags?.fechados) || 0,
-    lacrados:           Number(flags?.lacrados) || 0,
+    locais: Number(k?.locais) || 0,
+    pessoas: Number(k?.pessoas) || 0,
+    veiculos: Number(k?.veiculos) || 0,
+    itensApreendidos: Number(aggApr?.itens_apreendidos) || 0,
+    apreensoes: Number(aggApr?.apreensoes) || 0,
+    multados: Number(flags?.multados) || 0,
+    fechados: Number(flags?.fechados) || 0,
+    lacrados: Number(flags?.lacrados) || 0,
   };
 
   // Subquery: fiscalização por cidade
@@ -2046,8 +2046,8 @@ app.get('/operacoes/:id/monitor/data', requireAdminOrGestor, async (req, res) =>
 
   const seriesPorCidade = await db('operacao_cidades as oc')
     .join('cidades as c', 'c.id', 'oc.cidade_id')
-    .leftJoin(subF,  'sf.cidade_id', 'oc.cidade_id')
-    .leftJoin(subApr,'sa.cidade_id', 'oc.cidade_id')
+    .leftJoin(subF, 'sf.cidade_id', 'oc.cidade_id')
+    .leftJoin(subApr, 'sa.cidade_id', 'oc.cidade_id')
     .where('oc.operacao_id', id)
     .select(
       'c.id as cidade_id',
@@ -2082,15 +2082,15 @@ app.get('/operacoes/:id/monitor/data', requireAdminOrGestor, async (req, res) =>
 
 
 // =============================================================================
-// FISCALIZAÇÃO: EDITAR + GERENCIAR FOTOS
+//       EDIÇÃO DE INSERIR ACÇOES 
 // =============================================================================
 
 
 // GET editar fiscalização
 app.get('/operacoes/:opId/fiscalizacoes/:fiscId/editar',
   requireAuth, csrfProtection, async (req, res) => {
-    const user   = (req.session as any).user;
-    const opId   = Number(req.params.opId);
+    const user = (req.session as any).user;
+    const opId = Number(req.params.opId);
     const fiscId = Number(req.params.fiscId);
 
     // Permissão baseada no evento
@@ -2112,22 +2112,22 @@ app.get('/operacoes/:opId/fiscalizacoes/:fiscId/editar',
     // 🔁 Troque 'evento_apreensao' se o seu nome for diferente:
     const aprs = await db('evento_apreensao')
       .where({ fiscalizacao_evento_id: fiscId })
-      .select('id', 'tipo', 'quantidade', 'unidade', 'obs');
+      .select({ id: 'evento_id' }, 'tipo', 'quantidade', 'unidade', 'obs');
 
     // Monta o objeto para o EJS (o seu EJS já espera essas chaves)
     const fiscForView = {
       id: fiscId,
-      tipo_local:         fisc?.tipo_local || null,
-      local_nome:         fisc?.local_nome || null,
-      local_endereco:     fisc?.local_endereco || null,
-      pessoas_abordadas:  fisc?.pessoas_abordadas ?? 0,
+      tipo_local: fisc?.tipo_local || null,
+      local_nome: fisc?.local_nome || null,
+      local_endereco: fisc?.local_endereco || null,
+      pessoas_abordadas: fisc?.pessoas_abordadas ?? 0,
       veiculos_abordados: fisc?.veiculos_abordados ?? 0,
-      multado:            !!fisc?.multado,
-      fechado:            !!fisc?.fechado,
-      lacrado:            !!fisc?.lacrado,
+      multado: !!fisc?.multado,
+      fechado: !!fisc?.fechado,
+      lacrado: !!fisc?.lacrado,
       // 🌟 novos campos
       pessoas_detidas_flag: !!fisc?.pessoas_detidas_flag,
-      pessoas_detidas_qtd:  fisc?.pessoas_detidas_qtd ?? null,
+      pessoas_detidas_qtd: fisc?.pessoas_detidas_qtd ?? null,
       // geo (se quiser reapresentar no form)
       lat: ev?.lat ?? null,
       lng: ev?.lng ?? null,
@@ -2138,11 +2138,12 @@ app.get('/operacoes/:opId/fiscalizacoes/:fiscId/editar',
       csrfToken: (req as any).csrfToken(),
       user,
       operacao,
-      mode: 'edit',
-      postAction: `/operacoes/${opId}/fiscalizacoes/${fiscId}/editar`, // <- usado no form
-      fisc: fiscForView,           // INIT.fisc
-      apreensoes: aprs || []       // INIT.apreensoes
+      mode: 'edit',                                                     // <-- IMPORTANTE
+      postAction: `/operacoes/${opId}/fiscalizacoes/${fiscId}/editar`,  // <-- IMPORTANTE
+      fisc: fiscForView,
+      apreensoes: aprs || []
     });
+
   });
 
 
@@ -2152,8 +2153,8 @@ app.get('/operacoes/:opId/fiscalizacoes/:fiscId/editar',
 
 app.post('/operacoes/:opId/fiscalizacoes/:fiscId/editar',
   requireAuth, csrfProtection, async (req, res) => {
-    const user   = (req.session as any).user;
-    const opId   = Number(req.params.opId);
+    const user = (req.session as any).user;
+    const opId = Number(req.params.opId);
     const fiscId = Number(req.params.fiscId);
 
     const ev = await db('operacao_eventos')
@@ -2163,25 +2164,25 @@ app.post('/operacoes/:opId/fiscalizacoes/:fiscId/editar',
     const perm = await canEditEvento(user, opId, fiscId);
     if (!perm.ok) return res.status(perm.status || 403).send(perm.reason || 'Não autorizado.');
 
-    const toInt  = (v:any) => (v === '' || v == null) ? 0 : Math.max(0, Math.floor(Number(v) || 0));
-    const toBool = (v:any) => v === 'on' || v === 'true' || v === '1';
-    const S      = (v:any) => String(v ?? '').trim();
+    const toInt = (v: any) => (v === '' || v == null) ? 0 : Math.max(0, Math.floor(Number(v) || 0));
+    const toBool = (v: any) => v === 'on' || v === 'true' || v === '1';
+    const S = (v: any) => String(v ?? '').trim();
 
-    const tipo_local         = S(req.body.tipo_local);
+    const tipo_local = S(req.body.tipo_local);
     if (!tipo_local) return res.status(400).send('Informe o tipo de local.');
 
-    const local_nome         = S(req.body.local_nome) || null;
-    const local_endereco     = S(req.body.local_endereco) || null;
-    const obs                = S(req.body.obs) || null;
-    const pessoas_abordadas  = toInt(req.body.pessoas_abordadas);
+    const local_nome = S(req.body.local_nome) || null;
+    const local_endereco = S(req.body.local_endereco) || null;
+    const obs = S(req.body.obs) || null;
+    const pessoas_abordadas = toInt(req.body.pessoas_abordadas);
     const veiculos_abordados = toInt(req.body.veiculos_abordados);
-    const multado            = toBool(req.body.multado);
-    const fechado            = toBool(req.body.fechado);
-    const lacrado            = toBool(req.body.lacrado);
+    const multado = toBool(req.body.multado);
+    const fechado = toBool(req.body.fechado);
+    const lacrado = toBool(req.body.lacrado);
 
     // 🌟 novos campos
     const pessoas_detidas_flag = toBool(req.body.pessoas_detidas_flag);
-    const pessoas_detidas_qtd  = toInt(req.body.pessoas_detidas_qtd);
+    const pessoas_detidas_qtd = toInt(req.body.pessoas_detidas_qtd);
 
     // Se também quiser atualizar a localização do evento:
     const { lat, lng, acc } = getGeoFromBody(req);
