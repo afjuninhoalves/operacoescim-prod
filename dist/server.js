@@ -1692,22 +1692,26 @@ app.get('/operacoes/:opId/fiscalizacoes/:eventoId/editar', requireAuth, csrfProt
     const apreensoes = await db('evento_apreensao as a')
         .join('operacao_eventos as e', 'e.id', 'a.evento_id')
         .where('a.fiscalizacao_evento_id', evId)
-        .select('a.evento_id as id', 'a.tipo', 'a.quantidade', 'a.unidade', 'e.obs')
-        .orderBy('a.evento_id', 'desc');
+        .select('a.evento_id as id', 'a.tipo', 'a.quantidade', 'a.unidade', db.raw('e.obs as obs') // 👈 garante o nome
+    )
+        .orderBy('a.evento_id', 'asc');
     // Renderiza a MESMA página usada para criar, em modo edição
-    return res.render('operacoes-acoes-nova', {
+    return res
+        .cookie('XSRF-TOKEN', req.csrfToken(), { sameSite: 'lax', secure: true })
+        .render('operacoes-acoes-nova', {
         csrfToken: req.csrfToken(),
         operacao,
         mode: 'edit',
         postAction: `/operacoes/${opId}/fiscalizacoes/${evId}/editar`,
-        fisc: f, // dados da fiscalização
-        apreensoes // <- array de apreensões desta fiscalização
+        fisc: f,
+        apreensoes
     });
 });
 // POST: salvar alterações na fiscalização + (opcional) anexar novas fotos
 // Aceita campos: tipo_local, obs e (opcional) fotos[] / foto
-app.post('/operacoes/:opId/fiscalizacoes/:eventoId/editar', requireAuth, uploadFotosFields, // <<< precisa vir antes do csurf
-csrfProtection, async (req, res) => {
+app.post('/operacoes/:opId/fiscalizacoes/:eventoId/editar', requireAuth, uploadFotosFields, // multer primeiro
+csrfProtection, // depois CSRF
+async (req, res) => {
     const user = req.session.user;
     const opId = Number(req.params.opId);
     const evId = Number(req.params.eventoId);
