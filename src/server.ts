@@ -1349,8 +1349,8 @@ app.post('/operacoes/:id/status', requireAdminOrGestor, csrfProtection, async (r
 // CRIAR fiscalização + fotos + apreensões (a partir do JSON do formulário)
 app.post('/operacoes/:opId/fiscalizacoes',
   requireAuth,
-  uploadFotosFields,     // multer primeiro
-  csrfProtection,        // depois CSRF
+  uploadFotosFields,
+  csrfProtection,
   async (req, res) => {
     const user = (req.session as any).user;
     const opId = Number(req.params.opId);
@@ -1358,37 +1358,38 @@ app.post('/operacoes/:opId/fiscalizacoes',
     const toInt  = (v:any) => (v === '' || v == null) ? 0 : Math.max(0, Math.floor(Number(v) || 0));
     const toBool = (v:any) => v === 'on' || v === 'true' || v === '1';
 
-    // Campos básicos
     const tipo_local = String(req.body.tipo_local || '').trim();
     if (!tipo_local) return res.status(400).send('Informe o tipo de local.');
 
-    const local_nome          = String(req.body.local_nome || '').trim() || null;
-    const local_endereco      = String(req.body.local_endereco || '').trim() || null;
-    const obs                 = String(req.body.obs || '').trim() || null;
-    const pessoas_abordadas   = toInt(req.body.pessoas_abordadas);
-    const veiculos_abordados  = toInt(req.body.veiculos_abordados);
-    const multado             = toBool(req.body.multado);
-    const fechado             = toBool(req.body.fechado);
-    const lacrado             = toBool(req.body.lacrado);
+    const local_nome         = String(req.body.local_nome || '').trim() || null;
+    const local_endereco     = String(req.body.local_endereco || '').trim() || null;
+    const obs                = String(req.body.obs || '').trim() || null;
+    const pessoas_abordadas  = toInt(req.body.pessoas_abordadas);
+    const veiculos_abordados = toInt(req.body.veiculos_abordados);
+    const multado            = toBool(req.body.multado);
+    const fechado            = toBool(req.body.fechado);
+    const lacrado            = toBool(req.body.lacrado);
 
-    // Geo do form
-    const { lat, lng, acc } = getGeoFromBody(req); // seu helper
+    const { lat, lng, acc }  = getGeoFromBody(req);
 
-    // Use transação para criar tudo junto
     await db.transaction(async trx => {
-      // 1) cria o evento base da fiscalização
-      const fisc_evento_id = await createEventoBase({
-        operacao_id: opId,
-        cidade_id:   req.body.cidade_id ?? null,  // se você tiver isso no form/perm
-        user_id:     user.id,
-        tipo:        'fiscalizacao',
-        obs,
-        lat:         lat ?? null,
-        lng:         lng ?? null,
-        accuracy:    acc ?? null
-      }, trx); // se seu helper aceitar trx; se não, remova o argumento
+      // 1) cria evento base da FISCALIZAÇÃO
+      const retFisc = await trx('operacao_eventos')
+        .insert({
+          operacao_id: opId,
+          cidade_id:   null,           // ajuste se sua coluna exigir valor
+          user_id:     user.id,
+          tipo:        'fiscalizacao',
+          obs,
+          lat:         lat ?? null,
+          lng:         lng ?? null,
+          accuracy:    acc ?? null
+        })
+        .returning('id');
 
-      // 2) insere detalhes da fiscalização
+      const fisc_evento_id = Array.isArray(retFisc) ? (retFisc[0]?.id ?? retFisc[0]) : retFisc;
+
+      // 2) detalhes da fiscalização
       await trx('evento_fiscalizacao').insert({
         evento_id: fisc_evento_id,
         tipo_local,
@@ -1401,8 +1402,8 @@ app.post('/operacoes/:opId/fiscalizacoes',
         lacrado
       });
 
-      // 3) fotos (se houver)
-      const files = fotosFromRequest(req); // seu helper
+      // 3) fotos
+      const files = fotosFromRequest(req);
       if (files.length) {
         await trx('evento_fotos').insert(
           files.map(f => ({
@@ -1415,7 +1416,7 @@ app.post('/operacoes/:opId/fiscalizacoes',
         );
       }
 
-      // 4) apreensões (a partir do JSON do form)
+      // 4) apreensões do JSON
       let itens:any[] = [];
       try {
         itens = JSON.parse(String(req.body.apreensoes_json || '[]'));
@@ -1426,29 +1427,29 @@ app.post('/operacoes/:opId/fiscalizacoes',
         const tipo = String(it.tipo || '').trim();
         if (!tipo) continue;
 
-        // Se sua coluna "quantidade" for NOT NULL, troque a lógica:
-        //   const quantidade = Number.isFinite(Number(it.quantidade)) ? Number(it.quantidade) : 0;
-        const quantidade = (it.quantidade === '' || it.quantidade == null)
-          ? null
-          : Number(it.quantidade);
+        // Se a coluna quantidade for NOT NULL, troque para 0 quando vier vazia
+        const quantidade =
+          (it.quantidade === '' || it.quantidade == null) ? null : Number(it.quantidade);
 
         const unidade = String(it.unidade || '').trim() || null;
         const aprObs  = String(it.obs || '').trim() || null;
 
-        // cria evento base da apreensão
-        const apr_evento_id = await createEventoBase({
-          operacao_id: opId,
-          cidade_id:   req.body.cidade_id ?? null,
-          user_id:     user.id,
-          tipo:        'apreensao',
-          obs:         aprObs,
-          // herda a geo da fiscalização
-          lat:         lat ?? null,
-          lng:         lng ?? null,
-          accuracy:    acc ?? null
-        }, trx);
+        // evento base da APREENSÃO
+        const retApr = await trx('operacao_eventos')
+          .insert({
+            operacao_id: opId,
+            cidade_id:   null,         // ajuste se necessário
+            user_id:     user.id,
+            tipo:        'apreensao',
+            obs:         aprObs,
+            lat:         lat ?? null,
+            lng:         lng ?? null,
+            accuracy:    acc ?? null
+          })
+          .returning('id');
 
-        // vincula os dados de apreensão + chave da fiscalização
+        const apr_evento_id = Array.isArray(retApr) ? (retApr[0]?.id ?? retApr[0]) : retApr;
+
         await trx('evento_apreensao').insert({
           evento_id: apr_evento_id,
           tipo,
@@ -1458,13 +1459,12 @@ app.post('/operacoes/:opId/fiscalizacoes',
         });
       }
 
-      // redireciona para a tela de edição já dessa fiscalização
       const go = pickReturnTo(req, `/operacoes/${opId}/fiscalizacoes/${fisc_evento_id}/editar`);
-      // (se quiser abrir o modal de apreensão vazio depois de criar, pode usar `?open=apr`)
-      res.redirect(go);
+      return res.redirect(go);
     });
   }
 );
+
 
 
 
