@@ -1,67 +1,305 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
-
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>
-    <%= (mode==='edit' ?'Editar fiscalização — ':' Inserir ações — ') + operacao.nome %></title>
+
+  <%  
+    const MODE        = (typeof mode === 'string' ? mode : 'create');
+    const POST_ACTION = (typeof postAction === 'string'
+      ? postAction
+      : ('/operacoes/' + operacao.id + '/fiscalizacoes'));
+    const FISC        = (fisc && typeof fisc === 'object') ? fisc : null;
+    const APR_LIST    = Array.isArray(apreensoes) ? apreensoes : [];
+  %>
+
+  <title><%= (MODE === 'edit' ? 'Editar fiscalização — ' : 'Inserir ações — ') + operacao.nome %></title>
+
+  
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
 
   <style>
-    :root{
-      --bg:#0b1220; --panel:#0f172a; --panel2:#111827; --border:#1f2937;
-      --muted:#9ca3af; --text:#e5e7eb; --blue:#2563eb; --green:#22c55e; --red:#ef4444;
-      --radius:14px; --shadow:0 10px 30px rgba(0,0,0,.35);
+    :root {
+      --bg: #0b1220;
+      --panel: #0f172a;
+      --panel2: #111827;
+      --border: #1f2937;
+      --muted: #9ca3af;
+      --text: #e5e7eb;
+      --blue: #2563eb;
+      --green: #22c55e;
+      --red: #ef4444;
+      --radius: 14px;
+      --shadow: 0 10px 30px rgba(0, 0, 0, .35);
     }
-    *{box-sizing:border-box}
-    body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial}
-    a{color:inherit;text-decoration:none}
-    .topbar{position:sticky;top:0;z-index:10;background:linear-gradient(180deg,rgba(17,24,39,.9),rgba(17,24,39,.7));border-bottom:1px solid var(--border);backdrop-filter:saturate(140%) blur(8px)}
-    .topbar-inner{max-width:1160px;margin:0 auto;padding:12px 16px;display:flex;gap:8px;align-items:center;justify-content:space-between}
-    .brand{display:flex;gap:10px;align-items:center;font-weight:700}
-    .badge{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:10px;background:linear-gradient(135deg,var(--blue),#0ea5e9);color:#fff;font-weight:900;box-shadow:0 6px 16px rgba(37,99,235,.35)}
-    .btn{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:#111826;color:var(--text);cursor:pointer}
-    .btn:hover{filter:brightness(1.06)}
-    .btn-primary{background:var(--blue);color:#fff;border-color:rgba(37,99,235,.5)}
-    .btn-ghost{background:#0b1325}
-    .btn-red{background:var(--red);color:#fff;border-color:#991b1b}
-    .btn[disabled]{opacity:.6;cursor:not-allowed}
-    .container{max-width:1160px;margin:0 auto;padding:20px 16px 40px}
-    .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px}
-    .muted{color:var(--muted)}
-    .pill{display:inline-block;padding:4px 10px;border-radius:999px;border:1px solid var(--border);background:#0b1325;color:#93c5fd}
-    .actions{display:flex;gap:8px;flex-wrap:wrap}
-    .grid{display:grid;gap:18px}
-    .grid.two{grid-template-columns:1.2fr .8fr}
-    @media (max-width:980px){ .grid.two{grid-template-columns:1fr} }
-    label{font-size:13px;color:var(--muted);display:block;margin-bottom:6px}
-    input[type="text"],input[type="number"],textarea,select,input[type="file"]{
-      width:100%;padding:11px 12px;border-radius:10px;border:1px solid var(--border);background:#0b1325;color:var(--text);outline:none
+
+    * {
+      box-sizing: border-box
     }
-    textarea{min-height:90px;resize:vertical}
-    .row{display:flex;gap:14px;flex-wrap:wrap}
-    .row > .col{flex:1 1 220px}
-    .geo-card{margin-top:16px}
-    #pickMap{height:300px;border-radius:12px}
-    .geo-status{color:var(--muted);font-size:12px}
-    .hide{display:none}
-    .geo-ok{color:#22c55e;font-weight:600}
-    .geo-err{color:#ef4444;font-weight:600}
 
-    .apr-item{border:1px solid var(--border);border-radius:12px;padding:10px;display:flex;justify-content:space-between;gap:10px}
-    .apr-kind{font-weight:600}
-    .apr-meta{font-size:12px;color:var(--muted)}
-    .apr-actions{display:flex;gap:8px}
-    .empty{border:1px dashed var(--border);border-radius:12px;padding:12px;text-align:center;color:var(--muted)}
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Arial
+    }
 
-    .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:50}
-    .modal{width:min(560px,92vw);background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow);padding:16px}
-    .modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
-    .modal-title{font-weight:700}
+    a {
+      color: inherit;
+      text-decoration: none
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: linear-gradient(180deg, rgba(17, 24, 39, .9), rgba(17, 24, 39, .7));
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: saturate(140%) blur(8px)
+    }
+
+    .topbar-inner {
+      max-width: 1160px;
+      margin: 0 auto;
+      padding: 12px 16px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      justify-content: space-between
+    }
+
+    .brand {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      font-weight: 700
+    }
+
+    .badge {
+      display: inline-grid;
+      place-items: center;
+      width: 30px;
+      height: 30px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--blue), #0ea5e9);
+      color: #fff;
+      font-weight: 900;
+      box-shadow: 0 6px 16px rgba(37, 99, 235, .35)
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: #111826;
+      color: var(--text);
+      cursor: pointer
+    }
+
+    .btn:hover {
+      filter: brightness(1.06)
+    }
+
+    .btn-primary {
+      background: var(--blue);
+      color: #fff;
+      border-color: rgba(37, 99, 235, .5)
+    }
+
+    .btn-ghost {
+      background: #0b1325
+    }
+
+    .btn-red {
+      background: var(--red);
+      color: #fff;
+      border-color: #991b1b
+    }
+
+    .btn[disabled] {
+      opacity: .6;
+      cursor: not-allowed
+    }
+
+    .container {
+      max-width: 1160px;
+      margin: 0 auto;
+      padding: 20px 16px 40px
+    }
+
+    .card {
+      background: linear-gradient(180deg, var(--panel), var(--panel2));
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 18px
+    }
+
+    .muted {
+      color: var(--muted)
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: #0b1325;
+      color: #93c5fd
+    }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap
+    }
+
+    .grid {
+      display: grid;
+      gap: 18px
+    }
+
+    .grid.two {
+      grid-template-columns: 1.2fr .8fr
+    }
+
+    @media (max-width:980px) {
+      .grid.two {
+        grid-template-columns: 1fr
+      }
+    }
+
+    label {
+      font-size: 13px;
+      color: var(--muted);
+      display: block;
+      margin-bottom: 6px
+    }
+
+    input[type="text"],
+    input[type="number"],
+    textarea,
+    select,
+    input[type="file"] {
+      width: 100%;
+      padding: 11px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: #0b1325;
+      color: var(--text);
+      outline: none
+    }
+
+    textarea {
+      min-height: 90px;
+      resize: vertical
+    }
+
+    .row {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap
+    }
+
+    .row>.col {
+      flex: 1 1 220px
+    }
+
+    .geo-card {
+      margin-top: 16px
+    }
+
+    #pickMap {
+      height: 300px;
+      border-radius: 12px
+    }
+
+    .geo-status {
+      color: var(--muted);
+      font-size: 12px
+    }
+
+    .hide {
+      display: none
+    }
+
+    .geo-ok {
+      color: #22c55e;
+      font-weight: 600
+    }
+
+    .geo-err {
+      color: #ef4444;
+      font-weight: 600
+    }
+
+    .apr-item {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px;
+      display: flex;
+      justify-content: space-between;
+      gap: 10px
+    }
+
+    .apr-kind {
+      font-weight: 600
+    }
+
+    .apr-meta {
+      font-size: 12px;
+      color: var(--muted)
+    }
+
+    .apr-actions {
+      display: flex;
+      gap: 8px
+    }
+
+    .empty {
+      border: 1px dashed var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      text-align: center;
+      color: var(--muted)
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, .5);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 50
+    }
+
+    .modal {
+      width: min(560px, 92vw);
+      background: linear-gradient(180deg, var(--panel), var(--panel2));
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      padding: 16px
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px
+    }
+
+    .modal-title {
+      font-weight: 700
+    }
   </style>
 </head>
+
 <body>
 
   <div class="topbar">
@@ -70,7 +308,8 @@
         <span class="badge">CIM</span>
         <div>
           Operações CIM
-          <div class="muted"><%= (mode===' edit'?'Editar fiscalização — ':' Inserir ações — ') + operacao.nome %></div>
+          <div class="muted">
+            <%= (mode===' edit' ?'Editar fiscalização — ':' Inserir ações — ') + operacao.nome %></div>
         </div>
       </div>
       <div class="actions">
@@ -117,8 +356,7 @@
 
       <!-- Form da FISCALIZAÇÃO -->
       <form class="card" id="formFiscalizacao"
-            method="post"
-            action="<%= postAction || (' /operacoes/' + operacao.id + '/fiscalizacoes' ) %>"
+      method="post" action="<%= POST_ACTION %>"
       enctype="multipart/form-data" autocomplete="off" novalidate>
       <input type="hidden" name="_csrf" value="<%= csrfToken %>">
       <input type="hidden" name="return_to" value="/operacoes/<%= operacao.id %>/acoes/nova">
@@ -171,50 +409,50 @@
 
       <div class="row" style="margin-top:10px">
         <label style="display:flex;align-items:center;gap:8px">
-          <input type="checkbox" name="multado" <%=(fisc && fisc.multado)? 'checked' : '' %> > Multado
-        </label>
-        <label style="display:flex;align-items:center;gap:8px">
-          <input type="checkbox" name="fechado" <%=(fisc && fisc.fechado)? 'checked' : '' %> > Fechado
-        </label>
-        <label style="display:flex;align-items:center;gap:8px">
-          <input type="checkbox" name="lacrado" <%=(fisc && fisc.lacrado)? 'checked' : '' %> > Lacrado
-        </label>
-      </div>
+          <input type="checkbox" name="multado" <%=(fisc && fisc.multado)? ' checked' : '' %> > Multado
+              </label>
+              <label style="display:flex;align-items:center;gap:8px">
+                <input type="checkbox" name="fechado" <%=(fisc && fisc.fechado)? 'checked' : '' %> > Fechado
+              </label>
+              <label style="display:flex;align-items:center;gap:8px">
+                <input type="checkbox" name="lacrado" <%=(fisc && fisc.lacrado)? 'checked' : '' %> > Lacrado
+              </label>
+          </div>
 
-      <div style="margin-top:12px">
-        <label>Fotos (câmera ou galeria)</label>
-        <input type="file" name="fotos" accept="image/*" capture="environment" multiple>
-      </div>
+          <div style="margin-top:12px">
+            <label>Fotos (câmera ou galeria)</label>
+            <input type="file" name="fotos" accept="image/*" capture="environment" multiple>
+          </div>
 
-      <div class="muted geo-status" style="margin-top:6px">Localização: aguardando…</div>
+          <div class="muted geo-status" style="margin-top:6px">Localização: aguardando…</div>
 
-      <hr style="border-color:#1f2937; margin:14px 0">
+          <hr style="border-color:#1f2937; margin:14px 0">
 
-      <div class="row" style="justify-content:space-between;align-items:center">
-        <h4 style="margin:0">Apreensões</h4>
-        <button type="button" class="btn btn-primary" id="btnAddApr">Adicionar apreensão</button>
-      </div>
+          <div class="row" style="justify-content:space-between;align-items:center">
+            <h4 style="margin:0">Apreensões</h4>
+            <button type="button" class="btn btn-primary" id="btnAddApr">Adicionar apreensão</button>
+          </div>
 
-      <div class="row" style="justify-content:space-between;margin-top:14px">
-        <div class="muted geo-status">Localização: aguardando…</div>
-        <button class="btn btn-primary" id="btnSubmit" type="submit">
-          <%= mode==='edit' ?'Salvar alterações':'Salvar fiscalização' %>
-        </button>
-      </div>
-      </form>
+          <div class="row" style="justify-content:space-between;margin-top:14px">
+            <div class="muted geo-status">Localização: aguardando…</div>
+            <button class="btn btn-primary" id="btnSubmit" type="submit">
+              <%= mode==='edit' ?'Salvar alterações':'Salvar fiscalização' %>
+            </button>
+          </div>
+          </form>
 
-      <!-- Painel direito: lista de apreensões -->
-      <div class="card">
-        <div class="row" style="justify-content:space-between;align-items:center">
-          <h3 style="margin:0">Apreensões desta fiscalização</h3>
-          <span class="pill" id="aprCount">0 itens</span>
+          <!-- Painel direito: lista de apreensões -->
+          <div class="card">
+            <div class="row" style="justify-content:space-between;align-items:center">
+              <h3 style="margin:0">Apreensões desta fiscalização</h3>
+              <span class="pill" id="aprCount">0 itens</span>
+            </div>
+            <div id="aprList" style="margin-top:12px;display:flex;flex-direction:column;gap:10px">
+              <div class="empty">Nenhuma apreensão adicionada. Clique em <strong>Adicionar apreensão</strong>.</div>
+            </div>
+          </div>
+
         </div>
-        <div id="aprList" style="margin-top:12px;display:flex;flex-direction:column;gap:10px">
-          <div class="empty">Nenhuma apreensão adicionada. Clique em <strong>Adicionar apreensão</strong>.</div>
-        </div>
-      </div>
-
-      </div>
       </div>
 
       <!-- MODAL de Apreensão -->
@@ -257,12 +495,13 @@
       <!-- Bootstrap de dados para modo edição -->
       <script>
         window.INIT = {
-          mode: "<%= mode || 'create' %>",
-          postAction: "<%= postAction || ('/operacoes/' + operacao.id + '/fiscalizacoes') %>",
-          fisc: <%- JSON.stringify(fisc || {}) %>,
-          apreensoes: <%- JSON.stringify(apreensoes || []) %>
+          mode: "<%= MODE %>",
+          postAction: "<%= POST_ACTION %>",
+          fisc: <%- JSON.stringify(FISC || {}) %>,
+          apreensoes: <%- JSON.stringify(APR_LIST) %>
   };
       </script>
+
 
       <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
       <script>
@@ -483,28 +722,28 @@
 
           // ======== MODO EDIÇÃO: preencher tudo ========
           const INIT = window.INIT || {};
-if (INIT.mode === 'edit') {
-  // preenche o form:
-  const f = INIT.fisc || {};
-  document.querySelector('[name="tipo_local"]').value       = f.tipo_local || '';
-  document.querySelector('[name="local_nome"]').value       = f.local_nome || '';
-  document.querySelector('[name="local_endereco"]').value   = f.local_endereco || '';
-  document.querySelector('[name="pessoas_abordadas"]').value= f.pessoas_abordadas ?? 0;
-  document.querySelector('[name="veiculos_abordados"]').value= f.veiculos_abordados ?? 0;
-  document.querySelector('[name="multado"]').checked        = !!f.multado;
-  document.querySelector('[name="fechado"]').checked        = !!f.fechado;
-  document.querySelector('[name="lacrado"]').checked        = !!f.lacrado;
-  document.querySelector('[name="obs"]').value              = f.obs || '';
+          if (INIT.mode === 'edit') {
+            // preenche o form:
+            const f = INIT.fisc || {};
+            document.querySelector('[name="tipo_local"]').value = f.tipo_local || '';
+            document.querySelector('[name="local_nome"]').value = f.local_nome || '';
+            document.querySelector('[name="local_endereco"]').value = f.local_endereco || '';
+            document.querySelector('[name="pessoas_abordadas"]').value = f.pessoas_abordadas ?? 0;
+            document.querySelector('[name="veiculos_abordados"]').value = f.veiculos_abordados ?? 0;
+            document.querySelector('[name="multado"]').checked = !!f.multado;
+            document.querySelector('[name="fechado"]').checked = !!f.fechado;
+            document.querySelector('[name="lacrado"]').checked = !!f.lacrado;
+            document.querySelector('[name="obs"]').value = f.obs || '';
 
-  // carrega as apreensões no painel direito:
-  apreensoes.splice(0, apreensoes.length, ...(INIT.apreensoes || []));
-  renderApr();
-}
+            // carrega as apreensões no painel direito:
+            apreensoes.splice(0, apreensoes.length, ...(INIT.apreensoes || []));
+            renderApr();
+          }
 
 
           renderApr();
         })();
       </script>
-      </body>
+</body>
 
 </html>
