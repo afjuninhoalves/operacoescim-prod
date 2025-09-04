@@ -2318,14 +2318,12 @@ app.get('/operacoes/:opId/pessoas/:eventoId/editar',
     // fiscalizações da MESMA cidade deste evento (para vincular)
     const fiscList = await db('operacao_eventos as e')
       .leftJoin('evento_fiscalizacao as f', 'f.evento_id', 'e.id')
-      .where({ 'e.operacao_id': opId, 'e.tipo': 'fiscalizacao' })
-      .modify(q => { if (perm.evento?.cidade_id) q.andWhere('e.cidade_id', perm.evento.cidade_id); })
+      .where({ 'e.operacao_id': opId, 'e.tipo': 'fiscalizacao', 'e.cidade_id': perm.evento!.cidade_id })
       .select(
         'e.id',
         db.raw(`COALESCE(NULLIF(f.tipo_local,''), 'Fiscalização #' || e.id) as nome`)
       )
       .orderBy('e.ts', 'desc');
-
 
     return res.render('pessoa-edit', {
       csrfToken: (req as any).csrfToken(),
