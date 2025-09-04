@@ -5,13 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Inserir ações — <%= operacao.nome %></title>
 
-  <!-- Leaflet (mapa para marcação manual) -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
 
   <style>
     :root{
       --bg:#0b1220; --panel:#0f172a; --panel2:#111827; --border:#1f2937;
-      --muted:#9ca3af; --text:#e5e7eb; --blue:#2563eb; --green:#22c55e; --red:#ef4444;
+      --muted:#9ca3af; --text:#e5e7eb; --blue:#2563eb; --green:#22c55e; --red:#ef4444; --amber:#f59e0b;
       --radius:14px; --shadow:0 10px 30px rgba(0,0,0,.35);
     }
     *{box-sizing:border-box}
@@ -24,28 +23,42 @@
     .btn{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:#111826;color:var(--text);cursor:pointer}
     .btn:hover{filter:brightness(1.06)}
     .btn-primary{background:var(--blue);color:#fff;border-color:rgba(37,99,235,.5)}
+    .btn-ghost{background:#0b1325}
+    .btn-red{background:var(--red);color:#fff;border-color:#991b1b}
     .container{max-width:1160px;margin:0 auto;padding:20px 16px 40px}
     .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px}
     .muted{color:var(--muted)}
     .pill{display:inline-block;padding:4px 10px;border-radius:999px;border:1px solid var(--border);background:#0b1325;color:#93c5fd}
     .actions{display:flex;gap:8px;flex-wrap:wrap}
     .grid{display:grid;gap:18px}
-    @media (min-width:960px){ .grid.two{grid-template-columns:1fr 1fr} }
+    .grid.two{grid-template-columns:1.2fr .8fr}
+    @media (max-width:980px){ .grid.two{grid-template-columns:1fr} }
     label{font-size:13px;color:var(--muted);display:block;margin-bottom:6px}
-    input[type="text"],input[type="number"],input[type="datetime-local"],textarea,select,input[type="file"]{
+    input[type="text"],input[type="number"],textarea,select,input[type="file"]{
       width:100%;padding:11px 12px;border-radius:10px;border:1px solid var(--border);background:#0b1325;color:var(--text);outline:none
     }
     textarea{min-height:90px;resize:vertical}
-    .section-title{font-weight:700;font-size:18px;margin:0 0 12px}
-    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-    /* GEO */
+    .row{display:flex;gap:14px;flex-wrap:wrap}
+    .row > .col{flex:1 1 220px}
     .geo-card{margin-top:16px}
     #pickMap{height:300px;border-radius:12px}
-    .geo-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
     .geo-status{color:var(--muted);font-size:12px}
     .hide{display:none}
     .geo-ok{color:#22c55e;font-weight:600}
     .geo-err{color:#ef4444;font-weight:600}
+
+    /* Lista de apreensões (painel direito) */
+    .apr-item{border:1px solid var(--border);border-radius:12px;padding:10px;display:flex;justify-content:space-between;gap:10px}
+    .apr-kind{font-weight:600}
+    .apr-meta{font-size:12px;color:var(--muted)}
+    .apr-actions{display:flex;gap:8px}
+    .empty{border:1px dashed var(--border);border-radius:12px;padding:12px;text-align:center;color:var(--muted)}
+
+    /* Modal */
+    .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:50}
+    .modal{width:min(560px,92vw);background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow);padding:16px}
+    .modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+    .modal-title{font-weight:700}
   </style>
 </head>
 <body>
@@ -68,7 +81,7 @@
   </div>
 
   <div class="container">
-    <!-- Cabeçalho da operação -->
+    <!-- Cabeçalho -->
     <div class="card">
       <div class="row" style="justify-content:space-between">
         <div>
@@ -82,13 +95,13 @@
       </div>
     </div>
 
-    <!-- ====== BLOCO DE LOCALIZAÇÃO (GPS + MAPA) ====== -->
+    <!-- GEO -->
     <div class="card geo-card">
       <h3 style="margin:0 0 10px">Localização (opcional)</h3>
-      <div class="geo-row" style="margin-bottom:10px">
+      <div class="row" style="align-items:center;margin-bottom:10px">
         <button type="button" class="btn" id="btnGPS">Usar GPS</button>
         <button type="button" class="btn" id="btnManual">Marcar no mapa</button>
-        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
           <input type="checkbox" id="ckAttach" checked>
           Anexar localização às fotos
         </label>
@@ -99,47 +112,59 @@
       </div>
     </div>
 
-    <!-- GRID (pode ficar two para manter o layout; só temos um card abaixo) -->
+    <!-- GRID principal -->
     <div class="grid two" style="margin-top:16px">
 
-      <!-- FISCALIZAÇÃO (único cartão) -->
-      <form class="card" method="post" action="/operacoes/<%= operacao.id %>/fiscalizacoes" enctype="multipart/form-data">
+      <!-- Form da FISCALIZAÇÃO -->
+      <form class="card" id="formFiscalizacao" method="post" action="/operacoes/<%= operacao.id %>/fiscalizacoes" enctype="multipart/form-data">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <input type="hidden" name="return_to" value="/operacoes/<%= operacao.id %>/acoes/nova">
-
-        <!-- HIDDEN GEO (usado pelo JS) -->
+        <!-- GEO -->
         <input type="hidden" name="lat" class="geo-lat">
         <input type="hidden" name="lng" class="geo-lng">
         <input type="hidden" name="acc" class="geo-acc">
+        <!-- JSON com as N apreensões -->
+        <input type="hidden" name="apreensoes_json" id="apreensoes_json">
 
         <h3 style="margin:0 0 10px">Fiscalização</h3>
 
-        <div class="row" style="gap:14px">
-          <div style="flex:1">
+        <div class="row">
+          <div class="col">
             <label>Tipo de local</label>
             <input type="text" name="tipo_local" placeholder="ex: bar, ferro-velho, baile">
           </div>
-          <div style="flex:1">
+          <div class="col">
+            <label>Nome do local</label>
+            <input type="text" name="local_nome" placeholder="ex: Bar do Zé">
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:10px">
+          <div class="col">
+            <label>Endereço</label>
+            <input type="text" name="local_endereco" placeholder="ex: Rua X, 123 — Centro">
+          </div>
+          <div class="col">
             <label>Observações</label>
             <textarea name="obs" rows="3" placeholder=""></textarea>
           </div>
         </div>
 
-        <div class="row" style="gap:14px; margin-top:10px">
-          <div style="flex:1">
+        <div class="row" style="margin-top:10px">
+          <div class="col">
             <label>Pessoas abordadas</label>
             <input type="number" min="0" name="pessoas_abordadas" value="0">
           </div>
-          <div style="flex:1">
+          <div class="col">
             <label>Veículos abordados</label>
             <input type="number" min="0" name="veiculos_abordados" value="0">
           </div>
         </div>
 
-        <div style="margin:10px 0 0; display:flex; gap:16px; flex-wrap:wrap">
-          <label style="display:flex; align-items:center; gap:8px"><input type="checkbox" name="multado"> Multado</label>
-          <label style="display:flex; align-items:center; gap:8px"><input type="checkbox" name="fechado"> Fechado</label>
-          <label style="display:flex; align-items:center; gap:8px"><input type="checkbox" name="lacrado"> Lacrado</label>
+        <div class="row" style="margin-top:10px">
+          <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" name="multado"> Multado</label>
+          <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" name="fechado"> Fechado</label>
+          <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" name="lacrado"> Lacrado</label>
         </div>
 
         <div style="margin-top:12px">
@@ -151,58 +176,84 @@
 
         <hr style="border-color:#1f2937; margin:14px 0">
 
-        <h4 style="margin:0 0 8px">Apreensão (opcional)</h4>
-
-        <div class="row" style="gap:14px">
-          <div style="flex:1">
-            <label>Tipo</label>
-            <input type="text" name="apr_tipo" placeholder="ex: drogas, arma, mercadoria">
-          </div>
-          <div style="flex:1">
-            <label>Quantidade</label>
-            <input type="number" min="0" name="apr_quantidade" placeholder="0">
-          </div>
-          <div style="flex:1">
-            <label>Unidade</label>
-            <input type="text" name="apr_unidade" placeholder="ex: kg, un, L">
-          </div>
+        <div class="row" style="justify-content:space-between;align-items:center">
+          <h4 style="margin:0">Apreensões</h4>
+          <button type="button" class="btn btn-primary" id="btnAddApr">Adicionar apreensão</button>
         </div>
 
-        <div style="margin-top:10px">
-          <label>Observações da apreensão</label>
-          <textarea name="apr_obs" rows="2"></textarea>
-        </div>
-
-        <div class="row" style="justify-content:space-between;margin-top:12px">
+        <div class="row" style="justify-content:space-between;margin-top:14px">
           <div class="muted geo-status">Localização: aguardando…</div>
           <button class="btn btn-primary" type="submit">Salvar fiscalização</button>
         </div>
       </form>
 
-      <!-- (REMOVIDOS os cartões de Pessoa, Veículo e a Apreensão separada) -->
+      <!-- Painel direito: lista de apreensões desta fiscalização (em memória) -->
+      <div class="card">
+        <div class="row" style="justify-content:space-between;align-items:center">
+          <h3 style="margin:0">Apreensões desta fiscalização</h3>
+          <span class="pill" id="aprCount">0 itens</span>
+        </div>
+        <div id="aprList" style="margin-top:12px;display:flex;flex-direction:column;gap:10px">
+          <div class="empty">Nenhuma apreensão adicionada. Clique em <strong>Adicionar apreensão</strong>.</div>
+        </div>
+      </div>
 
     </div>
   </div>
 
-  <!-- Leaflet + geolocalização -->
+  <!-- MODAL de Apreensão -->
+  <div class="modal-backdrop" id="aprModalBk">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title" id="aprModalTitle">Nova apreensão</div>
+        <button class="btn btn-ghost" type="button" id="aprClose">Fechar</button>
+      </div>
+
+      <div class="row">
+        <div class="col">
+          <label>Tipo</label>
+          <input type="text" id="apr_tipo" placeholder="ex: cigarro, bebida, droga">
+        </div>
+        <div class="col">
+          <label>Quantidade</label>
+          <input type="number" min="0" id="apr_quantidade" placeholder="0">
+        </div>
+        <div class="col">
+          <label>Unidade</label>
+          <input type="text" id="apr_unidade" placeholder="ex: pacotes, garrafas, kg">
+        </div>
+      </div>
+
+      <div style="margin-top:10px">
+        <label>Observações</label>
+        <textarea id="apr_obs" rows="3" placeholder=""></textarea>
+      </div>
+
+      <div class="row" style="justify-content:flex-end;margin-top:12px">
+        <button class="btn btn-ghost" type="button" id="aprCancel">Cancelar</button>
+        <button class="btn btn-primary" type="button" id="aprSave">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Leaflet + JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <script>
     (() => {
-      const $ = (s, r=document) => r.querySelector(s);
+      const $  = (s, r=document) => r.querySelector(s);
       const $$ = (s, r=document) => Array.from(r.querySelectorAll(s));
 
+      /* ===== GEO ===== */
       const statusEl = $('#geoStatus');
       const ckAttach = $('#ckAttach');
       const btnGPS   = $('#btnGPS');
       const btnManual= $('#btnManual');
       const mapWrap  = $('#mapWrap');
 
-      // sincroniza lat/lng/acc em TODOS os formulários desta página
       function syncHidden(lat, lng, acc) {
         $$('.geo-lat').forEach(i => i.value = (ckAttach.checked ? (lat ?? '') : ''));
         $$('.geo-lng').forEach(i => i.value = (ckAttach.checked ? (lng ?? '') : ''));
         $$('.geo-acc').forEach(i => i.value = (ckAttach.checked ? (acc ?? '') : ''));
-        // mostra status por formulário
         $$('.geo-status').forEach(s => {
           if (!s) return;
           if (ckAttach.checked && lat && lng) {
@@ -219,9 +270,8 @@
       }
       function setStatus(msg){ statusEl.textContent = msg; }
 
-      // Leaflet
       let map, marker, accuracyCircle;
-      const DEFAULT_VIEW = [-14.235004, -51.92528]; // Brasil
+      const DEFAULT_VIEW = [-14.235004, -51.92528];
       const DEFAULT_ZOOM = 4;
 
       function ensureMap(){
@@ -230,16 +280,12 @@
         map = L.map('pickMap');
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19, attribution:'&copy; OpenStreetMap'}).addTo(map);
         map.setView(DEFAULT_VIEW, DEFAULT_ZOOM);
-        map.on('click', (e) => {
-          if (!ckAttach.checked) return;
-          placeMarker(e.latlng.lat, e.latlng.lng, null, 'manual');
-        });
+        map.on('click', (e) => { if (!ckAttach.checked) return; placeMarker(e.latlng.lat, e.latlng.lng, null, 'manual'); });
       }
 
       function placeMarker(lat, lng, acc, source){
         if (!map) ensureMap();
         const ll = L.latLng(lat, lng);
-
         if (!marker){
           marker = L.marker(ll, { draggable:true }).addTo(map);
           marker.on('dragend', (ev) => {
@@ -247,9 +293,7 @@
             syncHidden(p.lat.toFixed(6), p.lng.toFixed(6), acc ?? '');
             setStatus(`Local definido manualmente: ${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}`);
           });
-        } else {
-          marker.setLatLng(ll);
-        }
+        } else { marker.setLatLng(ll); }
 
         if (accuracyCircle){ map.removeLayer(accuracyCircle); accuracyCircle = null; }
         if (acc && acc > 0){ accuracyCircle = L.circle(ll, { radius: acc }).addTo(map); }
@@ -264,9 +308,7 @@
       }
 
       function useGPS(){
-        if (!('geolocation' in navigator)){
-          setStatus('GPS não suportado neste dispositivo/navegador.'); return;
-        }
+        if (!('geolocation' in navigator)){ setStatus('GPS não suportado.'); return; }
         ensureMap();
         setStatus('Solicitando GPS…');
         navigator.geolocation.getCurrentPosition(
@@ -279,7 +321,7 @@
             let msg = 'Não foi possível obter o GPS.';
             if (err && err.code === 1) msg = 'Permissão de localização negada.';
             if (err && err.code === 2) msg = 'Posição indisponível.';
-            if (err && err.code === 3) msg = 'Tempo excedido na obtenção do GPS.';
+            if (err && err.code === 3) msg = 'Tempo excedido.';
             setStatus(msg + ' Você pode marcar no mapa.');
           },
           { enableHighAccuracy:true, timeout:15000, maximumAge:0 }
@@ -299,18 +341,118 @@
       });
 
       ckAttach.addEventListener('change', () => {
-        if (!ckAttach.checked){
-          syncHidden('', '', '');
-          setStatus('Localização NÃO será anexada.');
-        } else {
-          setStatus('Anexar localização: ligado. Use GPS ou marque no mapa.');
-        }
+        if (!ckAttach.checked){ syncHidden('', '', ''); setStatus('Localização NÃO será anexada.'); }
+        else { setStatus('Anexar localização: ligado. Use GPS ou marque no mapa.'); }
       });
 
-      // Inicialização
       const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-      if (isMobile) { useGPS(); }
-      else { setStatus('Anexar localização: ligado. Use GPS ou marque no mapa.'); }
+      if (isMobile) { useGPS(); } else { setStatus('Anexar localização: ligado. Use GPS ou marque no mapa.'); }
+
+      /* ===== APREENSÕES (UI + JSON) ===== */
+      const apreensoes = [];
+      let editingIndex = -1;
+
+      const aprListEl   = $('#aprList');
+      const aprCountEl  = $('#aprCount');
+      const jsonInput   = $('#apreensoes_json');
+
+      const bk   = $('#aprModalBk');
+      const mTit = $('#aprModalTitle');
+      const mTipo= $('#apr_tipo');
+      const mQtd = $('#apr_quantidade');
+      const mUni = $('#apr_unidade');
+      const mObs = $('#apr_obs');
+      const mClose = $('#aprClose');
+      const mCancel= $('#aprCancel');
+      const mSave = $('#aprSave');
+
+      function openModal(title, data = null, idx = -1){
+        mTit.textContent = title;
+        editingIndex = idx;
+        mTipo.value = data?.tipo || '';
+        mQtd.value  = (data?.quantidade ?? '') === null ? '' : (data?.quantidade ?? '');
+        mUni.value  = data?.unidade || '';
+        mObs.value  = data?.obs || '';
+        bk.style.display = 'flex';
+        mTipo.focus();
+      }
+      function closeModal(){ bk.style.display = 'none'; }
+
+      $('#btnAddApr').addEventListener('click', () => openModal('Nova apreensão'));
+
+      mClose.addEventListener('click', closeModal);
+      mCancel.addEventListener('click', closeModal);
+
+      mSave.addEventListener('click', () => {
+        const tipo = String(mTipo.value || '').trim();
+        if (!tipo){ mTipo.focus(); return; }
+        const rawQtd = mQtd.value;
+        const quantidade = rawQtd === '' ? null : Number(rawQtd);
+        if (quantidade !== null && !Number.isFinite(quantidade)){ mQtd.focus(); return; }
+        const unidade = String(mUni.value || '').trim() || null;
+        const obs = String(mObs.value || '').trim() || null;
+
+        const item = { tipo, quantidade, unidade, obs };
+
+        if (editingIndex >= 0) apreensoes[editingIndex] = item;
+        else apreensoes.push(item);
+
+        renderApr();
+        closeModal();
+      });
+
+      function renderApr(){
+        aprListEl.innerHTML = '';
+        if (!apreensoes.length){
+          aprListEl.innerHTML = '<div class="empty">Nenhuma apreensão adicionada. Clique em <strong>Adicionar apreensão</strong>.</div>';
+          aprCountEl.textContent = '0 itens';
+          jsonInput.value = '[]';
+          return;
+        }
+        apreensoes.forEach((a, i) => {
+          const wrap = document.createElement('div');
+          wrap.className = 'apr-item';
+          wrap.innerHTML = `
+            <div>
+              <div class="apr-kind">${escapeHtml(a.tipo)}</div>
+              <div class="apr-meta">
+                ${a.quantidade != null ? escapeHtml(String(a.quantidade)) : '—'}
+                ${a.unidade ? escapeHtml(a.unidade) : ''} 
+                ${a.obs ? ' · ' + escapeHtml(a.obs) : ''}
+              </div>
+            </div>
+            <div class="apr-actions">
+              <button type="button" class="btn btn-ghost" data-ed="${i}">Editar</button>
+              <button type="button" class="btn btn-red" data-del="${i}">Excluir</button>
+            </div>
+          `;
+          aprListEl.appendChild(wrap);
+        });
+        aprCountEl.textContent = apreensoes.length + (apreensoes.length === 1 ? ' item' : ' itens');
+        jsonInput.value = JSON.stringify(apreensoes);
+        // bind botões
+        aprListEl.querySelectorAll('[data-ed]').forEach(b => b.addEventListener('click', (ev) => {
+          const idx = Number(ev.currentTarget.getAttribute('data-ed'));
+          openModal('Editar apreensão', apreensoes[idx], idx);
+        }));
+        aprListEl.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', (ev) => {
+          const idx = Number(ev.currentTarget.getAttribute('data-del'));
+          apreensoes.splice(idx, 1);
+          renderApr();
+        }));
+      }
+
+      function escapeHtml(s){
+        return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[c]));
+      }
+
+      // garante JSON preenchido no submit
+      $('#formFiscalizacao').addEventListener('submit', () => {
+        jsonInput.value = JSON.stringify(apreensoes);
+      });
+
+      // start vazio
+      renderApr();
     })();
   </script>
 </body>
