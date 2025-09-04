@@ -1356,16 +1356,14 @@ app.post('/operacoes/:opId/fiscalizacoes',
     const opId = Number(req.params.opId);
 
     // 0) Descobrir cidade_id válido para esta operação
-    const allowed = await db('operacao_cidades')            // <— nome da sua tabela de vínculo
-      .where({ operacao_id: opId })
-      .pluck('cidade_id');                                  // [1, 2, 3...]
+    const allowed = await db('operacao_cidades').where({ operacao_id: opId }).pluck('cidade_id');
 
     let cidade_id =
       Number(req.body.cidade_id) ||
       Number(req.query.cidade_id) ||
       (user?.cidade_id && allowed.includes(user.cidade_id) ? user.cidade_id : 0);
 
-    if (!cidade_id) cidade_id = allowed[0];                 // fallback para a 1ª cidade da operação
+    if (!cidade_id) cidade_id = allowed[0];
     if (!cidade_id) return res.status(400).send('Operação sem cidades vinculadas.');
 
     // helpers…
@@ -1384,13 +1382,18 @@ app.post('/operacoes/:opId/fiscalizacoes',
     const fechado            = toBool(req.body.fechado);
     const lacrado            = toBool(req.body.lacrado);
 
+    // >>> NOVO: campos de detidos
+    const pessoas_detidas_flag = toBool(req.body.pessoas_detidas_flag);
+    const pessoas_detidas_qtd  = toInt(req.body.pessoas_detidas_qtd);
+    // <<<
+
     const { lat, lng, acc } = getGeoFromBody(req);
 
     await db.transaction(async trx => {
       // 1) evento base da fiscalização
       const retFisc = await trx('operacao_eventos').insert({
         operacao_id: opId,
-        cidade_id,                // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+        cidade_id,
         user_id:     user.id,
         tipo:        'fiscalizacao',
         obs,
@@ -1404,9 +1407,18 @@ app.post('/operacoes/:opId/fiscalizacoes',
       // 2) detalhes
       await trx('evento_fiscalizacao').insert({
         evento_id: fisc_evento_id,
-        tipo_local, local_nome, local_endereco,
-        pessoas_abordadas, veiculos_abordados,
-        multado, fechado, lacrado
+        tipo_local,
+        local_nome,
+        local_endereco,
+        pessoas_abordadas,
+        veiculos_abordados,
+        multado,
+        fechado,
+        lacrado,
+        // >>> NOVO: salvar no detalhe da fiscalização
+        pessoas_detidas_flag,
+        pessoas_detidas_qtd
+        // <<<
       });
 
       // 3) fotos
@@ -1432,7 +1444,6 @@ app.post('/operacoes/:opId/fiscalizacoes',
         const tipo = String(it.tipo || '').trim();
         if (!tipo) continue;
 
-        // se a coluna for NOT NULL mude para 0 quando vazio
         const quantidade = (it.quantidade === '' || it.quantidade == null)
           ? null : Number(it.quantidade);
         const unidade = String(it.unidade || '').trim() || null;
@@ -1440,7 +1451,7 @@ app.post('/operacoes/:opId/fiscalizacoes',
 
         const retApr = await trx('operacao_eventos').insert({
           operacao_id: opId,
-          cidade_id,              // <<<<<<<<<<<<<<<<< mesma cidade da fiscalização
+          cidade_id,
           user_id:     user.id,
           tipo:        'apreensao',
           obs:         aprObs,
@@ -1463,6 +1474,7 @@ app.post('/operacoes/:opId/fiscalizacoes',
     });
   }
 );
+
 
 
 
@@ -2075,209 +2087,137 @@ app.get('/operacoes/:id/monitor/data', requireAdminOrGestor, async (req, res) =>
 
 
 // GET editar fiscalização
-app.get('/operacoes/:opId/fiscalizacoes/:eventoId/editar',
-  requireAuth,
-  csrfProtection, // precisa vir ANTES do render
-  async (req, res) => {
-    const user = (req.session as any).user;
-    const opId = Number(req.params.opId);
-    const evId = Number(req.params.eventoId);
+app.get('/operacoes/:opId/fiscalizacoes/:fiscId/editar',
+  requireAuth, csrfProtection, async (req, res) => {
+    const user   = (req.session as any).user;
+    const opId   = Number(req.params.opId);
+    const fiscId = Number(req.params.fiscId);
 
-    const ev = await db('operacao_eventos').where({ id: evId, operacao_id: opId }).first();
-    if (!ev || ev.tipo !== 'fiscalizacao') return res.status(404).send('Fiscalização não encontrada.');
-
-    const can = await canEditEvento(user, opId, evId);
-    if (!can.ok) return res.status(can.status || 403).send(can.reason || 'Não autorizado.');
+    // Permissão baseada no evento
+    const ev = await db('operacao_eventos')
+      .where({ id: fiscId, operacao_id: opId, tipo: 'fiscalizacao' })
+      .first();
+    if (!ev) return res.status(404).send('Fiscalização não encontrada.');
+    const perm = await canEditEvento(user, opId, fiscId);
+    if (!perm.ok) return res.status(perm.status || 403).send(perm.reason || 'Não autorizado.');
 
     const operacao = await db('operacoes').where({ id: opId }).first();
 
-    const f = await db('evento_fiscalizacao as f')
-      .join('operacao_eventos as e', 'e.id', 'f.evento_id')
-      .select(
-        'f.evento_id as id',
-        'f.tipo_local',
-        'f.local_nome',
-        'f.local_endereco',
-        'f.pessoas_abordadas',
-        'f.veiculos_abordados',
-        'f.multado',
-        'f.fechado',
-        'f.lacrado',
-        'e.obs',
-        'e.lat', 'e.lng', 'e.accuracy as acc'
-      )
-      .where('f.evento_id', evId)
+    // Detalhes da fiscalização
+    const fisc = await db('evento_fiscalizacao')
+      .where({ evento_id: fiscId })
       .first();
 
-    if (!f) return res.status(404).send('Fiscalização não encontrada.');
+    // Apreensões (filhas) ligadas a esta fiscalização
+    // 🔁 Troque 'evento_apreensao' se o seu nome for diferente:
+    const aprs = await db('evento_apreensao')
+      .where({ fiscalizacao_evento_id: fiscId })
+      .select('id', 'tipo', 'quantidade', 'unidade', 'obs');
 
-    const apreensoes = await db('evento_apreensao as a')
-      .join('operacao_eventos as e', 'e.id', 'a.evento_id')
-      .where('a.fiscalizacao_evento_id', evId)
-      .select(
-        'a.evento_id as id',
-        'a.tipo',
-        'a.quantidade',
-        'a.unidade',
-        db.raw('e.obs as obs')
-      )
-      .orderBy('a.evento_id', 'asc');
-
-    // Evita token velho por cache do navegador
-    res.set('Cache-Control', 'no-store');
+    // Monta o objeto para o EJS (o seu EJS já espera essas chaves)
+    const fiscForView = {
+      id: fiscId,
+      tipo_local:         fisc?.tipo_local || null,
+      local_nome:         fisc?.local_nome || null,
+      local_endereco:     fisc?.local_endereco || null,
+      pessoas_abordadas:  fisc?.pessoas_abordadas ?? 0,
+      veiculos_abordados: fisc?.veiculos_abordados ?? 0,
+      multado:            !!fisc?.multado,
+      fechado:            !!fisc?.fechado,
+      lacrado:            !!fisc?.lacrado,
+      // 🌟 novos campos
+      pessoas_detidas_flag: !!fisc?.pessoas_detidas_flag,
+      pessoas_detidas_qtd:  fisc?.pessoas_detidas_qtd ?? null,
+      // geo (se quiser reapresentar no form)
+      lat: ev?.lat ?? null,
+      lng: ev?.lng ?? null,
+      acc: ev?.accuracy ?? null
+    };
 
     return res.render('operacoes-acoes-nova', {
-      csrfToken: req.csrfToken(),                   // <input name="_csrf" ...>
+      csrfToken: (req as any).csrfToken(),
+      user,
       operacao,
       mode: 'edit',
-      postAction: `/operacoes/${opId}/fiscalizacoes/${evId}/editar`,
-      fisc: f,
-      apreensoes
+      postAction: `/operacoes/${opId}/fiscalizacoes/${fiscId}/editar`, // <- usado no form
+      fisc: fiscForView,           // INIT.fisc
+      apreensoes: aprs || []       // INIT.apreensoes
     });
-  }
-);
+  });
 
 
 
 
-
-
-
-
-
-// POST: salvar alterações na fiscalização + (opcional) anexar novas fotos
 // Aceita campos: tipo_local, obs e (opcional) fotos[] / foto
-app.post('/operacoes/:opId/fiscalizacoes/:eventoId/editar',
-  requireAuth,
-  uploadFotosFields,  // multer primeiro (lê multipart e popula req.body)
-  csrfProtection,     // csurf depois (lê req.body._csrf)
-  async (req, res) => {
-    const user = (req.session as any).user;
-    const opId = Number(req.params.opId);
-    const evId = Number(req.params.eventoId);
 
-    const ev = await db('operacao_eventos').where({ id: evId, operacao_id: opId }).first();
-    if (!ev || ev.tipo !== 'fiscalizacao') return res.status(404).send('Fiscalização não encontrada.');
+app.post('/operacoes/:opId/fiscalizacoes/:fiscId/editar',
+  requireAuth, csrfProtection, async (req, res) => {
+    const user   = (req.session as any).user;
+    const opId   = Number(req.params.opId);
+    const fiscId = Number(req.params.fiscId);
 
-    const can = await canEditEvento(user, opId, evId);
-    if (!can.ok) return res.status(can.status || 403).send(can.reason || 'Não autorizado.');
+    const ev = await db('operacao_eventos')
+      .where({ id: fiscId, operacao_id: opId, tipo: 'fiscalizacao' })
+      .first();
+    if (!ev) return res.status(404).send('Fiscalização não encontrada.');
+    const perm = await canEditEvento(user, opId, fiscId);
+    if (!perm.ok) return res.status(perm.status || 403).send(perm.reason || 'Não autorizado.');
 
-    const toInt  = (v: any) => (v === '' || v == null) ? 0 : Math.max(0, Math.floor(Number(v) || 0));
-    const toBool = (v: any) => v === 'on' || v === 'true' || v === '1';
+    const toInt  = (v:any) => (v === '' || v == null) ? 0 : Math.max(0, Math.floor(Number(v) || 0));
+    const toBool = (v:any) => v === 'on' || v === 'true' || v === '1';
+    const S      = (v:any) => String(v ?? '').trim();
 
-    const tipo_local = String(req.body.tipo_local || '').trim();
+    const tipo_local         = S(req.body.tipo_local);
     if (!tipo_local) return res.status(400).send('Informe o tipo de local.');
 
-    const local_nome          = String(req.body.local_nome || '').trim() || null;
-    const local_endereco      = String(req.body.local_endereco || '').trim() || null;
-    const obs                 = String(req.body.obs || '').trim() || null;
-    const pessoas_abordadas   = toInt(req.body.pessoas_abordadas);
-    const veiculos_abordados  = toInt(req.body.veiculos_abordados);
-    const multado             = toBool(req.body.multado);
-    const fechado             = toBool(req.body.fechado);
-    const lacrado             = toBool(req.body.lacrado);
+    const local_nome         = S(req.body.local_nome) || null;
+    const local_endereco     = S(req.body.local_endereco) || null;
+    const obs                = S(req.body.obs) || null;
+    const pessoas_abordadas  = toInt(req.body.pessoas_abordadas);
+    const veiculos_abordados = toInt(req.body.veiculos_abordados);
+    const multado            = toBool(req.body.multado);
+    const fechado            = toBool(req.body.fechado);
+    const lacrado            = toBool(req.body.lacrado);
 
-    await db('evento_fiscalizacao')
-      .where({ evento_id: evId })
-      .update({
-        tipo_local, local_nome, local_endereco,
-        pessoas_abordadas, veiculos_abordados,
-        multado, fechado, lacrado
-      });
+    // 🌟 novos campos
+    const pessoas_detidas_flag = toBool(req.body.pessoas_detidas_flag);
+    const pessoas_detidas_qtd  = toInt(req.body.pessoas_detidas_qtd);
 
+    // Se também quiser atualizar a localização do evento:
     const { lat, lng, acc } = getGeoFromBody(req);
-    await db('operacao_eventos').where({ id: evId }).update({
-      obs,
-      lat: lat ?? null,
-      lng: lng ?? null,
-      accuracy: acc ?? null
-    });
 
-    const files = fotosFromRequest(req);
-    if (files.length) {
-      await db('evento_fotos').insert(
-        files.map(f => ({
-          evento_id: evId,
-          path: `/uploads/fotos/${f.filename}`,
+    await db.transaction(async trx => {
+      // Atualiza observação e geo no evento base (opcional)
+      await trx('operacao_eventos')
+        .where({ id: fiscId })
+        .update({
+          obs: obs,
           lat: lat ?? null,
           lng: lng ?? null,
           accuracy: acc ?? null
-        }))
-      );
-    }
-
-    // ---- Apreensões (upsert + remoção) ----
-    let itens: any[] = [];
-    try {
-      itens = JSON.parse(String(req.body.apreensoes_json || '[]'));
-      if (!Array.isArray(itens)) itens = [];
-    } catch { itens = []; }
-
-    const existentes = await db('evento_apreensao')
-      .where({ fiscalizacao_evento_id: evId })
-      .select('evento_id');
-
-    const idsExist   = new Set(existentes.map(x => x.evento_id));
-    const idsMantidos = new Set<number>();
-
-    for (const it of itens) {
-      const tipo = String(it.tipo || '').trim();
-      // Se sua coluna 'quantidade' for NOT NULL, defina 0 aqui:
-      // const quantidade = (it.quantidade === '' || it.quantidade == null) ? 0 : Number(it.quantidade);
-      // Se puder ser NULL, use:
-      const quantidade = (it.quantidade === '' || it.quantidade == null) ? null : Number(it.quantidade);
-
-      if (quantidade !== null && !Number.isFinite(quantidade)) continue;
-
-      const unidade = String(it.unidade || '').trim() || null;
-      const aprObs  = String(it.obs || '').trim() || null;
-      if (!tipo) continue;
-
-      if (it.id && idsExist.has(it.id)) {
-        await db('evento_apreensao').where({ evento_id: it.id }).update({
-          tipo, quantidade, unidade
-        });
-        await db('operacao_eventos').where({ id: it.id }).update({ obs: aprObs });
-        idsMantidos.add(it.id);
-      } else {
-        const apr_evento_id = await createEventoBase({
-          operacao_id: opId,
-          cidade_id : ev.cidade_id,
-          user_id   : user.id,
-          tipo      : 'apreensao',
-          obs       : aprObs
         });
 
-        await db('evento_apreensao').insert({
-          evento_id: apr_evento_id,
-          tipo, quantidade, unidade,
-          fiscalizacao_evento_id: evId
+      // Atualiza detalhes na tabela da fiscalização
+      await trx('evento_fiscalizacao')
+        .where({ evento_id: fiscId })
+        .update({
+          tipo_local,
+          local_nome,
+          local_endereco,
+          pessoas_abordadas,
+          veiculos_abordados,
+          multado,
+          fechado,
+          lacrado,
+          // 🌟 novos
+          pessoas_detidas_flag,
+          pessoas_detidas_qtd
         });
+    });
 
-        const base = await db('operacao_eventos').where({ id: evId }).first();
-        if (base?.lat != null && base?.lng != null) {
-          await db('operacao_eventos').where({ id: apr_evento_id }).update({
-            lat: base.lat, lng: base.lng, accuracy: base.accuracy ?? null
-          });
-        }
-        idsMantidos.add(apr_evento_id);
-      }
-    }
-
-    const apagar = existentes
-      .filter(x => !idsMantidos.has(x.evento_id))
-      .map(x => x.evento_id);
-
-    if (apagar.length) {
-      await db('evento_fotos').whereIn('evento_id', apagar).del();
-      await db('evento_apreensao').whereIn('evento_id', apagar).del();
-      await db('operacao_eventos').whereIn('id', apagar).del();
-    }
-
-    const go = pickReturnTo(req, `/operacoes/${opId}/fiscalizacoes/${evId}/editar`);
-    return res.redirect(go);
-  }
-);
+    // Volta para a própria edição (ou onde preferir)
+    res.redirect(`/operacoes/${opId}/fiscalizacoes/${fiscId}/editar`);
+  });
 
 
 
