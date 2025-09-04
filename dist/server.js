@@ -2162,21 +2162,23 @@ app.get('/operacoes/:opId/apreensoes/:eventoId/editar', requireAuth, csrfProtect
     const aprFotos = await db('evento_fotos')
         .where({ evento_id: eventoId })
         .orderBy('id', 'desc');
-    // Lista de fiscalizações para o <select>
+    // Lista de fiscalizações para o <select> (sem f.nome_local)
     const fiscListQ = db('operacao_eventos as e')
         .leftJoin('evento_fiscalizacao as f', 'f.evento_id', 'e.id')
         .where({ 'e.operacao_id': opId, 'e.tipo': 'fiscalizacao' })
-        .select('e.id', db.raw(`COALESCE(NULLIF(f.nome_local,''), NULLIF(f.tipo_local,''), 'Fiscalização #' || e.id) as nome`))
+        .select('e.id', db.raw(`COALESCE(NULLIF(f.tipo_local,''), 'Fiscalização #' || e.id) AS nome`))
         .orderBy('e.ts', 'desc');
-    // (se quiser restringir à cidade do autor do evento)
-    if (perm.evento?.cidade_id)
+    if (perm.evento?.cidade_id) {
         fiscListQ.andWhere('e.cidade_id', perm.evento.cidade_id);
+    }
     const fiscList = await fiscListQ;
-    // Outras apreensões da mesma fiscalização (coluna da direita)
-    const aprList = await db('evento_apreensao')
-        .where({ fiscalizacao_evento_id: apr.fiscalizacao_evento_id })
-        .select('evento_id as id', 'tipo', 'quantidade', 'unidade')
-        .orderBy('evento_id', 'desc');
+    // Outras apreensões da mesma fiscalização (se existir vínculo)
+    const aprList = apr.fiscalizacao_evento_id
+        ? await db('evento_apreensao')
+            .where({ fiscalizacao_evento_id: apr.fiscalizacao_evento_id })
+            .select('evento_id as id', 'tipo', 'quantidade', 'unidade')
+            .orderBy('evento_id', 'desc')
+        : [];
     return res.render('apreensao-edit', {
         csrfToken: req.csrfToken(),
         user,
