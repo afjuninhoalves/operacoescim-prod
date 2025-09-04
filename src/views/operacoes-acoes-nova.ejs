@@ -1,3 +1,15 @@
+<%
+  // --- Guardas para evitar ReferenceError quando as variáveis não vierem do render ---
+  const MODE        = (typeof mode === 'string') ? mode : 'create';
+  const POST_ACTION = (typeof postAction === 'string')
+    ? postAction
+    : ('/operacoes/' + operacao.id + '/fiscalizacoes');
+
+  const FISC     = (typeof fisc        !== 'undefined' && fisc && typeof fisc === 'object') ? fisc : null;
+  const APR_LIST = (typeof apreensoes  !== 'undefined' && Array.isArray(apreensoes)) ? apreensoes : [];
+%>
+
+
 <!DOCTYPE html>
 <html lang="pt-BR">
 
@@ -5,10 +17,6 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <% //===Variáveis seguras (evitam ReferenceError quando não vierem do render)===const MODE=(typeof mode==='string' ) ?
-    mode : 'create' ; const POST_ACTION=(typeof postAction==='string' ) ? postAction : ('/operacoes/' + operacao.id
-    + '/fiscalizacoes' ); const FISC=(typeof fisc !=='undefined' && fisc && typeof fisc==='object' ) ? fisc : null;
-    const APR_LIST=(typeof apreensoes !=='undefined' && Array.isArray(apreensoes)) ? apreensoes : []; %>
 
     <title>
       <%= (MODE==='edit' ? 'Editar fiscalização — ' : 'Inserir ações — ' ) + operacao.nome %>
