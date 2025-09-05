@@ -45,16 +45,11 @@
       <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
         <div class="muted">Mostrando eventos com geolocalização capturada nas fotos.</div>
 
-        <!-- ÚNICO bloco de toggles -->
+        <!-- Filtros: apenas Fiscalizações e Apreensões -->
         <div>
           <label style="margin-right:10px"><input type="checkbox" id="chk-fis" checked> Fiscalizações</label>
-          <label style="margin-right:10px"><input type="checkbox" id="chk-pes" checked> Pessoas</label>
-          <label style="margin-right:10px"><input type="checkbox" id="chk-vei" checked> Veículos</label>
-          <label><input type="checkbox" id="chk-apr" checked> Apreensões</label>
-        </div>
+          <label style="margin-right:18px"><input type="checkbox" id="chk-apr" checked> Apreensões</label>
 
-        <!-- Filtro de cidade separado -->
-        <div>
           <label>Cidade:
             <select id="sel-cidade"
               style="margin-left:6px;padding:6px 8px;border-radius:8px;border:1px solid var(--border);background:#0f172a;color:var(--text)">
@@ -69,8 +64,6 @@
 
       <div class="legend">
         <span><span class="dot" style="background:#60a5fa"></span> Fiscalização</span>
-        <span><span class="dot" style="background:#f87171"></span> Pessoa</span>
-        <span><span class="dot" style="background:#34d399"></span> Veículo</span>
         <span><span class="dot" style="background:#fbbf24"></span> Apreensão</span>
       </div>
     </div>
@@ -99,47 +92,43 @@
     }).addTo(map);
 
     const gFis = L.layerGroup().addTo(map);
-    const gPes = L.layerGroup().addTo(map);
-    const gVei = L.layerGroup().addTo(map);
     const gApr = L.layerGroup().addTo(map);
-    const gAcc = L.layerGroup().addTo(map);
+    const gAcc = L.layerGroup().addTo(map); // círculos de precisão
 
-    const colorFor = (t) =>
-      t==='fiscalizacao' ? '#60a5fa' :
-      t==='pessoa'       ? '#f87171' :
-      t==='veiculo'      ? '#34d399' :
-      t==='apreensao'    ? '#fbbf24' : '#a78bfa';
+    const colorFor = (t) => t === 'fiscalizacao' ? '#60a5fa' : '#fbbf24';
 
     function applyFilters(){
       const showFis = document.getElementById('chk-fis').checked;
-      const showPes = document.getElementById('chk-pes').checked;
-      const showVei = document.getElementById('chk-vei').checked;
       const showApr = document.getElementById('chk-apr').checked;
       const cid = document.getElementById('sel-cidade').value;
 
-      gFis.clearLayers(); gPes.clearLayers(); gVei.clearLayers(); gApr.clearLayers(); gAcc.clearLayers();
+      gFis.clearLayers(); gApr.clearLayers(); gAcc.clearLayers();
 
       const bounds = [];
       data.forEach(m => {
-        if (cid && String(m.cidade_id) !== cid) return;
-        if (m.tipo==='fiscalizacao' && !showFis) return;
-        if (m.tipo==='pessoa'       && !showPes) return;
-        if (m.tipo==='veiculo'      && !showVei) return;
-        if (m.tipo==='apreensao'    && !showApr) return;
+        // só renderiza os dois tipos desejados
+        if (m.tipo !== 'fiscalizacao' && m.tipo !== 'apreensao') return;
 
-        const circle = L.circleMarker([m.lat, m.lng], { radius:8, weight:2, color:colorFor(m.tipo), fillOpacity:.7 });
+        if (cid && String(m.cidade_id) !== cid) return;
+        if (m.tipo === 'fiscalizacao' && !showFis) return;
+        if (m.tipo === 'apreensao'    && !showApr) return;
+
+        const circle = L.circleMarker([m.lat, m.lng], {
+          radius: 8, weight: 2, color: colorFor(m.tipo), fillOpacity: .7
+        });
         if (m.popup) circle.bindPopup(m.popup);
 
-        if (m.tipo==='fiscalizacao') circle.addTo(gFis);
-        else if (m.tipo==='pessoa')  circle.addTo(gPes);
-        else if (m.tipo==='veiculo') circle.addTo(gVei);
-        else if (m.tipo==='apreensao') circle.addTo(gApr);
-        else circle.addTo(map);
+        if (m.tipo === 'fiscalizacao') circle.addTo(gFis);
+        else circle.addTo(gApr);
 
         bounds.push([m.lat, m.lng]);
 
         if (m.accuracy > 0) {
-          L.circle([m.lat, m.lng], { radius:m.accuracy, color:colorFor(m.tipo), weight:1, opacity:.3, fillOpacity:.05 }).addTo(gAcc);
+          L.circle([m.lat, m.lng], {
+            radius: m.accuracy,
+            color: colorFor(m.tipo),
+            weight: 1, opacity: .3, fillOpacity: .05
+          }).addTo(gAcc);
         }
       });
 
@@ -147,7 +136,7 @@
       else map.setView([-14.2350, -51.9253], 4);
     }
 
-    ['chk-fis','chk-pes','chk-vei','chk-apr','sel-cidade'].forEach(id =>
+    ['chk-fis','chk-apr','sel-cidade'].forEach(id =>
       document.getElementById(id).addEventListener('change', applyFilters)
     );
 
