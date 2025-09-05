@@ -1,40 +1,43 @@
 <!doctype html>
 <html lang="pt-br">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Monitor — <%= operacao.nome %></title>
 
   <style>
-    :root{
-      --bg:#0b1220; --panel:#0f172a; --panel2:#111827; --border:#1f2937;
-      --text:#e5e7eb; --muted:#9ca3af; --chip:#1f2937; --radius:14px;
-    }
+    :root{ --bg:#0b1220; --panel:#0f172a; --panel2:#111827; --border:#1f2937;
+      --text:#e5e7eb; --muted:#9ca3af; --chip:#1f2937; --radius:14px; }
     *{box-sizing:border-box}
     body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial}
     a{color:inherit;text-decoration:none}
+
     .topbar{position:sticky;top:0;z-index:10;background:linear-gradient(to bottom,rgba(17,24,39,.92),rgba(17,24,39,.75));border-bottom:1px solid var(--border)}
     .topbar-inner{max-width:1160px;margin:0 auto;padding:14px 20px;display:flex;justify-content:space-between;align-items:center;gap:12px}
-    .btn{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:#111826;color:var(--text)}
+    .btn{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:#111826}
     .btn:hover{filter:brightness(1.08)}
+
     .container{max-width:1160px;margin:0 auto;padding:20px}
     .muted{color:var(--muted)}
+
     .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--border);border-radius:var(--radius);padding:14px}
     .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
     .kpi .label{font-size:13px;color:var(--muted)}
     .kpi .value{font-size:28px;font-weight:700}
     .kpi .sub{font-size:12px;color:var(--muted);margin-top:4px}
     .mini-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:12px}
+
     .grid{display:grid;grid-template-columns:1.2fr .8fr;gap:12px;margin-top:14px}
     table{width:100%;border-collapse:collapse}
     th,td{padding:10px;border-bottom:1px solid var(--border);text-align:center}
     th:first-child,td:first-child{text-align:left}
     .num{text-align:right}
+
     .chip{display:inline-block;padding:3px 8px;border-radius:999px;background:var(--chip);font-size:12px}
+
     @media (max-width:1100px){ .grid{grid-template-columns:1fr} }
   </style>
 </head>
-
 <body>
   <!-- Topbar -->
   <div class="topbar">
@@ -52,15 +55,19 @@
   </div>
 
   <div class="container">
+    <!-- fallback para refresh() -->
+    <script>
+      window.OP_ID = <%= Number(operacao.id) %>;
+      window.INIT_EF_CITIES = <%- JSON.stringify(efetivoByCity || []) %>;
+    </script>
+
     <!-- KPIs -->
     <div class="kpi-grid">
       <div class="kpi card"><div class="label">Locais fiscalizados</div><div class="value" data-kpi="locais"><%= (cards&&cards.locais)||0 %></div></div>
       <div class="kpi card"><div class="label">Pessoas abordadas</div><div class="value" data-kpi="pessoas"><%= (cards&&cards.pessoas)||0 %></div></div>
       <div class="kpi card"><div class="label">Veículos abordados</div><div class="value" data-kpi="veiculos"><%= (cards&&cards.veiculos)||0 %></div></div>
-
       <div class="kpi card"><div class="label">Itens apreendidos</div><div class="value" data-kpi="itensApreendidos"><%= (cards&&cards.itensApreendidos)||0 %></div></div>
       <div class="kpi card"><div class="label">Apreensões</div><div class="value" data-kpi="apreensoes"><%= (cards&&cards.apreensoes)||0 %></div></div>
-
       <div class="kpi card"><div class="label">Multados</div><div class="value" data-kpi="multados"><%= (cards&&cards.multados)||0 %></div></div>
       <div class="kpi card"><div class="label">Fechados</div><div class="value" data-kpi="fechados"><%= (cards&&cards.fechados)||0 %></div></div>
       <div class="kpi card"><div class="label">Lacrados</div><div class="value" data-kpi="lacrados"><%= (cards&&cards.lacrados)||0 %></div></div>
@@ -69,39 +76,23 @@
 
     <!-- Efetivo total (mini cards) -->
     <div class="mini-grid">
-      <div class="card">
-        <div class="kpi .title">Efetivo total de GCM´s</div>
-        <div class="kpi value"><%= (efetivo&&+efetivo.total_agentes)||0 %> ag.</div>
-        <div class="kpi sub"><%= (efetivo&&+efetivo.total_viaturas)||0 %> viaturas</div>
-      </div>
-      <div class="card">
-        <div class="kpi .title">Polícia Civil</div>
-        <div class="kpi value"><%= (efetivo&&+efetivo.pc_agentes)||0 %> ag.</div>
-        <div class="kpi sub"><%= (efetivo&&+efetivo.pc_viaturas)||0 %> viaturas</div>
-      </div>
-      <div class="card">
-        <div class="kpi .title">Polícia Militar</div>
-        <div class="kpi value"><%= (efetivo&&+efetivo.pm_agentes)||0 %> ag.</div>
-        <div class="kpi sub"><%= (efetivo&&+efetivo.pm_viaturas)||0 %> viaturas</div>
-      </div>
-      <div class="card">
-        <div class="kpi .title">Outros órgãos</div>
-        <div class="kpi value"><%= (efetivo&&+efetivo.outros_agentes)||0 %> ag.</div>
-        <div class="kpi sub"><%= (efetivo&&+efetivo.outros_viaturas)||0 %> viaturas</div>
-      </div>
+      <div class="card"><div class="kpi .title">Efetivo total de GCM´s</div><div class="kpi value"><%= (+efetivo?.total_agentes)||0 %> ag.</div><div class="kpi sub"><%= (+efetivo?.total_viaturas)||0 %> viaturas</div></div>
+      <div class="card"><div class="kpi .title">Polícia Civil</div><div class="kpi value"><%= (+efetivo?.pc_agentes)||0 %> ag.</div><div class="kpi sub"><%= (+efetivo?.pc_viaturas)||0 %> viaturas</div></div>
+      <div class="card"><div class="kpi .title">Polícia Militar</div><div class="kpi value"><%= (+efetivo?.pm_agentes)||0 %> ag.</div><div class="kpi sub"><%= (+efetivo?.pm_viaturas)||0 %> viaturas</div></div>
+      <div class="card"><div class="kpi .title">Outros órgãos</div><div class="kpi value"><%= (+efetivo?.outros_agentes)||0 %> ag.</div><div class="kpi sub"><%= (+efetivo?.outros_viaturas)||0 %> viaturas</div></div>
     </div>
 
-    <!-- Gráfico -->
+    <!-- Card do gráfico -->
     <div class="card" style="margin-top:16px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         <h3 style="margin:0">Distribuição por cidade</h3>
         <div class="muted" style="font-size:13px">
           <span style="display:inline-block;width:10px;height:10px;background:#60a5fa;border-radius:50%;margin-right:6px"></span>Fiscalizações
           &nbsp;&nbsp;<span style="display:inline-block;width:10px;height:10px;background:#f87171;border-radius:50%;margin-right:6px"></span>Pessoas
-          &nbsp;&nbsp;<span style="display:inline-block;width:10px;height:10px;background:#06b6d4;border-radius:50%;margin-right:6px"></span>Pessoas detidas
           &nbsp;&nbsp;<span style="display:inline-block;width:10px;height:10px;background:#34d399;border-radius:50%;margin-right:6px"></span>Veículos
           &nbsp;&nbsp;<span style="display:inline-block;width:10px;height:10px;background:#fbbf24;border-radius:50%;margin-right:6px"></span>Itens apreendidos
-          &nbsp;&nbsp;<span style="display:inline-block;width:10px;height:10px	background:#a78bfa;border-radius:50%;margin-right:6px"></span>Apreensões
+          &nbsp;&nbsp;<span style="display:inline-block;width:10px;height:10px;background:#a78bfa;border-radius:50%;margin-right:6px"></span>Apreensões
+          &nbsp;&nbsp;<span style="display:inline-block;width:10px;height:10px;background:#06b6d4;border-radius:50%;margin-right:6px"></span>Pessoas detidas
         </div>
       </div>
 
@@ -122,12 +113,7 @@
 
       function hasAnyValue(rows){
         return Array.isArray(rows) && rows.some(r =>
-          (Number(r.fiscalizacao)||0) +
-          (Number(r.pessoa)||0) +
-          (Number(r.detidos)||0) +
-          (Number(r.veiculo)||0) +
-          (Number(r.itens_apreendidos)||0) +
-          (Number(r.apreensoes)||0) > 0
+          (+r.fiscalizacao||0)+(+r.pessoa||0)+(+r.detidos||0)+(+r.veiculo||0)+(+r.itens_apreendidos||0)+(+r.apreensoes||0) > 0
         );
       }
 
@@ -139,38 +125,29 @@
         noData.style.display='none';
 
         const labels = rows.map(r => r.cidade);
-        const mk = (k,label,color) => ({
-          label, data: rows.map(r => Number(r[k]||0)),
-          backgroundColor: color, borderColor: color, borderWidth:1, borderRadius:6, maxBarThickness:36
-        });
+        const mk = (k,label,color)=>({ label, data: rows.map(r => +r[k]||0), backgroundColor: color, borderColor: color, borderWidth:1, borderRadius:6, maxBarThickness:36 });
 
         chart = new Chart(canvas.getContext('2d'), {
           type:'bar',
-          data:{
-            labels,
-            datasets:[
-              mk('fiscalizacao','Fiscalizações',COLORS.fis),
-              mk('pessoa','Pessoas',COLORS.pes),
-              mk('detidos','Pessoas detidas',COLORS.det),
-              mk('veiculo','Veículos',COLORS.vei),
-              mk('itens_apreendidos','Itens apreendidos',COLORS.itens),
-              mk('apreensoes','Apreensões',COLORS.apr),
-            ]
-          },
+          data:{ labels, datasets:[
+            mk('fiscalizacao','Fiscalizações',COLORS.fis),
+            mk('pessoa','Pessoas',COLORS.pes),
+            mk('detidos','Pessoas detidas',COLORS.det),
+            mk('veiculo','Veículos',COLORS.vei),
+            mk('itens_apreendidos','Itens apreendidos',COLORS.itens),
+            mk('apreensoes','Apreensões',COLORS.apr),
+          ]},
           options:{
             responsive:true, maintainAspectRatio:false, animation:false,
-            scales:{
-              x:{ticks:{color:'#e5e7eb'}, grid:{display:false}},
-              y:{beginAtZero:true, ticks:{precision:0,color:'#e5e7eb'}, grid:{color:'rgba(229,231,235,.1)'}}
-            },
-            plugins:{legend:{position:'top', labels:{color:'#e5e7eb'}}}
+            scales:{ x:{ticks:{color:'#e5e7eb'}, grid:{display:false}}, y:{beginAtZero:true, ticks:{precision:0,color:'#e5e7eb'}, grid:{color:'rgba(229,231,235,.1)'}} },
+            plugins:{legend:{position:'top',labels:{color:'#e5e7eb'}}}
           }
         });
       }
 
       function updateChart(rows){
         if(!chart){ buildChart(rows); return; }
-        const get = k => rows.map(r => Number(r[k]||0));
+        const get = k => rows.map(r => +r[k]||0);
         chart.data.labels           = rows.map(r => r.cidade);
         chart.data.datasets[0].data = get('fiscalizacao');
         chart.data.datasets[1].data = get('pessoa');
@@ -181,11 +158,10 @@
         chart.update();
       }
 
-      // primeiro render do gráfico server-side
       window.addEventListener('load', () => buildChart(series));
     </script>
 
-    <% const tot = (arr,key)=> (arr||[]).reduce((s,it)=> s + (Number(it?.[key])||0), 0); %>
+    <% const tot = (arr,key)=> (arr||[]).reduce((s,it)=> s + (+it?.[key]||0), 0); %>
 
     <div class="grid">
       <!-- Distribuição por cidade (tabela) -->
@@ -245,7 +221,7 @@
       <div class="card">
         <div style="font-weight:700;margin-bottom:8px">Efetivo por cidade</div>
         <% const efRows = Array.isArray(efetivoByCity) ? efetivoByCity : [];
-           const t = efRows.reduce((a,r)=>({
+           const T = efRows.reduce((a,r)=>({
              ag:a.ag+(+r.agentes||0),
              vt:a.vt+(+r.viaturas||0),
              pc_ag:a.pc_ag+(+r.pc_agentes||0),
@@ -270,7 +246,6 @@
               <th>Outros (viat.)</th>
             </tr>
           </thead>
-          <!-- IMPORTANTE: IDs para atualizar via JS -->
           <tbody id="ef-body">
             <% efRows.forEach(r => { %>
               <tr>
@@ -289,14 +264,14 @@
           <tfoot id="ef-foot">
             <tr>
               <th>Total</th>
-              <th class="num"><%= t.ag %></th>
-              <th class="num"><%= t.vt %></th>
-              <th class="num"><%= t.pc_ag %></th>
-              <th class="num"><%= t.pc_vt %></th>
-              <th class="num"><%= t.pm_ag %></th>
-              <th class="num"><%= t.pm_vt %></th>
-              <th class="num"><%= t.ou_ag %></th>
-              <th class="num"><%= t.ou_vt %></th>
+              <th class="num"><%= T.ag %></th>
+              <th class="num"><%= T.vt %></th>
+              <th class="num"><%= T.pc_ag %></th>
+              <th class="num"><%= T.pc_vt %></th>
+              <th class="num"><%= T.pm_ag %></th>
+              <th class="num"><%= T.pm_vt %></th>
+              <th class="num"><%= T.ou_ag %></th>
+              <th class="num"><%= T.ou_vt %></th>
             </tr>
           </tfoot>
         </table>
@@ -343,20 +318,21 @@
     function renderDistTable(rows){
       const tbody = document.getElementById('dist-body');
       const tfoot = document.getElementById('dist-foot');
-      const tot = (k) => (rows||[]).reduce((s,r)=> s + (+r[k]||0), 0);
+      const safe  = Array.isArray(rows) ? rows : [];
+      const tot = k => safe.reduce((s,r)=> s + (+r[k]||0), 0);
 
-      tbody.innerHTML = (rows||[]).map(r => `
+      tbody.innerHTML = safe.map(r => `
         <tr>
           <td>${r.cidade}</td>
-          <td class="num">${r.fiscalizacao || 0}</td>
-          <td class="num">${r.pessoa || 0}</td>
-          <td class="num">${r.veiculo || 0}</td>
-          <td class="num">${r.itens_apreendidos || 0}</td>
-          <td class="num">${r.apreensoes || 0}</td>
-          <td class="num">${r.detidos || 0}</td>
-          <td class="num">${r.lacrado || 0}</td>
-          <td class="num">${r.fechado || 0}</td>
-          <td class="num">${r.multado || 0}</td>
+          <td class="num">${+r.fiscalizacao || 0}</td>
+          <td class="num">${+r.pessoa || 0}</td>
+          <td class="num">${+r.veiculo || 0}</td>
+          <td class="num">${+r.itens_apreendidos || 0}</td>
+          <td class="num">${+r.apreensoes || 0}</td>
+          <td class="num">${+r.detidos || 0}</td>
+          <td class="num">${+r.lacrado || 0}</td>
+          <td class="num">${+r.fechado || 0}</td>
+          <td class="num">${+r.multado || 0}</td>
         </tr>
       `).join('');
 
@@ -372,53 +348,7 @@
           <th class="num">${tot('lacrado')}</th>
           <th class="num">${tot('fechado')}</th>
           <th class="num">${tot('multado')}</th>
-        </tr>
-      `;
-    }
-
-    function renderEfetivoTable(rows){
-      const body = document.getElementById('ef-body');
-      const foot = document.getElementById('ef-foot');
-      const safe = Array.isArray(rows) ? rows : [];
-
-      body.innerHTML = safe.map(r => `
-        <tr>
-          <td>${r.cidade || ''}</td>
-          <td class="num">${+r.agentes || 0}</td>
-          <td class="num">${+r.viaturas || 0}</td>
-          <td class="num">${+r.pc_agentes || 0}</td>
-          <td class="num">${+r.pc_viaturas || 0}</td>
-          <td class="num">${+r.pm_agentes || 0}</td>
-          <td class="num">${+r.pm_viaturas || 0}</td>
-          <td class="num">${+r.outros_agentes || 0}</td>
-          <td class="num">${+r.outros_viaturas || 0}</td>
-        </tr>
-      `).join('');
-
-      const tot = safe.reduce((a,r)=>({
-        ag: a.ag + (+r.agentes||0),
-        vt: a.vt + (+r.viaturas||0),
-        pc_ag: a.pc_ag + (+r.pc_agentes||0),
-        pc_vt: a.pc_vt + (+r.pc_viaturas||0),
-        pm_ag: a.pm_ag + (+r.pm_agentes||0),
-        pm_vt: a.pm_vt + (+r.pm_viaturas||0),
-        ou_ag: a.ou_ag + (+r.outros_agentes||0),
-        ou_vt: a.ou_vt + (+r.outros_viaturas||0),
-      }), {ag:0,vt:0,pc_ag:0,pc_vt:0,pm_ag:0,pm_vt:0,ou_ag:0,ou_vt:0});
-
-      foot.innerHTML = `
-        <tr>
-          <th>Total</th>
-          <th class="num">${tot.ag}</th>
-          <th class="num">${tot.vt}</th>
-          <th class="num">${tot.pc_ag}</th>
-          <th class="num">${tot.pc_vt}</th>
-          <th class="num">${tot.pm_ag}</th>
-          <th class="num">${tot.pm_vt}</th>
-          <th class="num">${tot.ou_ag}</th>
-          <th class="num">${tot.ou_vt}</th>
-        </tr>
-      `;
+        </tr>`;
     }
 
     function renderFeed(feed){
@@ -438,25 +368,75 @@
       `).join('');
     }
 
+    function renderEfetivoTable(rows){
+      const body = document.getElementById('ef-body');
+      const foot = document.getElementById('ef-foot');
+      const safe = Array.isArray(rows) ? rows : [];
+
+      body.innerHTML = safe.map(r => `
+        <tr>
+          <td>${r.cidade ?? ''}</td>
+          <td class="num">${+r.agentes || 0}</td>
+          <td class="num">${+r.viaturas || 0}</td>
+          <td class="num">${+r.pc_agentes || 0}</td>
+          <td class="num">${+r.pc_viaturas || 0}</td>
+          <td class="num">${+r.pm_agentes || 0}</td>
+          <td class="num">${+r.pm_viaturas || 0}</td>
+          <td class="num">${+r.outros_agentes || 0}</td>
+          <td class="num">${+r.outros_viaturas || 0}</td>
+        </tr>
+      `).join('');
+
+      const tot = safe.reduce((a,r)=>({
+        ag:a.ag+(+r.agentes||0),
+        vt:a.vt+(+r.viaturas||0),
+        pc_ag:a.pc_ag+(+r.pc_agentes||0),
+        pc_vt:a.pc_vt+(+r.pc_viaturas||0),
+        pm_ag:a.pm_ag+(+r.pm_agentes||0),
+        pm_vt:a.pm_vt+(+r.pm_viaturas||0),
+        ou_ag:a.ou_ag+(+r.outros_agentes||0),
+        ou_vt:a.ou_vt+(+r.outros_viaturas||0),
+      }),{ag:0,vt:0,pc_ag:0,pc_vt:0,pm_ag:0,pm_vt:0,ou_ag:0,ou_vt:0});
+
+      foot.innerHTML = `
+        <tr>
+          <th>Total</th>
+          <th class="num">${tot.ag}</th>
+          <th class="num">${tot.vt}</th>
+          <th class="num">${tot.pc_ag}</th>
+          <th class="num">${tot.pc_vt}</th>
+          <th class="num">${tot.pm_ag}</th>
+          <th class="num">${tot.pm_vt}</th>
+          <th class="num">${tot.ou_ag}</th>
+          <th class="num">${tot.ou_vt}</th>
+        </tr>`;
+    }
+
     async function refresh(){
       try{
-        const res  = await fetch(`/operacoes/${OP_ID}/monitor/data`, { cache: 'no-store' });
+        const res  = await fetch(`/operacoes/${window.OP_ID}/monitor/data`, { cache: 'no-store' });
         if(!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
 
         updateKPIs(data.cards);
-        updateChart(data.seriesPorCidade);
-        renderDistTable(data.seriesPorCidade);
-        renderEfetivoTable(data.efetivoByCity);   // <<<<<<<<<<<<<< ATUALIZA EFETIVO
+        try { updateChart?.(data.seriesPorCidade); } catch(e){ console.warn('updateChart:', e); }
+        try { renderDistTable(data.seriesPorCidade); } catch(e){ console.warn('renderDistTable:', e); }
+
+        const efRows = Array.isArray(data.efetivoByCity) ? data.efetivoByCity : (window.INIT_EF_CITIES || []);
+        if (!Array.isArray(data.efetivoByCity)) console.warn('efetivoByCity ausente; usando fallback do SSR.');
+        renderEfetivoTable(efRows);
+
         renderFeed(data.feed);
       }catch(err){
         console.error('Monitor refresh failed:', err);
+        // mantém pelo menos o SSR
+        renderEfetivoTable(window.INIT_EF_CITIES || []);
       }
     }
 
     refresh();
     setInterval(refresh, 3000);
-    document.addEventListener('visibilitychange', () => { if(!document.hidden) refresh(); });
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
   </script>
 </body>
 </html>
