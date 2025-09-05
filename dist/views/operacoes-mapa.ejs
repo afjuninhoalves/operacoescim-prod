@@ -1,123 +1,35 @@
 <!doctype html>
 <html lang="pt-br">
-
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Mapa — <%= operacao.nome %>
-  </title>
+  <title>Mapa — <%= operacao.nome %></title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
-    :root {
-      --bg: #0b1220;
-      --panel: #0f172a;
-      --panel2: #111827;
-      --border: #1f2937;
-      --text: #e5e7eb;
-      --muted: #9ca3af;
-      --blue: #2563eb;
-    }
-
-    * {
-      box-sizing: border-box
-    }
-
-    body {
-      margin: 0;
-      background: var(--bg);
-      color: var(--text);
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Arial
-    }
-
-    a {
-      color: inherit;
-      text-decoration: none
-    }
-
-    .topbar {
-      position: sticky;
-      top: 0;
-      z-index: 10;
-      background: linear-gradient(to bottom, rgba(17, 24, 39, .92), rgba(17, 24, 39, .75));
-      border-bottom: 1px solid var(--border)
-    }
-
-    .topbar-inner {
-      max-width: 1160px;
-      margin: 0 auto;
-      padding: 14px 20px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 12px
-    }
-
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 10px 14px;
-      border-radius: 10px;
-      border: 1px solid var(--border);
-      background: #111826;
-      color: var(--text)
-    }
-
-    .btn:hover {
-      filter: brightness(1.08)
-    }
-
-    .container {
-      max-width: 1160px;
-      margin: 0 auto;
-      padding: 20px
-    }
-
-    .card {
-      background: linear-gradient(180deg, var(--panel), var(--panel2));
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 14px;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, .35)
-    }
-
-    .muted {
-      color: var(--muted)
-    }
-
-    #map {
-      width: 100%;
-      height: 72vh;
-      border-radius: 12px;
-      border: 1px solid var(--border)
-    }
-
-    .legend {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      margin: 8px 0 0
-    }
-
-    .dot {
-      width: 12px;
-      height: 12px;
-      border-radius: 999px;
-      display: inline-block;
-      margin-right: 6px
-    }
+    :root{ --bg:#0b1220; --panel:#0f172a; --panel2:#111827; --border:#1f2937; --text:#e5e7eb; --muted:#9ca3af; --blue:#2563eb; }
+    *{ box-sizing:border-box }
+    body{ margin:0; background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial }
+    a{ color:inherit; text-decoration:none }
+    .topbar{ position:sticky; top:0; z-index:10; background:linear-gradient(to bottom,rgba(17,24,39,.92),rgba(17,24,39,.75)); border-bottom:1px solid var(--border) }
+    .topbar-inner{ max-width:1160px; margin:0 auto; padding:14px 20px; display:flex; justify-content:space-between; align-items:center; gap:12px }
+    .btn{ display:inline-flex; align-items:center; gap:8px; padding:10px 14px; border-radius:10px; border:1px solid var(--border); background:#111826; color:var(--text) }
+    .btn:hover{ filter:brightness(1.08) }
+    .container{ max-width:1160px; margin:0 auto; padding:20px }
+    .card{ background:linear-gradient(180deg,var(--panel),var(--panel2)); border:1px solid var(--border); border-radius:14px; padding:14px; box-shadow:0 10px 30px rgba(0,0,0,.35) }
+    .muted{ color:var(--muted) }
+    #map{ width:100%; height:72vh; border-radius:12px; border:1px solid var(--border) }
+    .legend{ display:flex; gap:10px; flex-wrap:wrap; margin:8px 0 0 }
+    .dot{ width:12px; height:12px; border-radius:999px; display:inline-block; margin-right:6px }
   </style>
 </head>
-
 <body>
 
   <div class="topbar">
     <div class="topbar-inner">
       <div>
-        <div style="font-weight:700">Mapa — <%= operacao.nome %>
-        </div>
-        <div class="muted">Agendada: <%= new Date(operacao.inicio_agendado).toLocaleString('pt-BR') %> · ID #<%=
-              operacao.id %>
+        <div style="font-weight:700">Mapa — <%= operacao.nome %></div>
+        <div class="muted">
+          Agendada: <%= new Date(operacao.inicio_agendado).toLocaleString('pt-BR') %> · ID #<%= operacao.id %>
         </div>
       </div>
       <div style="display:flex;gap:10px">
@@ -132,6 +44,8 @@
     <div class="card" style="margin-bottom:12px">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
         <div class="muted">Mostrando eventos com geolocalização capturada nas fotos.</div>
+
+        <!-- ÚNICO bloco de toggles -->
         <div>
           <label style="margin-right:10px"><input type="checkbox" id="chk-fis" checked> Fiscalizações</label>
           <label style="margin-right:10px"><input type="checkbox" id="chk-pes" checked> Pessoas</label>
@@ -139,26 +53,20 @@
           <label><input type="checkbox" id="chk-apr" checked> Apreensões</label>
         </div>
 
+        <!-- Filtro de cidade separado -->
         <div>
-          <label style="margin-right:10px"><input type="checkbox" id="chk-fis" checked> Fiscalizações</label>
-          <label style="margin-right:10px"><input type="checkbox" id="chk-pes" checked> Pessoas</label>
-          <label style="margin-right:10px"><input type="checkbox" id="chk-vei" checked> Veículos</label>
-          <label style="margin-right:18px"><input type="checkbox" id="chk-apr" checked> Apreensões</label>
-
           <label>Cidade:
             <select id="sel-cidade"
               style="margin-left:6px;padding:6px 8px;border-radius:8px;border:1px solid var(--border);background:#0f172a;color:var(--text)">
               <option value="">Todas</option>
-              <% (cidades || []).forEach(c=> { %>
-                <option value="<%= c.id %>">
-                  <%= c.nome %>
-                </option>
-                <% }) %>
+              <% (cidades || []).forEach(c => { %>
+                <option value="<%= c.id %>"><%= c.nome %></option>
+              <% }) %>
             </select>
           </label>
         </div>
-
       </div>
+
       <div class="legend">
         <span><span class="dot" style="background:#60a5fa"></span> Fiscalização</span>
         <span><span class="dot" style="background:#f87171"></span> Pessoa</span>
@@ -171,84 +79,79 @@
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script>
-  const rawMarkers = <%- JSON.stringify(markers || []) %>;
-  const toNum = v => Number.isFinite(Number(v)) ? Number(v) : null;
-  const toMeters = v => (Number.isFinite(Number(v)) && Number(v) > 0) ? Number(v) : 0;
+  <script>
+    const rawMarkers = <%- JSON.stringify(markers || []) %>;
+    const toNum = v => Number.isFinite(Number(v)) ? Number(v) : null;
+    const toMeters = v => (Number.isFinite(Number(v)) && Number(v) > 0) ? Number(v) : 0;
 
-  const data = rawMarkers.map(m => ({
-    ...m,
-    lat: toNum(m.lat),
-    lng: toNum(m.lng),
-    accuracy: toMeters(m.accuracy),
-    cidade_id: m.cidade_id ?? null
-  })).filter(m => m.lat !== null && m.lng !== null);
+    const data = rawMarkers.map(m => ({
+      ...m,
+      lat: toNum(m.lat),
+      lng: toNum(m.lng),
+      accuracy: toMeters(m.accuracy),
+      cidade_id: m.cidade_id ?? null
+    })).filter(m => m.lat !== null && m.lng !== null);
 
-  const map = L.map('map', { zoomControl: true });
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; OpenStreetMap',
-    maxZoom: 19
-  }).addTo(map);
+    const map = L.map('map', { zoomControl: true });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap',
+      maxZoom: 19
+    }).addTo(map);
 
-  const gFis = L.layerGroup().addTo(map);
-  const gPes = L.layerGroup().addTo(map);
-  const gVei = L.layerGroup().addTo(map);
-  const gApr = L.layerGroup().addTo(map);
-  const gAcc = L.layerGroup().addTo(map); // círculos de precisão
+    const gFis = L.layerGroup().addTo(map);
+    const gPes = L.layerGroup().addTo(map);
+    const gVei = L.layerGroup().addTo(map);
+    const gApr = L.layerGroup().addTo(map);
+    const gAcc = L.layerGroup().addTo(map);
 
-  const colorFor = (t) => t==='fiscalizacao'?'#60a5fa' : t==='pessoa'?'#f87171' : t==='veiculo'?'#34d399' : t==='apreensao'?'#fbbf24' : '#a78bfa';
+    const colorFor = (t) =>
+      t==='fiscalizacao' ? '#60a5fa' :
+      t==='pessoa'       ? '#f87171' :
+      t==='veiculo'      ? '#34d399' :
+      t==='apreensao'    ? '#fbbf24' : '#a78bfa';
 
-  function applyFilters(){
-    const showFis = document.getElementById('chk-fis').checked;
-    const showPes = document.getElementById('chk-pes').checked;
-    const showVei = document.getElementById('chk-vei').checked;
-    const showApr = document.getElementById('chk-apr').checked;
-    const cid = document.getElementById('sel-cidade').value; // "" = todas
+    function applyFilters(){
+      const showFis = document.getElementById('chk-fis').checked;
+      const showPes = document.getElementById('chk-pes').checked;
+      const showVei = document.getElementById('chk-vei').checked;
+      const showApr = document.getElementById('chk-apr').checked;
+      const cid = document.getElementById('sel-cidade').value;
 
-    gFis.clearLayers(); gPes.clearLayers(); gVei.clearLayers(); gApr.clearLayers(); gAcc.clearLayers();
+      gFis.clearLayers(); gPes.clearLayers(); gVei.clearLayers(); gApr.clearLayers(); gAcc.clearLayers();
 
-    const bounds = [];
-    data.forEach(m => {
-      if (cid && String(m.cidade_id) !== cid) return;
-      if (m.tipo==='fiscalizacao' && !showFis) return;
-      if (m.tipo==='pessoa'       && !showPes) return;
-      if (m.tipo==='veiculo'      && !showVei) return;
-      if (m.tipo==='apreensao'    && !showApr) return;
+      const bounds = [];
+      data.forEach(m => {
+        if (cid && String(m.cidade_id) !== cid) return;
+        if (m.tipo==='fiscalizacao' && !showFis) return;
+        if (m.tipo==='pessoa'       && !showPes) return;
+        if (m.tipo==='veiculo'      && !showVei) return;
+        if (m.tipo==='apreensao'    && !showApr) return;
 
-      const circle = L.circleMarker([m.lat, m.lng], {
-        radius: 8, weight: 2, color: colorFor(m.tipo), fillOpacity: .7
+        const circle = L.circleMarker([m.lat, m.lng], { radius:8, weight:2, color:colorFor(m.tipo), fillOpacity:.7 });
+        if (m.popup) circle.bindPopup(m.popup);
+
+        if (m.tipo==='fiscalizacao') circle.addTo(gFis);
+        else if (m.tipo==='pessoa')  circle.addTo(gPes);
+        else if (m.tipo==='veiculo') circle.addTo(gVei);
+        else if (m.tipo==='apreensao') circle.addTo(gApr);
+        else circle.addTo(map);
+
+        bounds.push([m.lat, m.lng]);
+
+        if (m.accuracy > 0) {
+          L.circle([m.lat, m.lng], { radius:m.accuracy, color:colorFor(m.tipo), weight:1, opacity:.3, fillOpacity:.05 }).addTo(gAcc);
+        }
       });
-      if (m.popup) circle.bindPopup(m.popup);
 
-      if (m.tipo==='fiscalizacao') circle.addTo(gFis);
-      else if (m.tipo==='pessoa')  circle.addTo(gPes);
-      else if (m.tipo==='veiculo') circle.addTo(gVei);
-      else if (m.tipo==='apreensao') circle.addTo(gApr);
-      else circle.addTo(map);
+      if (bounds.length) map.fitBounds(L.latLngBounds(bounds).pad(0.2));
+      else map.setView([-14.2350, -51.9253], 4);
+    }
 
-      bounds.push([m.lat, m.lng]);
+    ['chk-fis','chk-pes','chk-vei','chk-apr','sel-cidade'].forEach(id =>
+      document.getElementById(id).addEventListener('change', applyFilters)
+    );
 
-      if (m.accuracy > 0) {
-        L.circle([m.lat, m.lng], {
-          radius: m.accuracy, color: colorFor(m.tipo), weight:1, opacity:.3, fillOpacity:.05
-        }).addTo(gAcc);
-      }
-    });
-
-    if (bounds.length) map.fitBounds(L.latLngBounds(bounds).pad(0.2));
-    else map.setView([-14.2350, -51.9253], 4);
-  }
-
-  // eventos
-  ['chk-fis','chk-pes','chk-vei','chk-apr','sel-cidade'].forEach(id =>
-    document.getElementById(id).addEventListener('change', applyFilters)
-  );
-
-  // primeira renderização
-  applyFilters();
-</script>
-
-
+    applyFilters();
+  </script>
 </body>
-
 </html>
