@@ -2158,10 +2158,14 @@ app.get('/operacoes/:opId/fiscalizacoes/:fiscId/editar',
 
 // Aceita campos: tipo_local, obs e (opcional) fotos[] / foto
 
+// EDITAR fiscalização (POST) — multer ANTES do csurf
 app.post('/operacoes/:opId/fiscalizacoes/:fiscId/editar',
-  requireAuth, csrfProtection, async (req, res) => {
-    const user = (req.session as any).user;
-    const opId = Number(req.params.opId);
+  requireAuth,
+  uploadFotosFields,          // ✅ parseia multipart/form-data (lê _csrf do body)
+  csrfProtection,             // ✅ agora o csurf encontra o token
+  async (req, res) => {
+    const user   = (req.session as any).user;
+    const opId   = Number(req.params.opId);
     const fiscId = Number(req.params.fiscId);
 
     const ev = await db('operacao_eventos')
@@ -2171,31 +2175,30 @@ app.post('/operacoes/:opId/fiscalizacoes/:fiscId/editar',
     const perm = await canEditEvento(user, opId, fiscId);
     if (!perm.ok) return res.status(perm.status || 403).send(perm.reason || 'Não autorizado.');
 
-    const toInt = (v: any) => (v === '' || v == null) ? 0 : Math.max(0, Math.floor(Number(v) || 0));
-    const toBool = (v: any) => v === 'on' || v === 'true' || v === '1';
-    const S = (v: any) => String(v ?? '').trim();
+    const toInt  = (v:any) => (v === '' || v == null) ? 0 : Math.max(0, Math.floor(Number(v) || 0));
+    const toBool = (v:any) => v === 'on' || v === 'true' || v === '1';
+    const S      = (v:any) => String(v ?? '').trim();
 
-    const tipo_local = S(req.body.tipo_local);
+    const tipo_local         = S(req.body.tipo_local);
     if (!tipo_local) return res.status(400).send('Informe o tipo de local.');
 
-    const local_nome = S(req.body.local_nome) || null;
-    const local_endereco = S(req.body.local_endereco) || null;
-    const obs = S(req.body.obs) || null;
-    const pessoas_abordadas = toInt(req.body.pessoas_abordadas);
+    const local_nome         = S(req.body.local_nome) || null;
+    const local_endereco     = S(req.body.local_endereco) || null;
+    const obs                = S(req.body.obs) || null;
+    const pessoas_abordadas  = toInt(req.body.pessoas_abordadas);
     const veiculos_abordados = toInt(req.body.veiculos_abordados);
-    const multado = toBool(req.body.multado);
-    const fechado = toBool(req.body.fechado);
-    const lacrado = toBool(req.body.lacrado);
+    const multado            = toBool(req.body.multado);
+    const fechado            = toBool(req.body.fechado);
+    const lacrado            = toBool(req.body.lacrado);
 
     // 🌟 novos campos
     const pessoas_detidas_flag = toBool(req.body.pessoas_detidas_flag);
-    const pessoas_detidas_qtd = toInt(req.body.pessoas_detidas_qtd);
+    const pessoas_detidas_qtd  = toInt(req.body.pessoas_detidas_qtd);
 
-    // Se também quiser atualizar a localização do evento:
+    // Geo (se enviado)
     const { lat, lng, acc } = getGeoFromBody(req);
 
     await db.transaction(async trx => {
-      // Atualiza observação e geo no evento base (opcional)
       await trx('operacao_eventos')
         .where({ id: fiscId })
         .update({
@@ -2205,7 +2208,6 @@ app.post('/operacoes/:opId/fiscalizacoes/:fiscId/editar',
           accuracy: acc ?? null
         });
 
-      // Atualiza detalhes na tabela da fiscalização
       await trx('evento_fiscalizacao')
         .where({ evento_id: fiscId })
         .update({
@@ -2217,15 +2219,15 @@ app.post('/operacoes/:opId/fiscalizacoes/:fiscId/editar',
           multado,
           fechado,
           lacrado,
-          // 🌟 novos
           pessoas_detidas_flag,
           pessoas_detidas_qtd
         });
     });
 
-    // Volta para a própria edição (ou onde preferir)
     res.redirect(`/operacoes/${opId}/fiscalizacoes/${fiscId}/editar`);
-  });
+  }
+);
+
 
 
 

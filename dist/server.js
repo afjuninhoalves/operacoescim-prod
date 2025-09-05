@@ -1861,7 +1861,10 @@ app.get('/operacoes/:opId/fiscalizacoes/:fiscId/editar', requireAuth, csrfProtec
     });
 });
 // Aceita campos: tipo_local, obs e (opcional) fotos[] / foto
-app.post('/operacoes/:opId/fiscalizacoes/:fiscId/editar', requireAuth, csrfProtection, async (req, res) => {
+// EDITAR fiscalização (POST) — multer ANTES do csurf
+app.post('/operacoes/:opId/fiscalizacoes/:fiscId/editar', requireAuth, uploadFotosFields, // ✅ parseia multipart/form-data (lê _csrf do body)
+csrfProtection, // ✅ agora o csurf encontra o token
+async (req, res) => {
     const user = req.session.user;
     const opId = Number(req.params.opId);
     const fiscId = Number(req.params.fiscId);
@@ -1890,10 +1893,9 @@ app.post('/operacoes/:opId/fiscalizacoes/:fiscId/editar', requireAuth, csrfProte
     // 🌟 novos campos
     const pessoas_detidas_flag = toBool(req.body.pessoas_detidas_flag);
     const pessoas_detidas_qtd = toInt(req.body.pessoas_detidas_qtd);
-    // Se também quiser atualizar a localização do evento:
+    // Geo (se enviado)
     const { lat, lng, acc } = getGeoFromBody(req);
     await db.transaction(async (trx) => {
-        // Atualiza observação e geo no evento base (opcional)
         await trx('operacao_eventos')
             .where({ id: fiscId })
             .update({
@@ -1902,7 +1904,6 @@ app.post('/operacoes/:opId/fiscalizacoes/:fiscId/editar', requireAuth, csrfProte
             lng: lng ?? null,
             accuracy: acc ?? null
         });
-        // Atualiza detalhes na tabela da fiscalização
         await trx('evento_fiscalizacao')
             .where({ evento_id: fiscId })
             .update({
@@ -1914,12 +1915,10 @@ app.post('/operacoes/:opId/fiscalizacoes/:fiscId/editar', requireAuth, csrfProte
             multado,
             fechado,
             lacrado,
-            // 🌟 novos
             pessoas_detidas_flag,
             pessoas_detidas_qtd
         });
     });
-    // Volta para a própria edição (ou onde preferir)
     res.redirect(`/operacoes/${opId}/fiscalizacoes/${fiscId}/editar`);
 });
 // POST: remover UMA foto da fiscalização
