@@ -1,49 +1,161 @@
 <!doctype html>
 <html lang="pt-br">
+
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Monitor — <%= operacao.nome %></title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Monitor — <%= operacao.nome %>
+  </title>
 
   <style>
-    :root{
-      --bg:#0b1220; --panel:#0f172a; --panel2:#111827; --border:#1f2937;
-      --text:#e5e7eb; --muted:#9ca3af; --chip:#1f2937;
-      --radius:14px;
+    :root {
+      --bg: #0b1220;
+      --panel: #0f172a;
+      --panel2: #111827;
+      --border: #1f2937;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --chip: #1f2937;
+      --radius: 14px;
     }
-    *{box-sizing:border-box}
-    body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial}
-    a{color:inherit;text-decoration:none}
+
+    * {
+      box-sizing: border-box
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Arial
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none
+    }
 
     /* Topbar */
-    .topbar{position:sticky;top:0;z-index:10;background:linear-gradient(to bottom,rgba(17,24,39,.92),rgba(17,24,39,.75));border-bottom:1px solid var(--border)}
-    .topbar-inner{max-width:1160px;margin:0 auto;padding:14px 20px;display:flex;justify-content:space-between;align-items:center;gap:12px}
-    .btn{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:#111826}
-    .btn:hover{filter:brightness(1.08)}
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: linear-gradient(to bottom, rgba(17, 24, 39, .92), rgba(17, 24, 39, .75));
+      border-bottom: 1px solid var(--border)
+    }
 
-    .container{max-width:1160px;margin:0 auto;padding:20px}
-    .muted{color:var(--muted)}
+    .topbar-inner {
+      max-width: 1160px;
+      margin: 0 auto;
+      padding: 14px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: #111826
+    }
+
+    .btn:hover {
+      filter: brightness(1.08)
+    }
+
+    .container {
+      max-width: 1160px;
+      margin: 0 auto;
+      padding: 20px
+    }
+
+    .muted {
+      color: var(--muted)
+    }
 
     /* Cards */
-    .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--border);border-radius:var(--radius);padding:14px}
-    .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
-    .kpi .label{font-size:13px;color:var(--muted)}
-    .kpi .value{font-size:28px;font-weight:700}
-    .kpi .sub{font-size:12px;color:var(--muted);margin-top:4px}
+    .card {
+      background: linear-gradient(180deg, var(--panel), var(--panel2));
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px
+    }
 
-    .mini-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:12px}
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px
+    }
+
+    .kpi .label {
+      font-size: 13px;
+      color: var(--muted)
+    }
+
+    .kpi .value {
+      font-size: 28px;
+      font-weight: 700
+    }
+
+    .kpi .sub {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 4px
+    }
+
+    .mini-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+      margin-top: 12px
+    }
 
     /* Tabelas */
-    .grid{display:grid;grid-template-columns:1.2fr .8fr;gap:12px;margin-top:14px}
-    table{width:100%;border-collapse:collapse}
-    th,td{padding:10px;border-bottom:1px solid var(--border);text-align:center}
-    th:first-child,td:first-child{text-align:left}
-    .num{text-align:right}
+    .grid {
+      display: grid;
+      grid-template-columns: 1.2fr .8fr;
+      gap: 12px;
+      margin-top: 14px
+    }
 
-    .chip{display:inline-block;padding:3px 8px;border-radius:999px;background:var(--chip);font-size:12px}
+    table {
+      width: 100%;
+      border-collapse: collapse
+    }
 
-    @media (max-width:1100px){
-      .grid{grid-template-columns:1fr}
+    th,
+    td {
+      padding: 10px;
+      border-bottom: 1px solid var(--border);
+      text-align: center
+    }
+
+    th:first-child,
+    td:first-child {
+      text-align: left
+    }
+
+    .num {
+      text-align: right
+    }
+
+    .chip {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: var(--chip);
+      font-size: 12px
+    }
+
+    @media (max-width:1100px) {
+      .grid {
+        grid-template-columns: 1fr
+      }
     }
   </style>
 </head>
@@ -53,8 +165,10 @@
   <div class="topbar">
     <div class="topbar-inner">
       <div>
-        <div style="font-weight:700">Monitor — <%= operacao.nome %></div>
-        <div class="muted">Agendada: <%= operacao.inicio_fmt %> · ID #<%= operacao.id %></div>
+        <div style="font-weight:700">Monitor — <%= operacao.nome %>
+        </div>
+        <div class="muted">Agendada: <%= operacao.inicio_fmt %> · ID #<%= operacao.id %>
+        </div>
       </div>
       <div style="display:flex;gap:10px">
         <a class="btn" href="/operacoes/<%= operacao.id %>">Voltar ao detalhe</a>
@@ -67,45 +181,107 @@
   <div class="container">
     <!-- KPIs -->
     <div class="kpi-grid">
-      <div class="kpi card"><div class="label">Locais fiscalizados</div><div class="value" data-kpi="locais"><%= (cards&&cards.locais)||0 %></div></div>
-      <div class="kpi card"><div class="label">Pessoas abordadas</div><div class="value" data-kpi="pessoas"><%= (cards&&cards.pessoas)||0 %></div></div>
-      <div class="kpi card"><div class="label">Veículos abordados</div><div class="value" data-kpi="veiculos"><%= (cards&&cards.veiculos)||0 %></div></div>
+      <div class="kpi card">
+        <div class="label">Locais fiscalizados</div>
+        <div class="value" data-kpi="locais">
+          <%= (cards&&cards.locais)||0 %>
+        </div>
+      </div>
+      <div class="kpi card">
+        <div class="label">Pessoas abordadas</div>
+        <div class="value" data-kpi="pessoas">
+          <%= (cards&&cards.pessoas)||0 %>
+        </div>
+      </div>
+      <div class="kpi card">
+        <div class="label">Veículos abordados</div>
+        <div class="value" data-kpi="veiculos">
+          <%= (cards&&cards.veiculos)||0 %>
+        </div>
+      </div>
 
       <!-- RENOMEADO: total de itens (linhas em evento_apreensao) -->
-      <div class="kpi card"><div class="label">Itens apreendidos</div><div class="value" data-kpi="itensApreendidos"><%= (cards&&cards.itensApreendidos)||0 %></div></div>
+      <div class="kpi card">
+        <div class="label">Itens apreendidos</div>
+        <div class="value" data-kpi="itensApreendidos">
+          <%= (cards&&cards.itensApreendidos)||0 %>
+        </div>
+      </div>
 
       <!-- NOVO: 1 por fiscalização com >=1 item -->
-      <div class="kpi card"><div class="label">Apreensões</div><div class="value" data-kpi="apreensoes"><%= (cards&&cards.apreensoes)||0 %></div></div>
+      <div class="kpi card">
+        <div class="label">Apreensões</div>
+        <div class="value" data-kpi="apreensoes">
+          <%= (cards&&cards.apreensoes)||0 %>
+        </div>
+      </div>
 
-      <div class="kpi card"><div class="label">Multados</div><div class="value" data-kpi="multados"><%= (cards&&cards.multados)||0 %></div></div>
-      <div class="kpi card"><div class="label">Fechados</div><div class="value" data-kpi="fechados"><%= (cards&&cards.fechados)||0 %></div></div>
-      <div class="kpi card"><div class="label">Lacrados</div><div class="value" data-kpi="lacrados"><%= (cards&&cards.lacrados)||0 %></div></div>
+      <div class="kpi card">
+        <div class="label">Multados</div>
+        <div class="value" data-kpi="multados">
+          <%= (cards&&cards.multados)||0 %>
+        </div>
+      </div>
+      <div class="kpi card">
+        <div class="label">Fechados</div>
+        <div class="value" data-kpi="fechados">
+          <%= (cards&&cards.fechados)||0 %>
+        </div>
+      </div>
+      <div class="kpi card">
+        <div class="label">Lacrados</div>
+        <div class="value" data-kpi="lacrados">
+          <%= (cards&&cards.lacrados)||0 %>
+        </div>
+      </div>
+      <div class="kpi card">
+        <div class="label">Pessoas detidas</div>
+        <div class="value" data-kpi="detidos">
+          <%= (cards && cards.detidos) || 0 %>
+        </div>
+      </div>
     </div>
 
     <!-- Efetivo total (mini cards) -->
     <div class="mini-grid">
       <div class="card">
         <div class="kpi .title">Efetivo total de GCM´s</div>
-        <div class="kpi value"><%= (efetivo&&+efetivo.total_agentes)||0 %> ag.</div>
-        <div class="kpi sub"><%= (efetivo&&+efetivo.total_viaturas)||0 %> viaturas</div>
+        <div class="kpi value">
+          <%= (efetivo&&+efetivo.total_agentes)||0 %> ag.
+        </div>
+        <div class="kpi sub">
+          <%= (efetivo&&+efetivo.total_viaturas)||0 %> viaturas
+        </div>
       </div>
 
       <div class="card">
         <div class="kpi .title">Polícia Civil</div>
-        <div class="kpi value"><%= (efetivo&&+efetivo.pc_agentes)||0 %> ag.</div>
-        <div class="kpi sub"><%= (efetivo&&+efetivo.pc_viaturas)||0 %> viaturas</div>
+        <div class="kpi value">
+          <%= (efetivo&&+efetivo.pc_agentes)||0 %> ag.
+        </div>
+        <div class="kpi sub">
+          <%= (efetivo&&+efetivo.pc_viaturas)||0 %> viaturas
+        </div>
       </div>
 
       <div class="card">
         <div class="kpi .title">Polícia Militar</div>
-        <div class="kpi value"><%= (efetivo&&+efetivo.pm_agentes)||0 %> ag.</div>
-        <div class="kpi sub"><%= (efetivo&&+efetivo.pm_viaturas)||0 %> viaturas</div>
+        <div class="kpi value">
+          <%= (efetivo&&+efetivo.pm_agentes)||0 %> ag.
+        </div>
+        <div class="kpi sub">
+          <%= (efetivo&&+efetivo.pm_viaturas)||0 %> viaturas
+        </div>
       </div>
 
       <div class="card">
         <div class="kpi .title">Outros órgãos</div>
-        <div class="kpi value"><%= (efetivo&&+efetivo.outros_agentes)||0 %> ag.</div>
-        <div class="kpi sub"><%= (efetivo&&+efetivo.outros_viaturas)||0 %> viaturas</div>
+        <div class="kpi value">
+          <%= (efetivo&&+efetivo.outros_agentes)||0 %> ag.
+        </div>
+        <div class="kpi sub">
+          <%= (efetivo&&+efetivo.outros_viaturas)||0 %> viaturas
+        </div>
       </div>
     </div>
 
@@ -114,242 +290,341 @@
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         <h3 style="margin:0">Distribuição por cidade</h3>
         <div class="muted" style="font-size:13px">
-          <span style="display:inline-block;width:10px;height:10px;background:#60a5fa;border-radius:50%;margin-right:6px"></span>Fiscalizações
-          &nbsp;&nbsp;<span style="display:inline-block;width:10px;height:10px;background:#f87171;border-radius:50%;margin-right:6px"></span>Pessoas
-          &nbsp;&nbsp;<span style="display:inline-block;width:10px;height:10px;background:#34d399;border-radius:50%;margin-right:6px"></span>Veículos
-          &nbsp;&nbsp;<span style="display:inline-block;width:10px;height:10px;background:#fbbf24;border-radius:50%;margin-right:6px"></span>Itens apreendidos
-          &nbsp;&nbsp;<span style="display:inline-block;width:10px;height:10px;background:#a78bfa;border-radius:50%;margin-right:6px"></span>Apreensões
+          <span
+            style="display:inline-block;width:10px;height:10px;background:#60a5fa;border-radius:50%;margin-right:6px"></span>Fiscalizações
+          &nbsp;&nbsp;<span
+            style="display:inline-block;width:10px;height:10px;background:#f87171;border-radius:50%;margin-right:6px"></span>Pessoas
+          &nbsp;&nbsp;<span
+            style="display:inline-block;width:10px;height:10px;background:#34d399;border-radius:50%;margin-right:6px"></span>Veículos
+          &nbsp;&nbsp;<span
+            style="display:inline-block;width:10px;height:10px;background:#fbbf24;border-radius:50%;margin-right:6px"></span>Itens
+          apreendidos
+          &nbsp;&nbsp;<span
+            style="display:inline-block;width:10px;height:10px;background:#a78bfa;border-radius:50%;margin-right:6px"></span>Apreensões
+          &nbsp;&nbsp;<span
+            style="display:inline-block;width:10px;height:10px;background:#06b6d4;border-radius:50%;margin-right:6px"></span>Pessoas
+          detidas
         </div>
+
       </div>
 
       <div id="chartWrap" style="position:relative;height:340px">
         <canvas id="byCityChart"></canvas>
       </div>
-      <div id="noChartData" class="muted" style="display:none;margin-top:8px">Sem dados suficientes para o gráfico.</div>
+      <div id="noChartData" class="muted" style="display:none;margin-top:8px">Sem dados suficientes para o gráfico.
+      </div>
     </div>
 
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
     <script>
-      const OP_ID  = <%= operacao.id %>;
-      const series = <%- JSON.stringify(seriesPorCidade || []) %>;
+      const OP_ID = <%= operacao.id %>;
+      const series = <% - JSON.stringify(seriesPorCidade || []) %>;
       let chart;
 
-      function hasAnyValue(rows){
+      function hasAnyValue(rows) {
         return Array.isArray(rows) && rows.some(r =>
-          (Number(r.fiscalizacao)||0) +
-          (Number(r.pessoa)||0) +
-          (Number(r.veiculo)||0) +
-          (Number(r.itens_apreendidos)||0) +
-          (Number(r.apreensoes)||0) > 0
+          (Number(r.fiscalizacao) || 0) +
+          (Number(r.pessoa) || 0) +
+          (Number(r.veiculo) || 0) +
+          (Number(r.itens_apreendidos) || 0) +
+          (Number(r.apreensoes) || 0) > 0
+            (Number(r.detidos) || 0) +     
         );
       }
 
-      function buildChart(rows){
+      function buildChart(rows) {
         const canvas = document.getElementById('byCityChart');
         const noData = document.getElementById('noChartData');
 
-        if(!hasAnyValue(rows)){ noData.style.display='block'; return; }
+        if (!hasAnyValue(rows)) { noData.style.display = 'block'; return; }
 
         const labels = rows.map(r => r.cidade);
-        const mk = (k,label,color)=>({
-          label, data: rows.map(r => Number(r[k]||0)),
-          backgroundColor: color, borderColor: color, borderWidth:1, borderRadius:6, maxBarThickness:36
+        const mk = (k, label, color) => ({
+          label, data: rows.map(r => Number(r[k] || 0)),
+          backgroundColor: color, borderColor: color, borderWidth: 1, borderRadius: 6, maxBarThickness: 36
         });
 
         chart = new Chart(canvas.getContext('2d'), {
-          type:'bar',
-          data:{
+          type: 'bar',
+          data: {
             labels,
-            datasets:[
-              mk('fiscalizacao','Fiscalizações','#60a5fa'),
-              mk('pessoa','Pessoas','#f87171'),
-              mk('veiculo','Veículos','#34d399'),
-              mk('itens_apreendidos','Itens apreendidos','#fbbf24'),
-              mk('apreensoes','Apreensões','#a78bfa'),
+            datasets: [
+              mk('fiscalizacao', 'Fiscalizações', '#60a5fa'),
+              mk('pessoa', 'Pessoas', '#f87171'),
+              mk('veiculo', 'Veículos', '#34d399'),
+              mk('itens_apreendidos', 'Itens apreendidos', '#fbbf24'),
+              mk('apreensoes', 'Apreensões', '#a78bfa'),
+              mk('detidos', 'Pessoas detidas', '#06b6d4'),   // << novo
             ]
           },
-          options:{
-            responsive:true, maintainAspectRatio:false, animation:false,
-            scales:{
-              x:{ticks:{color:'#e5e7eb'}, grid:{display:false}},
-              y:{beginAtZero:true, ticks:{precision:0,color:'#e5e7eb'}, grid:{color:'rgba(229,231,235,.1)'}}
+          options: {
+            responsive: true, maintainAspectRatio: false, animation: false,
+            scales: {
+              x: { ticks: { color: '#e5e7eb' }, grid: { display: false } },
+              y: { beginAtZero: true, ticks: { precision: 0, color: '#e5e7eb' }, grid: { color: 'rgba(229,231,235,.1)' } }
             },
-            plugins:{legend:{position:'top', labels:{color:'#e5e7eb'}}}
+            plugins: { legend: { position: 'top', labels: { color: '#e5e7eb' } } }
           }
         });
       }
 
-      function updateChart(rows){
-        if(!chart){ buildChart(rows); return; }
+      function updateChart(rows) {
+        if (!chart) { buildChart(rows); return; }
         chart.data.labels = rows.map(r => r.cidade);
-        const get = k => rows.map(r => Number(r[k]||0));
+        const get = k => rows.map(r => Number(r[k] || 0));
         chart.data.datasets[0].data = get('fiscalizacao');
         chart.data.datasets[1].data = get('pessoa');
         chart.data.datasets[2].data = get('veiculo');
         chart.data.datasets[3].data = get('itens_apreendidos');
         chart.data.datasets[4].data = get('apreensoes');
+        chart.data.datasets[2].data = get('detidos');
         chart.update();
       }
 
       window.addEventListener('load', () => buildChart(series));
     </script>
 
-    <% const tot = (arr,key) => (arr||[]).reduce((s,it)=> s + (Number(it?.[key])||0), 0); %>
+    <% const tot=(arr,key)=> (arr||[]).reduce((s,it)=> s + (Number(it?.[key])||0), 0); %>
 
-    <div class="grid">
-      <!-- Distribuição por cidade (tabela) -->
-      <div class="card">
-        <div style="font-weight:700;margin-bottom:8px">Distribuição por cidade</div>
-        <table>
-          <thead>
-            <tr>
-              <th>Cidade</th>
-              <th>Fiscalizações</th>
-              <th>Pessoas</th>
-              <th>Veículos</th>
-              <th>Itens apreendidos</th>
-              <th>Apreensões</th>
-              <th>Lacrados</th>
-              <th>Fechados</th>
-              <th>Multados</th>
-            </tr>
-          </thead>
-          <tbody id="dist-body">
-            <% (seriesPorCidade||[]).forEach(linha => { %>
+      <div class="grid">
+        <!-- Distribuição por cidade (tabela) -->
+        <div class="card">
+          <div style="font-weight:700;margin-bottom:8px">Distribuição por cidade</div>
+          <table>
+            <thead>
               <tr>
-                <td><%= linha.cidade %></td>
-                <td class="num"><%= linha.fiscalizacao || 0 %></td>
-                <td class="num"><%= linha.pessoa || 0 %></td>
-                <td class="num"><%= linha.veiculo || 0 %></td>
-                <td class="num"><%= linha.itens_apreendidos || 0 %></td>
-                <td class="num"><%= linha.apreensoes || 0 %></td>
-                <td class="num"><%= linha.lacrado || 0 %></td>
-                <td class="num"><%= linha.fechado || 0 %></td>
-                <td class="num"><%= linha.multado || 0 %></td>
+                <th>Cidade</th>
+                <th>Fiscalizações</th>
+                <th>Pessoas</th>
+                <th>Veículos</th>
+                <th>Itens apreendidos</th>
+                <th>Apreensões</th>
+                <th>Detidos</th>
+                <th>Lacrados</th>
+                <th>Fechados</th>
+                <th>Multados</th>
               </tr>
-            <% }) %>
-          </tbody>
-          <tfoot id="dist-foot">
-            <tr>
-              <th>Total</th>
-              <th class="num"><%= tot(seriesPorCidade,'fiscalizacao') %></th>
-              <th class="num"><%= tot(seriesPorCidade,'pessoa') %></th>
-              <th class="num"><%= tot(seriesPorCidade,'veiculo') %></th>
-              <th class="num"><%= tot(seriesPorCidade,'itens_apreendidos') %></th>
-              <th class="num"><%= tot(seriesPorCidade,'apreensoes') %></th>
-              <th class="num"><%= tot(seriesPorCidade,'lacrado') %></th>
-              <th class="num"><%= tot(seriesPorCidade,'fechado') %></th>
-              <th class="num"><%= tot(seriesPorCidade,'multado') %></th>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
+            </thead>
+            <tbody id="dist-body">
+              <% (seriesPorCidade||[]).forEach(linha=> { %>
+                <tr>
+                  <td>
+                    <%= linha.cidade %>
+                  </td>
+                  <td class="num">
+                    <%= linha.fiscalizacao || 0 %>
+                  </td>
+                  <td class="num">
+                    <%= linha.pessoa || 0 %>
+                  </td>
+                  <td class="num">
+                    <%= linha.veiculo || 0 %>
+                  </td>
+                  <td class="num">
+                    <%= linha.itens_apreendidos || 0 %>
+                  </td>
+                  <td class="num">
+                    <%= linha.apreensoes || 0 %>
+                  </td>
+                  <td class="num">
+                    <%= linha.detidos || 0 %>
+                  </td>
+                  <td class="num">
+                    <%= linha.lacrado || 0 %>
+                  </td>
+                  <td class="num">
+                    <%= linha.fechado || 0 %>
+                  </td>
+                  <td class="num">
+                    <%= linha.multado || 0 %>
+                  </td>
+                </tr>
+                <% }) %>
+            </tbody>
+            <tfoot id="dist-foot">
+              <tr>
+                <th>Total</th>
+                <th class="num">
+                  <%= tot(seriesPorCidade,'fiscalizacao') %>
+                </th>
+                <th class="num">
+                  <%= tot(seriesPorCidade,'pessoa') %>
+                </th>
+                <th class="num">
+                  <%= tot(seriesPorCidade,'veiculo') %>
+                </th>
+                <th class="num">
+                  <%= tot(seriesPorCidade,'itens_apreendidos') %>
+                </th>
+                <th class="num">
+                  <%= tot(seriesPorCidade,'apreensoes') %>
+                </th>
+                <th class="num">
+                  <%= tot(seriesPorCidade,'detidos') %>
+                </th>
+                <th class="num">
+                  <%= tot(seriesPorCidade,'lacrado') %>
+                </th>
+                <th class="num">
+                  <%= tot(seriesPorCidade,'fechado') %>
+                </th>
+                <th class="num">
+                  <%= tot(seriesPorCidade,'multado') %>
+                </th>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
       </div>
 
       <div class="grid">
 
-      <!-- Efetivo por cidade -->
-      <div class="card">
-        <div style="font-weight:700;margin-bottom:8px">Efetivo por cidade</div>
-        <% const efRows = Array.isArray(efetivoByCity) ? efetivoByCity : [];
-           const t = efRows.reduce((a,r)=>({
-             ag:a.ag+(+r.agentes||0),
-             vt:a.vt+(+r.viaturas||0),
-             pc_ag:a.pc_ag+(+r.pc_agentes||0),
-             pc_vt:a.pc_vt+(+r.pc_viaturas||0),
-             pm_ag:a.pm_ag+(+r.pm_agentes||0),
-             pm_vt:a.pm_vt+(+r.pm_viaturas||0),
-             ou_ag:a.ou_ag+(+r.outros_agentes||0),
-             ou_vt:a.ou_vt+(+r.outros_viaturas||0),
-           }),{ag:0,vt:0,pc_ag:0,pc_vt:0,pm_ag:0,pm_vt:0,ou_ag:0,ou_vt:0}); %>
+        <!-- Efetivo por cidade -->
+        <div class="card">
+          <div style="font-weight:700;margin-bottom:8px">Efetivo por cidade</div>
+          <% const efRows=Array.isArray(efetivoByCity) ? efetivoByCity : []; const t=efRows.reduce((a,r)=>({
+            ag:a.ag+(+r.agentes||0),
+            vt:a.vt+(+r.viaturas||0),
+            pc_ag:a.pc_ag+(+r.pc_agentes||0),
+            pc_vt:a.pc_vt+(+r.pc_viaturas||0),
+            pm_ag:a.pm_ag+(+r.pm_agentes||0),
+            pm_vt:a.pm_vt+(+r.pm_viaturas||0),
+            ou_ag:a.ou_ag+(+r.outros_agentes||0),
+            ou_vt:a.ou_vt+(+r.outros_viaturas||0),
+            }),{ag:0,vt:0,pc_ag:0,pc_vt:0,pm_ag:0,pm_vt:0,ou_ag:0,ou_vt:0}); %>
 
-        <table>
-          <thead>
-            <tr>
-              <th>Cidade</th>
-              <th>Agentes</th>
-              <th>Viaturas</th>
-              <th>PC (ag.)</th>
-              <th>PC (viat.)</th>
-              <th>PM (ag.)</th>
-              <th>PM (viat.)</th>
-              <th>Outros (ag.)</th>
-              <th>Outros (viat.)</th>
-            </tr>
-          </thead>
-          <tbody>
-            <% efRows.forEach(r => { %>
-              <tr>
-                <td><%= r.cidade %></td>
-                <td class="num"><%= r.agentes || 0 %></td>
-                <td class="num"><%= r.viaturas || 0 %></td>
-                <td class="num"><%= r.pc_agentes || 0 %></td>
-                <td class="num"><%= r.pc_viaturas || 0 %></td>
-                <td class="num"><%= r.pm_agentes || 0 %></td>
-                <td class="num"><%= r.pm_viaturas || 0 %></td>
-                <td class="num"><%= r.outros_agentes || 0 %></td>
-                <td class="num"><%= r.outros_viaturas || 0 %></td>
-              </tr>
+            <table>
+              <thead>
+                <tr>
+                  <th>Cidade</th>
+                  <th>Agentes</th>
+                  <th>Viaturas</th>
+                  <th>PC (ag.)</th>
+                  <th>PC (viat.)</th>
+                  <th>PM (ag.)</th>
+                  <th>PM (viat.)</th>
+                  <th>Outros (ag.)</th>
+                  <th>Outros (viat.)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% efRows.forEach(r=> { %>
+                  <tr>
+                    <td>
+                      <%= r.cidade %>
+                    </td>
+                    <td class="num">
+                      <%= r.agentes || 0 %>
+                    </td>
+                    <td class="num">
+                      <%= r.viaturas || 0 %>
+                    </td>
+                    <td class="num">
+                      <%= r.pc_agentes || 0 %>
+                    </td>
+                    <td class="num">
+                      <%= r.pc_viaturas || 0 %>
+                    </td>
+                    <td class="num">
+                      <%= r.pm_agentes || 0 %>
+                    </td>
+                    <td class="num">
+                      <%= r.pm_viaturas || 0 %>
+                    </td>
+                    <td class="num">
+                      <%= r.outros_agentes || 0 %>
+                    </td>
+                    <td class="num">
+                      <%= r.outros_viaturas || 0 %>
+                    </td>
+                  </tr>
+                  <% }) %>
+                    <tr>
+                      <th>Total</th>
+                      <th class="num">
+                        <%= t.ag %>
+                      </th>
+                      <th class="num">
+                        <%= t.vt %>
+                      </th>
+                      <th class="num">
+                        <%= t.pc_ag %>
+                      </th>
+                      <th class="num">
+                        <%= t.pc_vt %>
+                      </th>
+                      <th class="num">
+                        <%= t.pm_ag %>
+                      </th>
+                      <th class="num">
+                        <%= t.pm_vt %>
+                      </th>
+                      <th class="num">
+                        <%= t.ou_ag %>
+                      </th>
+                      <th class="num">
+                        <%= t.ou_vt %>
+                      </th>
+                    </tr>
+              </tbody>
+            </table>
+        </div>
+      </div>
+
+      <!-- Feed -->
+      <div class="card" style="margin-top:12px">
+        <div style="font-weight:700;margin-bottom:8px">Feed (últimos 20)</div>
+        <div id="feedWrap" style="display:flex;flex-direction:column;gap:10px">
+          <% (feed||[]).forEach(f=> { %>
+            <div style="padding:10px;border:1px solid var(--border);border-radius:10px">
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+                <span class="chip">
+                  <%= f.tipo %>
+                </span>
+                <span class="muted" style="font-size:12px">
+                  <%= new Date(f.ts).toLocaleString('pt-BR') %>
+                </span>
+              </div>
+              <div class="muted" style="margin-top:6px">
+                <%= f.cidade %>
+                  <% if (f.cidade && f.user) { %> · <% } %>
+                      <%= f.user %>
+              </div>
+              <% if (f.obs) { %>
+                <div style="margin-top:6px">
+                  <%= f.obs %>
+                </div>
+                <% } %>
+            </div>
             <% }) %>
-            <tr>
-              <th>Total</th>
-              <th class="num"><%= t.ag %></th>
-              <th class="num"><%= t.vt %></th>
-              <th class="num"><%= t.pc_ag %></th>
-              <th class="num"><%= t.pc_vt %></th>
-              <th class="num"><%= t.pm_ag %></th>
-              <th class="num"><%= t.pm_vt %></th>
-              <th class="num"><%= t.ou_ag %></th>
-              <th class="num"><%= t.ou_vt %></th>
-            </tr>
-          </tbody>
-        </table>
+        </div>
       </div>
-    </div>
-
-    <!-- Feed -->
-    <div class="card" style="margin-top:12px">
-      <div style="font-weight:700;margin-bottom:8px">Feed (últimos 20)</div>
-      <div id="feedWrap" style="display:flex;flex-direction:column;gap:10px">
-        <% (feed||[]).forEach(f => { %>
-          <div style="padding:10px;border:1px solid var(--border);border-radius:10px">
-            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
-              <span class="chip"><%= f.tipo %></span>
-              <span class="muted" style="font-size:12px"><%= new Date(f.ts).toLocaleString('pt-BR') %></span>
-            </div>
-            <div class="muted" style="margin-top:6px">
-              <%= f.cidade %><% if (f.cidade && f.user) { %> · <% } %><%= f.user %>
-            </div>
-            <% if (f.obs) { %><div style="margin-top:6px"><%= f.obs %></div><% } %>
-          </div>
-        <% }) %>
-      </div>
-    </div>
   </div>
 
   <!-- Auto-refresh -->
   <script>
     const $k = (name) => document.querySelector(`[data-kpi="${name}"]`);
 
-    function updateKPIs(cards){
-      if(!cards) return;
-      $k('locais').textContent           = cards.locais ?? 0;
-      $k('pessoas').textContent          = cards.pessoas ?? 0;
-      $k('veiculos').textContent         = cards.veiculos ?? 0;
+    function updateKPIs(cards) {
+      if (!cards) return;
+      $k('locais').textContent = cards.locais ?? 0;
+      $k('pessoas').textContent = cards.pessoas ?? 0;
+      $k('veiculos').textContent = cards.veiculos ?? 0;
       $k('itensApreendidos').textContent = cards.itensApreendidos ?? 0;
-      $k('apreensoes').textContent       = cards.apreensoes ?? 0;
-      $k('multados').textContent         = cards.multados ?? 0;
-      $k('fechados').textContent         = cards.fechados ?? 0;
-      $k('lacrados').textContent         = cards.lacrados ?? 0;
+      $k('apreensoes').textContent = cards.apreensoes ?? 0;
+      $k('detidos').textContent = cards.detidos ?? 0;
+      $k('multados').textContent = cards.multados ?? 0;
+      $k('fechados').textContent = cards.fechados ?? 0;
+      $k('lacrados').textContent = cards.lacrados ?? 0;
     }
 
-    function renderDistTable(rows){
+    function renderDistTable(rows) {
       const tbody = document.getElementById('dist-body');
       const tfoot = document.getElementById('dist-foot');
-      const tot = (k) => (rows||[]).reduce((s,r)=> s + (+r[k]||0), 0);
+      const tot = (k) => (rows || []).reduce((s, r) => s + (+r[k] || 0), 0);
 
-      tbody.innerHTML = (rows||[]).map(r => `
+      tbody.innerHTML = (rows || []).map(r => `
         <tr>
           <td>${r.cidade}</td>
           <td class="num">${r.fiscalizacao || 0}</td>
@@ -357,6 +632,7 @@
           <td class="num">${r.veiculo || 0}</td>
           <td class="num">${r.itens_apreendidos || 0}</td>
           <td class="num">${r.apreensoes || 0}</td>
+          <td class="num">${r.detidos || 0}</td>
           <td class="num">${r.lacrado || 0}</td>
           <td class="num">${r.fechado || 0}</td>
           <td class="num">${r.multado || 0}</td>
@@ -371,6 +647,7 @@
           <th class="num">${tot('veiculo')}</th>
           <th class="num">${tot('itens_apreendidos')}</th>
           <th class="num">${tot('apreensoes')}</th>
+          <th class="num">${tot('detidos')}</th>
           <th class="num">${tot('lacrado')}</th>
           <th class="num">${tot('fechado')}</th>
           <th class="num">${tot('multado')}</th>
@@ -378,10 +655,10 @@
       `;
     }
 
-    function renderFeed(feed){
+    function renderFeed(feed) {
       const wrap = document.getElementById('feedWrap');
-      if(!wrap) return;
-      wrap.innerHTML = (feed||[]).map(f => `
+      if (!wrap) return;
+      wrap.innerHTML = (feed || []).map(f => `
         <div style="padding:10px;border:1px solid var(--border);border-radius:10px">
           <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
             <span class="chip">${f.tipo}</span>
@@ -395,17 +672,17 @@
       `).join('');
     }
 
-    async function refresh(){
-      try{
-        const res  = await fetch(`/operacoes/${OP_ID}/monitor/data`, { cache: 'no-store' });
-        if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    async function refresh() {
+      try {
+        const res = await fetch(`/operacoes/${OP_ID}/monitor/data`, { cache: 'no-store' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
 
         updateKPIs(data.cards);
         updateChart(data.seriesPorCidade);
         renderDistTable(data.seriesPorCidade);
         renderFeed(data.feed);
-      }catch(err){
+      } catch (err) {
         console.error('Monitor refresh failed:', err);
       }
     }
@@ -413,7 +690,8 @@
     // primeira atualização + polling
     refresh();
     setInterval(refresh, 3000);
-    document.addEventListener('visibilitychange', () => { if(!document.hidden) refresh(); });
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
   </script>
 </body>
+
 </html>
