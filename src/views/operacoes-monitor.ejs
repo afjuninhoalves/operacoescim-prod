@@ -101,7 +101,7 @@
           &nbsp;&nbsp;<span style="display:inline-block;width:10px;height:10px;background:#06b6d4;border-radius:50%;margin-right:6px"></span>Pessoas detidas
           &nbsp;&nbsp;<span style="display:inline-block;width:10px;height:10px;background:#34d399;border-radius:50%;margin-right:6px"></span>Veículos
           &nbsp;&nbsp;<span style="display:inline-block;width:10px;height:10px;background:#fbbf24;border-radius:50%;margin-right:6px"></span>Itens apreendidos
-          &nbsp;&nbsp;<span style="display:inline-block;width:10px;height:10px;background:#a78bfa;border-radius:50%;margin-right:6px"></span>Apreensões
+          &nbsp;&nbsp;<span style="display:inline-block;width:10px;height:10px	background:#a78bfa;border-radius:50%;margin-right:6px"></span>Apreensões
         </div>
       </div>
 
@@ -118,9 +118,7 @@
       const series = <%- JSON.stringify(seriesPorCidade || []) %>;
       let chart;
 
-      const COLORS = {
-        fis:'#60a5fa', pes:'#f87171', det:'#06b6d4', vei:'#34d399', itens:'#fbbf24', apr:'#a78bfa'
-      };
+      const COLORS = { fis:'#60a5fa', pes:'#f87171', det:'#06b6d4', vei:'#34d399', itens:'#fbbf24', apr:'#a78bfa' };
 
       function hasAnyValue(rows){
         return Array.isArray(rows) && rows.some(r =>
@@ -183,10 +181,11 @@
         chart.update();
       }
 
+      // primeiro render do gráfico server-side
       window.addEventListener('load', () => buildChart(series));
     </script>
 
-    <% const tot = (arr,key) => (arr||[]).reduce((s,it)=> s + (Number(it?.[key])||0), 0); %>
+    <% const tot = (arr,key)=> (arr||[]).reduce((s,it)=> s + (Number(it?.[key])||0), 0); %>
 
     <div class="grid">
       <!-- Distribuição por cidade (tabela) -->
@@ -271,7 +270,8 @@
               <th>Outros (viat.)</th>
             </tr>
           </thead>
-          <tbody>
+          <!-- IMPORTANTE: IDs para atualizar via JS -->
+          <tbody id="ef-body">
             <% efRows.forEach(r => { %>
               <tr>
                 <td><%= r.cidade %></td>
@@ -285,6 +285,8 @@
                 <td class="num"><%= r.outros_viaturas || 0 %></td>
               </tr>
             <% }) %>
+          </tbody>
+          <tfoot id="ef-foot">
             <tr>
               <th>Total</th>
               <th class="num"><%= t.ag %></th>
@@ -296,7 +298,7 @@
               <th class="num"><%= t.ou_ag %></th>
               <th class="num"><%= t.ou_vt %></th>
             </tr>
-          </tbody>
+          </tfoot>
         </table>
       </div>
     </div>
@@ -374,6 +376,68 @@
       `;
     }
 
+    function renderEfetivoTable(rows){
+      const body = document.getElementById('ef-body');
+      const foot = document.getElementById('ef-foot');
+      const safe = Array.isArray(rows) ? rows : [];
+
+      body.innerHTML = safe.map(r => `
+        <tr>
+          <td>${r.cidade || ''}</td>
+          <td class="num">${+r.agentes || 0}</td>
+          <td class="num">${+r.viaturas || 0}</td>
+          <td class="num">${+r.pc_agentes || 0}</td>
+          <td class="num">${+r.pc_viaturas || 0}</td>
+          <td class="num">${+r.pm_agentes || 0}</td>
+          <td class="num">${+r.pm_viaturas || 0}</td>
+          <td class="num">${+r.outros_agentes || 0}</td>
+          <td class="num">${+r.outros_viaturas || 0}</td>
+        </tr>
+      `).join('');
+
+      const tot = safe.reduce((a,r)=>({
+        ag: a.ag + (+r.agentes||0),
+        vt: a.vt + (+r.viaturas||0),
+        pc_ag: a.pc_ag + (+r.pc_agentes||0),
+        pc_vt: a.pc_vt + (+r.pc_viaturas||0),
+        pm_ag: a.pm_ag + (+r.pm_agentes||0),
+        pm_vt: a.pm_vt + (+r.pm_viaturas||0),
+        ou_ag: a.ou_ag + (+r.outros_agentes||0),
+        ou_vt: a.ou_vt + (+r.outros_viaturas||0),
+      }), {ag:0,vt:0,pc_ag:0,pc_vt:0,pm_ag:0,pm_vt:0,ou_ag:0,ou_vt:0});
+
+      foot.innerHTML = `
+        <tr>
+          <th>Total</th>
+          <th class="num">${tot.ag}</th>
+          <th class="num">${tot.vt}</th>
+          <th class="num">${tot.pc_ag}</th>
+          <th class="num">${tot.pc_vt}</th>
+          <th class="num">${tot.pm_ag}</th>
+          <th class="num">${tot.pm_vt}</th>
+          <th class="num">${tot.ou_ag}</th>
+          <th class="num">${tot.ou_vt}</th>
+        </tr>
+      `;
+    }
+
+    function renderFeed(feed){
+      const wrap = document.getElementById('feedWrap');
+      if(!wrap) return;
+      wrap.innerHTML = (feed||[]).map(f => `
+        <div style="padding:10px;border:1px solid var(--border);border-radius:10px">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+            <span class="chip">${f.tipo}</span>
+            <span class="muted" style="font-size:12px">${new Date(f.ts).toLocaleString('pt-BR')}</span>
+          </div>
+          <div class="muted" style="margin-top:6px">
+            ${f.cidade || ''}${(f.cidade && f.user) ? ' · ' : ''}${f.user || ''}
+          </div>
+          ${f.obs ? `<div style="margin-top:6px">${f.obs}</div>` : ''}
+        </div>
+      `).join('');
+    }
+
     async function refresh(){
       try{
         const res  = await fetch(`/operacoes/${OP_ID}/monitor/data`, { cache: 'no-store' });
@@ -383,22 +447,8 @@
         updateKPIs(data.cards);
         updateChart(data.seriesPorCidade);
         renderDistTable(data.seriesPorCidade);
-        // feed:
-        const wrap = document.getElementById('feedWrap');
-        if (wrap) {
-          wrap.innerHTML = (data.feed||[]).map(f => `
-            <div style="padding:10px;border:1px solid var(--border);border-radius:10px">
-              <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
-                <span class="chip">${f.tipo}</span>
-                <span class="muted" style="font-size:12px">${new Date(f.ts).toLocaleString('pt-BR')}</span>
-              </div>
-              <div class="muted" style="margin-top:6px">
-                ${f.cidade || ''}${(f.cidade && f.user) ? ' · ' : ''}${f.user || ''}
-              </div>
-              ${f.obs ? `<div style="margin-top:6px">${f.obs}</div>` : ''}
-            </div>
-          `).join('');
-        }
+        renderEfetivoTable(data.efetivoByCity);   // <<<<<<<<<<<<<< ATUALIZA EFETIVO
+        renderFeed(data.feed);
       }catch(err){
         console.error('Monitor refresh failed:', err);
       }
