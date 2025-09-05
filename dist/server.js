@@ -1562,10 +1562,11 @@ async function buildMonitorData(id) {
         .count({ locais: 'e.id' })
         .sum({ pessoas: db.raw('COALESCE(f.pessoas_abordadas,0)') })
         .sum({ veiculos: db.raw('COALESCE(f.veiculos_abordados,0)') })
+        .sum({ detidos: db.raw('COALESCE(f.pessoas_detidas_qtd,0)') }) // << NOVO
         .first();
     // Itens (linhas de evento_apreensao) e Apreensões (1 por fiscalização com ≥1 item)
     const aggApr = await db('evento_apreensao as a')
-        .join('operacao_eventos as f', 'f.id', 'a.fiscalizacao_evento_id') // f = evento da fiscalização (pai)
+        .join('operacao_eventos as f', 'f.id', 'a.fiscalizacao_evento_id')
         .where('f.operacao_id', id)
         .count({ itens_apreendidos: 'a.evento_id' })
         .countDistinct({ apreensoes: 'a.fiscalizacao_evento_id' })
@@ -1585,6 +1586,7 @@ async function buildMonitorData(id) {
         multados: Number(flags?.multados) || 0,
         fechados: Number(flags?.fechados) || 0,
         lacrados: Number(flags?.lacrados) || 0,
+        detidos: Number(k?.detidos) || 0, // << NOVO
     };
     // Séries por cidade (fiscalizações + somas/flags + itens/apreensões)
     const subF = db('operacao_eventos as e')
@@ -1593,14 +1595,15 @@ async function buildMonitorData(id) {
         .select('e.cidade_id')
         .count({ fisc_cnt: 'e.id' })
         .sum({ pes_sum: db.raw('COALESCE(f.pessoas_abordadas,0)') })
+        .sum({ det_sum: db.raw('COALESCE(f.pessoas_detidas_qtd,0)') }) // << NOVO
         .sum({ vei_sum: db.raw('COALESCE(f.veiculos_abordados,0)') })
         .sum({ lac_sum: db.raw('CASE WHEN f.lacrado THEN 1 ELSE 0 END') })
         .sum({ fec_sum: db.raw('CASE WHEN f.fechado THEN 1 ELSE 0 END') })
         .sum({ mult_sum: db.raw('CASE WHEN f.multado THEN 1 ELSE 0 END') })
         .groupBy('e.cidade_id')
         .as('sf');
-    // Itens por cidade (total de linhas de apreensão) e Apreensões por cidade (DISTINCT fiscalizacao_evento_id)
-    const subApr = db('operacao_eventos as f') // f = fiscalização
+    // Itens / Apreensões por cidade
+    const subApr = db('operacao_eventos as f')
         .leftJoin('evento_apreensao as a', 'a.fiscalizacao_evento_id', 'f.id')
         .where({ 'f.operacao_id': id, 'f.tipo': 'fiscalizacao' })
         .groupBy('f.cidade_id')
@@ -1613,7 +1616,8 @@ async function buildMonitorData(id) {
         .leftJoin(subF, 'sf.cidade_id', 'oc.cidade_id')
         .leftJoin(subApr, 'sa.cidade_id', 'oc.cidade_id')
         .where('oc.operacao_id', id)
-        .select('c.id as cidade_id', 'c.nome as cidade', db.raw('COALESCE(sf.fisc_cnt,0)           as fiscalizacao'), db.raw('COALESCE(sf.pes_sum,0)            as pessoa'), db.raw('COALESCE(sf.vei_sum,0)            as veiculo'), db.raw('COALESCE(sa.itens_apreendidos,0)  as itens_apreendidos'), db.raw('COALESCE(sa.apreensoes,0)         as apreensoes'), db.raw('COALESCE(sf.lac_sum,0)            as lacrado'), db.raw('COALESCE(sf.fec_sum,0)            as fechado'), db.raw('COALESCE(sf.mult_sum,0)           as multado'))
+        .select('c.id as cidade_id', 'c.nome as cidade', db.raw('COALESCE(sf.fisc_cnt,0)           as fiscalizacao'), db.raw('COALESCE(sf.pes_sum,0)            as pessoa'), db.raw('COALESCE(sf.det_sum,0)            as detidos'), // << NOVO
+    db.raw('COALESCE(sf.vei_sum,0)            as veiculo'), db.raw('COALESCE(sa.itens_apreendidos,0)  as itens_apreendidos'), db.raw('COALESCE(sa.apreensoes,0)         as apreensoes'), db.raw('COALESCE(sf.lac_sum,0)            as lacrado'), db.raw('COALESCE(sf.fec_sum,0)            as fechado'), db.raw('COALESCE(sf.mult_sum,0)           as multado'))
         .orderBy('c.nome');
     // Efetivo total
     const ef = await db('operacao_efetivo')
@@ -1637,33 +1641,11 @@ async function buildMonitorData(id) {
         outros_agentes: Number(ef?.outros_agentes) || 0,
         outros_viaturas: Number(ef?.outros_viaturas) || 0,
     };
-    // Efetivo por cidade
-    const subEfCidades = db('operacao_efetivo')
-        .where('operacao_id', id)
-        .whereNotNull('cidade_id')
-        .select('cidade_id')
-        .sum({ agentes: 'total_agentes' })
-        .sum({ viaturas: 'total_viaturas' })
-        .sum({ pc_agentes: 'pc_agentes' })
-        .sum({ pc_viaturas: 'pc_viaturas' })
-        .sum({ pm_agentes: 'pm_agentes' })
-        .sum({ pm_viaturas: 'pm_viaturas' })
-        .sum({ outros_agentes: 'outros_agentes' })
-        .sum({ outros_viaturas: 'outros_viaturas' })
-        .groupBy('cidade_id')
-        .as('ef');
-    const efetivoByCity = await db('operacao_cidades as oc')
-        .join('cidades as c', 'c.id', 'oc.cidade_id')
-        .leftJoin(subEfCidades, 'ef.cidade_id', 'oc.cidade_id')
-        .where('oc.operacao_id', id)
-        .select('c.id as cidade_id', 'c.nome as cidade', db.raw('COALESCE(ef.agentes, 0)         as agentes'), db.raw('COALESCE(ef.viaturas, 0)        as viaturas'), db.raw('COALESCE(ef.pc_agentes, 0)      as pc_agentes'), db.raw('COALESCE(ef.pc_viaturas, 0)     as pc_viaturas'), db.raw('COALESCE(ef.pm_agentes, 0)      as pm_agentes'), db.raw('COALESCE(ef.pm_viaturas, 0)     as pm_viaturas'), db.raw('COALESCE(ef.outros_agentes, 0)  as outros_agentes'), db.raw('COALESCE(ef.outros_viaturas, 0) as outros_viaturas'))
-        .orderBy('c.nome');
-    // Feed
     const feed = await db('operacao_eventos as e')
         .where('e.operacao_id', id)
         .leftJoin('cidades as c', 'c.id', 'e.cidade_id')
         .leftJoin('usuarios as u', 'u.id', 'e.user_id')
-        .select('e.id', 'e.ts', 'e.tipo', 'e.obs', 'c.nome as cidade', 'u.nome as user')
+        .select('e.id', 'e.ts', 'e.tipo', 'e.obs', 'c.nome as userCidade', 'u.nome as user')
         .orderBy('e.ts', 'desc')
         .limit(20);
     const operacao = {
@@ -1671,7 +1653,7 @@ async function buildMonitorData(id) {
         nome: op.nome,
         inicio_fmt: op.inicio_agendado ? new Date(op.inicio_agendado).toLocaleString('pt-BR') : null,
     };
-    return { operacao, cards, efetivo, seriesPorCidade, feed, efetivoByCity };
+    return { operacao, cards, efetivo, seriesPorCidade, feed, efetivoByCity: [] };
 }
 // ———————————————————————————————————————————————
 // PÁGINA
