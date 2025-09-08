@@ -2521,7 +2521,7 @@ async function runGeoBackfill(opId) {
 }
 // final
 // -----------------------------
-// Helpers (Infos da operação)
+// Helper: informações da operação (para cabeçalho)
 // -----------------------------
 async function loadOpHeader(opId, cidadeId) {
     const op = await db('operacoes').where({ id: opId }).first();
@@ -2553,26 +2553,27 @@ async function loadOpHeader(opId, cidadeId) {
 // -----------------------------
 // RELATÓRIOS — ROTAS
 // -----------------------------
-// Página (não carrega dados até escolher a operação)
+// Página HTML (não carrega dados até escolher a operação)
 app.get('/relatorios', requireAdminOrGestor, async (req, res, next) => {
     try {
         const ops = await db('operacoes').select('id', 'nome').orderBy('id', 'desc');
         const cidades = await db('cidades').select('id', 'nome').orderBy('nome');
-        // datas padrão só para preencher inputs
+        // datas padrão só para preencher os inputs
         const today = new Date();
         const from = new Date(today);
         from.setDate(today.getDate() - 30);
         const fmt = (d) => d.toISOString().slice(0, 10);
         res.render('relatorios-operacoes', {
             filtrosInit: { from: fmt(from), to: fmt(today), opId: '', cidadeId: '' },
-            ops, cidades
+            ops,
+            cidades,
         });
     }
     catch (err) {
         next(err);
     }
 });
-// Dados (JSON). Se vier sem opId, buildRelatoriosData já devolve vazio.
+// Dados JSON (se vier sem opId, buildRelatoriosData devolve vazio)
 app.get('/relatorios/data', requireAdminOrGestor, async (req, res, next) => {
     try {
         const f = {
@@ -2592,7 +2593,7 @@ app.get('/relatorios/data', requireAdminOrGestor, async (req, res, next) => {
         next(err);
     }
 });
-// CSV por cidade
+// Export CSV (por cidade)
 app.get('/relatorios/export.csv', requireAdminOrGestor, async (req, res, next) => {
     try {
         const f = {
@@ -2606,7 +2607,10 @@ app.get('/relatorios/export.csv', requireAdminOrGestor, async (req, res, next) =
             'cidade', 'fiscalizacoes', 'pessoas', 'veiculos', 'detidos',
             'multados', 'fechados', 'lacrados', 'itens_apreendidos', 'apreensoes'
         ];
-        const rows = porCidade.map((r) => [r.cidade, r.fiscalizacoes, r.pessoas, r.veiculos, r.detidos, r.multados, r.fechados, r.lacrados, r.itens_apreendidos, r.apreensoes].join(','));
+        const rows = porCidade.map((r) => [
+            r.cidade, r.fiscalizacoes, r.pessoas, r.veiculos, r.detidos,
+            r.multados, r.fechados, r.lacrados, r.itens_apreendidos, r.apreensoes
+        ].join(','));
         const csv = [header.join(','), ...rows].join('\n');
         res.setHeader('Content-Type', 'text/csv; charset=utf-8');
         res.setHeader('Content-Disposition', 'attachment; filename="relatorio_por_cidade.csv"');
@@ -2616,7 +2620,7 @@ app.get('/relatorios/export.csv', requireAdminOrGestor, async (req, res, next) =
         next(err);
     }
 });
-// Excel por cidade (xlsx)
+// Export Excel (xlsx) — resumo por cidade + KPIs
 app.get('/relatorios/export.xlsx', requireAdminOrGestor, async (req, res, next) => {
     try {
         const f = {
@@ -2655,7 +2659,7 @@ app.get('/relatorios/export.xlsx', requireAdminOrGestor, async (req, res, next) 
         const ws2 = wb.addWorksheet('KPIs');
         Object.entries(cards).forEach(([k, v]) => ws2.addRow([k, Number(v || 0)]));
         ws2.getColumn(1).font = { bold: true };
-        ws2.columns.forEach((c) => c.width = 24);
+        ws2.columns.forEach((c) => (c.width = 24));
         const buf = await wb.xlsx.writeBuffer();
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         res.setHeader('Content-Disposition', 'attachment; filename="relatorio_operacao.xlsx"');
@@ -2665,7 +2669,7 @@ app.get('/relatorios/export.xlsx', requireAdminOrGestor, async (req, res, next) 
         next(err);
     }
 });
-// PDF (usa o template views/relatorio-pdf.ejs)
+// Export PDF — usa views/relatorio-pdf.ejs
 app.get('/relatorios/export.pdf', requireAdminOrGestor, async (req, res, next) => {
     try {
         const f = {
@@ -2678,21 +2682,21 @@ app.get('/relatorios/export.pdf', requireAdminOrGestor, async (req, res, next) =
             return res.status(400).send('opId obrigatório');
         const { cards, porCidade, fiscList } = await buildRelatoriosData(f);
         const opHeader = await loadOpHeader(f.opId, f.cidadeId);
-        // URL do logo (deixe o arquivo em public/img/logo-cim.png)
+        // logo (coloque o arquivo em public/img/logo-cim.png)
         const logoUrl = `${req.protocol}://${req.get('host')}/img/logo-cim.png`;
-        // Renderiza o HTML do PDF a partir do EJS
+        // Renderiza HTML do PDF a partir do EJS
         const html = await new Promise((resolve, reject) => {
-            res.render('relatorio-pdf', { logoUrl, opHeader, filtros: f, cards, porCidade, fiscList }, (err, str) => err ? reject(err) : resolve(str));
+            res.render('relatorio-pdf', { logoUrl, opHeader, filtros: f, cards, porCidade, fiscList }, (err, str) => (err ? reject(err) : resolve(str)));
         });
         const browser = await puppeteer_1.default.launch({
-            args: ['--no-sandbox', '--disable-setuid-sandbox']
+            args: ['--no-sandbox', '--disable-setuid-sandbox'],
         });
         const page = await browser.newPage();
         await page.setContent(html, { waitUntil: 'networkidle0' });
         const pdf = await page.pdf({
             format: 'A4',
             printBackground: true,
-            margin: { top: '20mm', right: '15mm', bottom: '20mm', left: '15mm' }
+            margin: { top: '20mm', right: '15mm', bottom: '20mm', left: '15mm' },
         });
         await browser.close();
         res.setHeader('Content-Type', 'application/pdf');
