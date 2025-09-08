@@ -24,6 +24,13 @@
     .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
     input,select{background:#0f172a;color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px}
     .btn{padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:#111826;color:#fff}
+    .hidden{display:none}
+
+    /* Cards de fiscalizações */
+    .cards-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}
+    .pill{display:inline-block;padding:2px 8px;border-radius:999px;background:#1f2937;font-size:12px;margin-right:6px}
+    .kv{display:grid;grid-template-columns:auto 1fr;gap:4px 8px;font-size:13px}
+    .kv .k{color:var(--muted)}
   </style>
 </head>
 <body>
@@ -40,8 +47,8 @@
       </div>
       <div>
         <label>Operação<br/>
-          <select name="opId">
-            <option value="">Todas</option>
+          <select name="opId" id="opId">
+            <option value="">Selecione…</option>
             <% (ops||[]).forEach(o=>{ %>
               <option value="<%= o.id %>"><%= o.id %> — <%= o.nome %></option>
             <% }) %>
@@ -50,7 +57,7 @@
       </div>
       <div>
         <label>Cidade<br/>
-          <select name="cidadeId">
+          <select name="cidadeId" id="cidadeId">
             <option value="">Todas</option>
             <% (cidades||[]).forEach(c=>{ %>
               <option value="<%= c.id %>"><%= c.nome %></option>
@@ -59,84 +66,106 @@
         </label>
       </div>
       <button class="btn" type="submit">Aplicar</button>
-      <a id="btnCsv" class="btn" href="#">Exportar CSV (por cidade)</a>
+      <a id="btnCsv" class="btn" href="#" aria-disabled="true">Exportar CSV (por cidade)</a>
     </form>
 
-    <!-- Resumo (KPIs) -->
-    <div class="kpi" style="margin:12px 0">
-      <div class="box"><div class="label">Fiscalizações</div><div id="k-fisc" class="value">—</div></div>
-      <div class="box"><div class="label">Pessoas</div><div id="k-pes" class="value">—</div></div>
-      <div class="box"><div class="label">Veículos</div><div id="k-vei" class="value">—</div></div>
-      <div class="box"><div class="label">Detidos</div><div id="k-det" class="value">—</div></div>
-      <div class="box"><div class="label">Itens apreendidos</div><div id="k-itens" class="value">—</div></div>
-      <div class="box"><div class="label">Apreensões</div><div id="k-apr" class="value">—</div></div>
-      <div class="box"><div class="label">Multados</div><div id="k-mul" class="value">—</div></div>
-      <div class="box"><div class="label">Fechados</div><div id="k-fec" class="value">—</div></div>
-      <div class="box"><div class="label">Lacrados</div><div id="k-lac" class="value">—</div></div>
-    </div>
-
-    <div class="grid grid-2">
-      <!-- Distribuição por cidade -->
-      <div class="card">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <div style="font-weight:700">Distribuição por cidade</div>
-          <div class="muted" style="font-size:12px">inclui % de participação sobre fiscalizações</div>
-        </div>
-
-        <table id="tblCidade">
-          <thead>
-            <tr>
-              <th>Cidade</th>
-              <th>Fiscalizações</th>
-              <th>% part.</th>
-              <th>Pessoas</th>
-              <th>Veículos</th>
-              <th>Detidos</th>
-              <th>Itens</th>
-              <th>Apreensões</th>
-              <th>Multados</th>
-              <th>Fechados</th>
-              <th>Lacrados</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-          <tfoot>
-            <tr>
-              <th>Total</th>
-              <th id="t-fisc" class="num"></th>
-              <th id="t-part" class="num">100%</th>
-              <th id="t-pes"  class="num"></th>
-              <th id="t-vei"  class="num"></th>
-              <th id="t-det"  class="num"></th>
-              <th id="t-itm"  class="num"></th>
-              <th id="t-apr"  class="num"></th>
-              <th id="t-mul"  class="num"></th>
-              <th id="t-fec"  class="num"></th>
-              <th id="t-lac"  class="num"></th>
-            </tr>
-          </tfoot>
-        </table>
+    <!-- Conteúdo: oculto até escolher operação -->
+    <div id="content" class="hidden">
+      <!-- Resumo (KPIs) -->
+      <div class="kpi" style="margin:12px 0">
+        <div class="box"><div class="label">Fiscalizações</div><div id="k-fisc" class="value">—</div></div>
+        <div class="box"><div class="label">Pessoas</div><div id="k-pes" class="value">—</div></div>
+        <div class="box"><div class="label">Veículos</div><div id="k-vei" class="value">—</div></div>
+        <div class="box"><div class="label">Detidos</div><div id="k-det" class="value">—</div></div>
+        <div class="box"><div class="label">Itens apreendidos</div><div id="k-itens" class="value">—</div></div>
+        <div class="box"><div class="label">Apreensões</div><div id="k-apr" class="value">—</div></div>
+        <div class="box"><div class="label">Multados</div><div id="k-mul" class="value">—</div></div>
+        <div class="box"><div class="label">Fechados</div><div id="k-fec" class="value">—</div></div>
+        <div class="box"><div class="label">Lacrados</div><div id="k-lac" class="value">—</div></div>
       </div>
 
-      <!-- Top locais -->
-      <div class="card">
-        <div style="font-weight:700;margin-bottom:6px">Top locais fiscalizados</div>
-        <table id="tblTop">
-          <thead><tr><th>Local</th><th>Qtd.</th></tr></thead>
-          <tbody></tbody>
-        </table>
+      <div class="grid grid-2">
+        <!-- Distribuição por cidade -->
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div style="font-weight:700">Distribuição por cidade</div>
+            <div class="muted" style="font-size:12px">inclui % de participação</div>
+          </div>
+
+          <table id="tblCidade">
+            <thead>
+              <tr>
+                <th>Cidade</th>
+                <th>Fiscalizações</th>
+                <th>% part.</th>
+                <th>Pessoas</th>
+                <th>Veículos</th>
+                <th>Detidos</th>
+                <th>Itens</th>
+                <th>Apreensões</th>
+                <th>Multados</th>
+                <th>Fechados</th>
+                <th>Lacrados</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+            <tfoot>
+              <tr>
+                <th>Total</th>
+                <th id="t-fisc" class="num"></th>
+                <th id="t-part" class="num">100%</th>
+                <th id="t-pes"  class="num"></th>
+                <th id="t-vei"  class="num"></th>
+                <th id="t-det"  class="num"></th>
+                <th id="t-itm"  class="num"></th>
+                <th id="t-apr"  class="num"></th>
+                <th id="t-mul"  class="num"></th>
+                <th id="t-fec"  class="num"></th>
+                <th id="t-lac"  class="num"></th>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        <!-- Top locais -->
+        <div class="card">
+          <div style="font-weight:700;margin-bottom:6px">Top locais fiscalizados</div>
+          <table id="tblTop">
+            <thead><tr><th>Local</th><th>Qtd.</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Lista de fiscalizações (cards) -->
+      <div class="card" style="margin-top:12px">
+        <div style="font-weight:700;margin-bottom:6px">Fiscalizações</div>
+        <div id="fiscCards" class="cards-list"></div>
+        <div id="noFisc" class="muted" style="display:none">Nenhuma fiscalização para os filtros escolhidos.</div>
       </div>
     </div>
   </div>
 
   <script>
     const qs = (s)=>document.querySelector(s);
+    const fmt = (n)=> (n ?? 0).toLocaleString('pt-BR');
+
+    function enableCsv(opSelected){
+      const a = qs('#btnCsv');
+      if(opSelected){
+        a.removeAttribute('aria-disabled');
+        a.classList.remove('muted');
+      }else{
+        a.setAttribute('aria-disabled','true');
+        a.classList.add('muted');
+      }
+    }
+
     function linkCsv(){
       const fd = new FormData(qs('#filtros'));
       const p  = new URLSearchParams(fd);
       qs('#btnCsv').href = '/relatorios/export.csv?' + p.toString();
     }
-    function fmt(n){ return (n ?? 0).toLocaleString('pt-BR'); }
 
     function renderKPIs(c){
       qs('#k-fisc').textContent = fmt(c.fiscalizacoes);
@@ -152,7 +181,7 @@
 
     function renderTopLocais(rows){
       const tb = qs('#tblTop tbody');
-      tb.innerHTML = rows.map(r=>`
+      tb.innerHTML = (rows||[]).map(r=>`
         <tr>
           <td>${r.local_nome || '-'}</td>
           <td style="text-align:right">${fmt(r.qtd)}</td>
@@ -163,7 +192,6 @@
     function renderPorCidade(rows){
       const tb = qs('#tblCidade tbody');
       const totalFisc = (rows||[]).reduce((s,r)=> s + (Number(r.fiscalizacoes)||0), 0);
-      const td = id => qs(id);
 
       tb.innerHTML = (rows||[]).map(r=>{
         const fisc = Number(r.fiscalizacoes)||0;
@@ -185,7 +213,6 @@
         `;
       }).join('');
 
-      // totais
       const sum = k => (rows||[]).reduce((s,r)=> s + (Number(r[k])||0), 0);
       qs('#t-fisc').textContent = fmt(totalFisc);
       qs('#t-pes').textContent  = fmt(sum('pessoas'));
@@ -198,19 +225,77 @@
       qs('#t-lac').textContent  = fmt(sum('lacrados'));
     }
 
+    function renderFiscCards(rows){
+      const wrap = qs('#fiscCards');
+      const empty = qs('#noFisc');
+      if(!rows || rows.length === 0){
+        wrap.innerHTML = '';
+        empty.style.display = 'block';
+        return;
+      }
+      empty.style.display = 'none';
+      wrap.innerHTML = rows.map(r => {
+        const flags = [
+          r.multado  ? '<span class="pill">Multado</span>'   : '',
+          r.fechado  ? '<span class="pill">Fechado</span>'   : '',
+          r.lacrado  ? '<span class="pill">Lacrado</span>'   : '',
+        ].join('');
+        const det = Number(r.pessoas_detidas_qtd)||0;
+        const itens = Number(r.itens_apreendidos)||0;
+
+        return `
+          <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div><strong>#${r.evento_id}</strong> — ${r.cidade || '-'} </div>
+              <div class="muted" style="font-size:12px">${new Date(r.ts).toLocaleString('pt-BR')}</div>
+            </div>
+
+            <div style="margin-top:6px">${flags}</div>
+
+            <div class="kv" style="margin-top:8px">
+              <div class="k">Tipo do local</div><div>${r.tipo_local || '-'}</div>
+              <div class="k">Nome</div><div>${r.local_nome || '-'}</div>
+              <div class="k">Endereço</div><div>${r.local_endereco || '-'}</div>
+              <div class="k">Pessoas</div><div>${fmt(r.pessoas_abordadas)}</div>
+              <div class="k">Veículos</div><div>${fmt(r.veiculos_abordados)}</div>
+              <div class="k">Detidos</div><div>${fmt(det)}</div>
+              <div class="k">Itens apreendidos</div><div>${fmt(itens)}</div>
+              <div class="k">Usuário</div><div>${r.usuario || '-'}</div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
     async function load(){
+      // exige operação selecionada
+      const opId = qs('#opId').value;
+      if(!opId){
+        qs('#content').classList.add('hidden');
+        enableCsv(false);
+        return;
+      }
       const fd = new FormData(qs('#filtros'));
       const params = new URLSearchParams(fd);
+
+      enableCsv(true);
       linkCsv();
-      const res = await fetch('/relatorios/data?' + params.toString(), { cache:'no-store' });
+
+      const res  = await fetch('/relatorios/data?' + params.toString(), { cache:'no-store' });
       const data = await res.json();
+
+      qs('#content').classList.remove('hidden');
       renderKPIs(data.cards||{});
       renderTopLocais(data.topLocais||[]);
       renderPorCidade(data.porCidade||[]);
+      renderFiscCards(data.fiscList||[]);
     }
 
+    // eventos
     qs('#filtros').addEventListener('submit', ev => { ev.preventDefault(); load(); });
-    load();
+    qs('#opId').addEventListener('change', () => { /* opcional: auto-carregar ao escolher op */ });
+    // inicial: não carregar nada
+    enableCsv(false);
   </script>
 </body>
 </html>

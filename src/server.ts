@@ -3017,7 +3017,7 @@ async function runGeoBackfill(opId?: number) {
 type ReportFilters = {
   from?: string;     // 'YYYY-MM-DD'
   to?: string;       // 'YYYY-MM-DD'
-  opId?: number;     // operação específica (opcional)
+  opId?: number;     // operação específica (opcional) -> no frontend, exigiremos
   cidadeId?: number; // cidade específica (opcional)
 };
 
@@ -3032,6 +3032,20 @@ function applyCommonWhere(q: any, f: ReportFilters, alias = 'e') {
 }
 
 async function buildRelatoriosData(filters: ReportFilters) {
+  // Se quiser, podemos retornar vazio quando não há opId.
+  // (O frontend já evita buscar sem opId, mas isso evita chamadas diretas.)
+  if (!filters.opId) {
+    return {
+      cards: {
+        fiscalizacoes: 0, pessoas: 0, veiculos: 0, detidos: 0,
+        multados: 0, fechados: 0, lacrados: 0, itensApreendidos: 0, apreensoes: 0
+      },
+      porCidade: [],
+      topLocais: [],
+      fiscList: []
+    };
+  }
+
   // ---- Totais / KPIs (a partir de fiscalizações)
   const baseFis = applyCommonWhere(
     db('operacao_eventos as e')
@@ -3060,7 +3074,7 @@ async function buildRelatoriosData(filters: ReportFilters) {
       .leftJoin('evento_apreensao as a', 'a.fiscalizacao_evento_id', 'fe.id')
       .where('fe.tipo', 'fiscalizacao'),
     filters,
-    'fe' // <-- importante: usa 'fe' aqui
+    'fe'
   )
     .select(
       db.raw('COUNT(a.evento_id)                       AS itens_apreendidos'),
@@ -3069,23 +3083,23 @@ async function buildRelatoriosData(filters: ReportFilters) {
     .first() as any;
 
   const cards = {
-    fiscalizacoes:    Number(kpis?.fiscalizacoes)       || 0,
-    pessoas:          Number(kpis?.pessoas)             || 0,
-    veiculos:         Number(kpis?.veiculos)            || 0,
-    detidos:          Number(kpis?.detidos)             || 0,
-    multados:         Number(kpis?.multados)            || 0,
-    fechados:         Number(kpis?.fechados)            || 0,
-    lacrados:         Number(kpis?.lacrados)            || 0,
+    fiscalizacoes:    Number(kpis?.fiscalizacoes)    || 0,
+    pessoas:          Number(kpis?.pessoas)          || 0,
+    veiculos:         Number(kpis?.veiculos)         || 0,
+    detidos:          Number(kpis?.detidos)          || 0,
+    multados:         Number(kpis?.multados)         || 0,
+    fechados:         Number(kpis?.fechados)         || 0,
+    lacrados:         Number(kpis?.lacrados)         || 0,
     itensApreendidos: Number(aprAgg?.itens_apreendidos) || 0,
     apreensoes:       Number(aprAgg?.apreensoes)        || 0,
   };
 
-  // ---- Por cidade (tabela)
+  // ---- Por cidade
   const porCidade = await applyCommonWhere(
     db('operacao_eventos as e')
       .join('evento_fiscalizacao as f', 'f.evento_id', 'e.id')
       .leftJoin('cidades as c', 'c.id', 'e.cidade_id')
-      .leftJoin('evento_apreensao as a', 'a.fiscalizacao_evento_id', 'e.id') // para itens/apreensões
+      .leftJoin('evento_apreensao as a', 'a.fiscalizacao_evento_id', 'e.id')
       .where('e.tipo', 'fiscalizacao'),
     filters,
     'e'
@@ -3120,8 +3134,42 @@ async function buildRelatoriosData(filters: ReportFilters) {
     .orderBy('qtd', 'desc')
     .limit(10);
 
-  // sem série temporal
-  return { cards, porCidade, topLocais };
+  // ---- Lista de fiscalizações (para os cards)
+  const fiscList = await applyCommonWhere(
+    db('operacao_eventos as e')
+      .join('evento_fiscalizacao as f', 'f.evento_id', 'e.id')
+      .leftJoin('cidades as c', 'c.id', 'e.cidade_id')
+      .leftJoin('usuarios as u', 'u.id', 'e.user_id')
+      .leftJoin('evento_apreensao as a', 'a.fiscalizacao_evento_id', 'e.id')
+      .where('e.tipo', 'fiscalizacao'),
+    filters,
+    'e'
+  )
+    .select(
+      'e.id as evento_id',
+      'e.ts',
+      'c.nome as cidade',
+      'u.nome as usuario',
+      'f.tipo_local',
+      'f.local_nome',
+      'f.local_endereco',
+      'f.pessoas_abordadas',
+      'f.veiculos_abordados',
+      'f.pessoas_detidas_qtd',
+      'f.multado',
+      'f.fechado',
+      'f.lacrado'
+    )
+    .count({ itens_apreendidos: 'a.evento_id' })
+    .groupBy(
+      'e.id','e.ts','c.nome','u.nome',
+      'f.tipo_local','f.local_nome','f.local_endereco',
+      'f.pessoas_abordadas','f.veiculos_abordados','f.pessoas_detidas_qtd',
+      'f.multado','f.fechado','f.lacrado'
+    )
+    .orderBy('e.ts', 'desc');
+
+  return { cards, porCidade, topLocais, fiscList };
 }
 
 // ---- Página de relatórios
@@ -3130,20 +3178,16 @@ app.get('/relatorios', requireAdminOrGestor, async (req, res, next) => {
     const ops = await db('operacoes').select('id', 'nome').orderBy('id', 'desc');
     const cidades = await db('cidades').select('id', 'nome').orderBy('nome');
 
-    // default: últimos 30 dias
+    // default: últimos 30 dias (ficam nos inputs, mas não carregamos dados até escolher opId)
     const today = new Date();
-    const from = new Date(today);
-    from.setDate(today.getDate() - 30);
+    const from = new Date(today); from.setDate(today.getDate() - 30);
     const fmt = (d: Date) => d.toISOString().slice(0, 10);
 
     res.render('relatorios-operacoes', {
       filtrosInit: { from: fmt(from), to: fmt(today), opId: '', cidadeId: '' },
-      ops,
-      cidades,
+      ops, cidades
     });
-  } catch (err) {
-    next(err);
-  }
+  } catch (err) { next(err); }
 });
 
 // ---- JSON para filtros
@@ -3157,9 +3201,7 @@ app.get('/relatorios/data', requireAdminOrGestor, async (req, res, next) => {
     };
     const data = await buildRelatoriosData(f);
     res.set('Cache-Control', 'no-store').json(data);
-  } catch (err) {
-    next(err);
-  }
+  } catch (err) { next(err); }
 });
 
 // ---- CSV export (por cidade)
@@ -3173,40 +3215,18 @@ app.get('/relatorios/export.csv', requireAdminOrGestor, async (req, res, next) =
     };
     const { porCidade } = await buildRelatoriosData(f);
     const header = [
-      'cidade',
-      'fiscalizacoes',
-      'pessoas',
-      'veiculos',
-      'detidos',
-      'multados',
-      'fechados',
-      'lacrados',
-      'itens_apreendidos',
-      'apreensoes',
+      'cidade','fiscalizacoes','pessoas','veiculos','detidos',
+      'multados','fechados','lacrados','itens_apreendidos','apreensoes'
     ];
-    const rows = porCidade.map((r: any) =>
-      [
-        r.cidade,
-        r.fiscalizacoes,
-        r.pessoas,
-        r.veiculos,
-        r.detidos,
-        r.multados,
-        r.fechados,
-        r.lacrados,
-        r.itens_apreendidos,
-        r.apreensoes,
-      ].join(',')
+    const rows = porCidade.map((r:any)=>
+      [r.cidade,r.fiscalizacoes,r.pessoas,r.veiculos,r.detidos,r.multados,r.fechados,r.lacrados,r.itens_apreendidos,r.apreensoes].join(',')
     );
     const csv = [header.join(','), ...rows].join('\n');
-    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', 'attachment; filename="relatorio_por_cidade.csv"');
+    res.setHeader('Content-Type','text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition','attachment; filename="relatorio_por_cidade.csv"');
     res.send(csv);
-  } catch (err) {
-    next(err);
-  }
+  } catch (err) { next(err); }
 });
-
 
 
 // =============================================================================
