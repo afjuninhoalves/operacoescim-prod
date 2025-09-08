@@ -3012,10 +3012,6 @@ async function runGeoBackfill(opId?: number) {
 }
 // final
 
-
-//  teste relarorio
-
-
 // =============================
 // RELATÓRIOS — PÁGINA + DATA
 // =============================
@@ -3233,6 +3229,148 @@ app.get('/relatorios/export.csv', requireAdminOrGestor, async (req, res, next) =
   } catch (err) { next(err); }
 });
 
+// rota pdf
+
+// ---- Excel (.xlsx) — resumo por cidade + lista de fiscalizações + KPIs
+app.get('/relatorios/export.xlsx', requireAdminOrGestor, async (req, res, next) => {
+  try {
+    const f: ReportFilters = {
+      from: String(req.query.from || ''),
+      to: String(req.query.to || ''),
+      opId: req.query.opId ? Number(req.query.opId) : undefined,
+      cidadeId: req.query.cidadeId ? Number(req.query.cidadeId) : undefined,
+    };
+    if (!f.opId) return res.status(400).send('opId obrigatório');
+
+    const { cards, porCidade, fiscList } = await buildRelatoriosData(f);
+
+    const wb = new ExcelJS.Workbook();
+
+    // Aba 1: Resumo por cidade
+    const wsCidade = wb.addWorksheet('Resumo por cidade');
+    wsCidade.addRow([
+      'Cidade','Fiscalizações','Pessoas','Veículos','Detidos',
+      'Multados','Fechados','Lacrados','Itens apreendidos','Apreensões'
+    ]);
+    wsCidade.getRow(1).font = { bold: true };
+    porCidade.forEach((r: any) => {
+      wsCidade.addRow([
+        r.cidade, r.fiscalizacoes, r.pessoas, r.veiculos, r.detidos,
+        r.multados, r.fechados, r.lacrados, r.itens_apreendidos, r.apreensoes
+      ]);
+    });
+    wsCidade.columns.forEach((col: any) => {
+      let max = 10;
+      col.eachCell?.((cell: any) => { max = Math.max(max, String(cell.value ?? '').length); });
+      col.width = Math.min(max + 2, 40);
+    });
+
+    // Aba 2: Fiscalizações (cards em linhas)
+    const wsFisc = wb.addWorksheet('Fiscalizações');
+    wsFisc.addRow([
+      'Evento','Data/Hora','Cidade','Tipo do local','Nome do local','Endereço',
+      'Pessoas','Veículos','Detidos','Multado','Fechado','Lacrado','Itens apreen.'
+    ]);
+    wsFisc.getRow(1).font = { bold: true };
+    fiscList.forEach((r: any) => {
+      wsFisc.addRow([
+        r.evento_id,
+        new Date(r.ts).toLocaleString('pt-BR'),
+        r.cidade || '-',
+        r.tipo_local || '-',
+        r.local_nome || '-',
+        r.local_endereco || '-',
+        Number(r.pessoas_abordadas || 0),
+        Number(r.veiculos_abordados || 0),
+        Number(r.pessoas_detidas_qtd || 0),
+        r.multado ? 'Sim' : 'Não',
+        r.fechado ? 'Sim' : 'Não',
+        r.lacrado ? 'Sim' : 'Não',
+        Number(r.itens_apreendidos || 0),
+      ]);
+    });
+    wsFisc.columns.forEach((c: any) => (c.width = 18));
+
+    // Aba 3: KPIs
+    const wsKpi = wb.addWorksheet('KPIs');
+    Object.entries(cards).forEach(([k, v]) => wsKpi.addRow([k, Number(v || 0)]));
+    wsKpi.getColumn(1).font = { bold: true };
+    wsKpi.columns.forEach((c: any) => (c.width = 26));
+
+    const buf = await wb.xlsx.writeBuffer();
+    res.setHeader('Content-Type','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition','attachment; filename="relatorio_operacao.xlsx"');
+    res.send(Buffer.from(buf));
+  } catch (err) { next(err); }
+});
+
+// ---- PDF — usa views/relatorio-pdf.ejs (logo em /public/img/logo-cim.png)
+app.get('/relatorios/export.pdf', requireAdminOrGestor, async (req, res, next) => {
+  try {
+    const f: ReportFilters = {
+      from: String(req.query.from || ''),
+      to: String(req.query.to || ''),
+      opId: req.query.opId ? Number(req.query.opId) : undefined,
+      cidadeId: req.query.cidadeId ? Number(req.query.cidadeId) : undefined,
+    };
+    if (!f.opId) return res.status(400).send('opId obrigatório');
+
+    const { cards, porCidade, fiscList } = await buildRelatoriosData(f);
+
+    // Cabeçalho da operação
+    const op = await db('operacoes').where({ id: f.opId }).first();
+    if (!op) return res.status(404).send('Operação não encontrada');
+
+    let cidadesParticipantes: string[] = [];
+    if (f.cidadeId) {
+      const c = await db('cidades').where({ id: f.cidadeId }).first('nome');
+      cidadesParticipantes = c ? [c.nome] : [];
+    } else {
+      const rows = await db('operacao_cidades as oc')
+        .join('cidades as c', 'c.id', 'oc.cidade_id')
+        .where('oc.operacao_id', f.opId)
+        .orderBy('c.nome')
+        .select('c.nome');
+      cidadesParticipantes = rows.map((r: any) => r.nome);
+    }
+
+    const opHeader = {
+      id: op.id,
+      nome: op.nome,
+      descricao: op.descricao || '',
+      inicio_agendado_fmt: op.inicio_agendado
+        ? new Date(op.inicio_agendado).toLocaleString('pt-BR')
+        : '-',
+      cidades_participantes: cidadesParticipantes.join(', ')
+    };
+
+    const logoUrl = `${req.protocol}://${req.get('host')}/img/logo-cim.png`;
+
+    // Renderiza HTML via EJS
+    const html: string = await new Promise((resolve, reject) => {
+      res.render(
+        'relatorio-pdf',
+        { logoUrl, opHeader, filtros: f, cards, porCidade, fiscList },
+        (err, str) => (err ? reject(err) : resolve(str as string))
+      );
+    });
+
+    const browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: 'networkidle0' });
+
+    const pdf = await page.pdf({
+      format: 'A4',
+      printBackground: true,
+      margin: { top: '20mm', right: '15mm', bottom: '20mm', left: '15mm' },
+    });
+    await browser.close();
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="relatorio_operacao_${opHeader.id}.pdf"`);
+    res.send(pdf);
+  } catch (err) { next(err); }
+});
 
 
 // =============================================================================
