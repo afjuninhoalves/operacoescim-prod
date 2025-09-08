@@ -11,12 +11,16 @@
     .container{max-width:1160px;margin:0 auto;padding:20px}
     .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--border);border-radius:14px;padding:14px}
     .grid{display:grid;gap:12px}
-    .kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
-    .kpi .box{padding:12px;border:1px solid var(--border);border-radius:12px}
+    .grid-2{grid-template-columns:1.2fr .8fr}
+    .kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+    .box{padding:12px;border:1px solid var(--border);border-radius:12px}
+    .box .label{font-size:12px;color:var(--muted)}
+    .box .value{font-size:24px;font-weight:700;margin-top:2px}
     .muted{color:var(--muted)}
     table{width:100%;border-collapse:collapse;margin-top:8px}
     th,td{padding:8px;border-bottom:1px solid var(--border);text-align:center}
     th:first-child,td:first-child{text-align:left}
+    tfoot th, tfoot td{font-weight:700}
     .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
     input,select{background:#0f172a;color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px}
     .btn{padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:#111826;color:#fff}
@@ -26,6 +30,7 @@
   <div class="container">
     <h2 style="margin:0 0 12px">Relatórios — Operações</h2>
 
+    <!-- Filtros -->
     <form id="filtros" class="card toolbar">
       <div>
         <label>De<br/><input type="date" name="from" value="<%= filtrosInit.from %>"></label>
@@ -57,60 +62,80 @@
       <a id="btnCsv" class="btn" href="#">Exportar CSV (por cidade)</a>
     </form>
 
-    <!-- KPIs -->
+    <!-- Resumo (KPIs) -->
     <div class="kpi" style="margin:12px 0">
-      <div class="box"><div class="muted">Fiscalizações</div><div id="k-fisc" style="font-size:24px;font-weight:700">—</div></div>
-      <div class="box"><div class="muted">Pessoas</div><div id="k-pes"  style="font-size:24px;font-weight:700">—</div></div>
-      <div class="box"><div class="muted">Veículos</div><div id="k-vei" style="font-size:24px;font-weight:700">—</div></div>
-      <div class="box"><div class="muted">Detidos</div><div id="k-det" style="font-size:24px;font-weight:700">—</div></div>
-      <div class="box"><div class="muted">Itens apreendidos</div><div id="k-itens" style="font-size:24px;font-weight:700">—</div></div>
-      <div class="box"><div class="muted">Apreensões</div><div id="k-apr" style="font-size:24px;font-weight:700">—</div></div>
-      <div class="box"><div class="muted">Multados</div><div id="k-mul" style="font-size:24px;font-weight:700">—</div></div>
-      <div class="box"><div class="muted">Fechados</div><div id="k-fec" style="font-size:24px;font-weight:700">—</div></div>
-      <div class="box"><div class="muted">Lacrados</div><div id="k-lac" style="font-size:24px;font-weight:700">—</div></div>
+      <div class="box"><div class="label">Fiscalizações</div><div id="k-fisc" class="value">—</div></div>
+      <div class="box"><div class="label">Pessoas</div><div id="k-pes" class="value">—</div></div>
+      <div class="box"><div class="label">Veículos</div><div id="k-vei" class="value">—</div></div>
+      <div class="box"><div class="label">Detidos</div><div id="k-det" class="value">—</div></div>
+      <div class="box"><div class="label">Itens apreendidos</div><div id="k-itens" class="value">—</div></div>
+      <div class="box"><div class="label">Apreensões</div><div id="k-apr" class="value">—</div></div>
+      <div class="box"><div class="label">Multados</div><div id="k-mul" class="value">—</div></div>
+      <div class="box"><div class="label">Fechados</div><div id="k-fec" class="value">—</div></div>
+      <div class="box"><div class="label">Lacrados</div><div id="k-lac" class="value">—</div></div>
     </div>
 
-    <!-- Top locais -->
-    <div class="card">
-      <div class="muted">Top locais fiscalizados</div>
-      <table id="tblTop">
-        <thead><tr><th>Local</th><th>Qtd.</th></tr></thead>
-        <tbody></tbody>
-      </table>
-    </div>
+    <div class="grid grid-2">
+      <!-- Distribuição por cidade -->
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div style="font-weight:700">Distribuição por cidade</div>
+          <div class="muted" style="font-size:12px">inclui % de participação sobre fiscalizações</div>
+        </div>
 
-    <!-- Distribuição por cidade -->
-    <div class="card" style="margin-top:12px">
-      <div style="font-weight:700;margin-bottom:6px">Distribuição por cidade</div>
-      <table id="tblCidade">
-        <thead>
-          <tr>
-            <th>Cidade</th>
-            <th>Fiscalizações</th>
-            <th>Pessoas</th>
-            <th>Veículos</th>
-            <th>Detidos</th>
-            <th>Itens</th>
-            <th>Apreensões</th>
-            <th>Multados</th>
-            <th>Fechados</th>
-            <th>Lacrados</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
+        <table id="tblCidade">
+          <thead>
+            <tr>
+              <th>Cidade</th>
+              <th>Fiscalizações</th>
+              <th>% part.</th>
+              <th>Pessoas</th>
+              <th>Veículos</th>
+              <th>Detidos</th>
+              <th>Itens</th>
+              <th>Apreensões</th>
+              <th>Multados</th>
+              <th>Fechados</th>
+              <th>Lacrados</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+          <tfoot>
+            <tr>
+              <th>Total</th>
+              <th id="t-fisc" class="num"></th>
+              <th id="t-part" class="num">100%</th>
+              <th id="t-pes"  class="num"></th>
+              <th id="t-vei"  class="num"></th>
+              <th id="t-det"  class="num"></th>
+              <th id="t-itm"  class="num"></th>
+              <th id="t-apr"  class="num"></th>
+              <th id="t-mul"  class="num"></th>
+              <th id="t-fec"  class="num"></th>
+              <th id="t-lac"  class="num"></th>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <!-- Top locais -->
+      <div class="card">
+        <div style="font-weight:700;margin-bottom:6px">Top locais fiscalizados</div>
+        <table id="tblTop">
+          <thead><tr><th>Local</th><th>Qtd.</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
     </div>
   </div>
 
   <script>
     const qs = (s)=>document.querySelector(s);
-
     function linkCsv(){
       const fd = new FormData(qs('#filtros'));
       const p  = new URLSearchParams(fd);
       qs('#btnCsv').href = '/relatorios/export.csv?' + p.toString();
     }
-
     function fmt(n){ return (n ?? 0).toLocaleString('pt-BR'); }
 
     function renderKPIs(c){
@@ -137,20 +162,40 @@
 
     function renderPorCidade(rows){
       const tb = qs('#tblCidade tbody');
-      tb.innerHTML = rows.map(r=>`
-        <tr>
-          <td>${r.cidade||'-'}</td>
-          <td style="text-align:right">${fmt(r.fiscalizacoes)}</td>
-          <td style="text-align:right">${fmt(r.pessoas)}</td>
-          <td style="text-align:right">${fmt(r.veiculos)}</td>
-          <td style="text-align:right">${fmt(r.detidos)}</td>
-          <td style="text-align:right">${fmt(r.itens_apreendidos)}</td>
-          <td style="text-align:right">${fmt(r.apreensoes)}</td>
-          <td style="text-align:right">${fmt(r.multados)}</td>
-          <td style="text-align:right">${fmt(r.fechados)}</td>
-          <td style="text-align:right">${fmt(r.lacrados)}</td>
-        </tr>
-      `).join('');
+      const totalFisc = (rows||[]).reduce((s,r)=> s + (Number(r.fiscalizacoes)||0), 0);
+      const td = id => qs(id);
+
+      tb.innerHTML = (rows||[]).map(r=>{
+        const fisc = Number(r.fiscalizacoes)||0;
+        const part = totalFisc ? ((fisc/totalFisc)*100).toFixed(1)+'%' : '—';
+        return `
+          <tr>
+            <td>${r.cidade||'-'}</td>
+            <td style="text-align:right">${fmt(fisc)}</td>
+            <td style="text-align:right">${part}</td>
+            <td style="text-align:right">${fmt(r.pessoas)}</td>
+            <td style="text-align:right">${fmt(r.veiculos)}</td>
+            <td style="text-align:right">${fmt(r.detidos)}</td>
+            <td style="text-align:right">${fmt(r.itens_apreendidos)}</td>
+            <td style="text-align:right">${fmt(r.apreensoes)}</td>
+            <td style="text-align:right">${fmt(r.multados)}</td>
+            <td style="text-align:right">${fmt(r.fechados)}</td>
+            <td style="text-align:right">${fmt(r.lacrados)}</td>
+          </tr>
+        `;
+      }).join('');
+
+      // totais
+      const sum = k => (rows||[]).reduce((s,r)=> s + (Number(r[k])||0), 0);
+      qs('#t-fisc').textContent = fmt(totalFisc);
+      qs('#t-pes').textContent  = fmt(sum('pessoas'));
+      qs('#t-vei').textContent  = fmt(sum('veiculos'));
+      qs('#t-det').textContent  = fmt(sum('detidos'));
+      qs('#t-itm').textContent  = fmt(sum('itens_apreendidos'));
+      qs('#t-apr').textContent  = fmt(sum('apreensoes'));
+      qs('#t-mul').textContent  = fmt(sum('multados'));
+      qs('#t-fec').textContent  = fmt(sum('fechados'));
+      qs('#t-lac').textContent  = fmt(sum('lacrados'));
     }
 
     async function load(){
@@ -165,7 +210,6 @@
     }
 
     qs('#filtros').addEventListener('submit', ev => { ev.preventDefault(); load(); });
-    // inicial
     load();
   </script>
 </body>
