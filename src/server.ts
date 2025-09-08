@@ -3012,6 +3012,196 @@ async function runGeoBackfill(opId?: number) {
 }
 // final
 
+// =============================
+// RELATÓRIOS — DEFINIÇÕES
+// (colocar ANTES das rotas que usam estas funções)
+// =============================
+type ReportFilters = {
+  from?: string;     // 'YYYY-MM-DD'
+  to?: string;       // 'YYYY-MM-DD'
+  opId?: number;     // operação específica (obrigatória no front)
+  cidadeId?: number; // cidade específica (opcional)
+};
+
+// Filtros comuns com alias configurável (default = 'e')
+function applyCommonWhere(q: any, f: ReportFilters, alias = 'e') {
+  const t = alias;
+  if (f.from)     q.where(`${t}.ts`, '>=', new Date(`${f.from}T00:00:00Z`));
+  if (f.to)       q.where(`${t}.ts`, '<',  new Date(`${f.to}T23:59:59.999Z`));
+  if (f.opId)     q.where(`${t}.operacao_id`, f.opId);
+  if (f.cidadeId) q.where(`${t}.cidade_id`,   f.cidadeId);
+  return q;
+}
+
+async function buildRelatoriosData(filters: ReportFilters) {
+  // Se vier sem opId, devolvemos vazio (o front já bloqueia, mas evita chamadas diretas)
+  if (!filters.opId) {
+    return {
+      cards: {
+        fiscalizacoes: 0, pessoas: 0, veiculos: 0, detidos: 0,
+        multados: 0, fechados: 0, lacrados: 0, itensApreendidos: 0, apreensoes: 0
+      },
+      porCidade: [],
+      topLocais: [],
+      fiscList: [],
+    };
+  }
+
+  // ---- KPIs a partir de fiscalizações
+  const baseFis = applyCommonWhere(
+    db('operacao_eventos as e')
+      .join('evento_fiscalizacao as f', 'f.evento_id', 'e.id')
+      .where('e.tipo', 'fiscalizacao'),
+    filters,
+    'e'
+  );
+
+  const kpis = await baseFis
+    .clone()
+    .select(
+      db.raw('COUNT(e.id)                                         AS fiscalizacoes'),
+      db.raw('COALESCE(SUM(f.pessoas_abordadas), 0)               AS pessoas'),
+      db.raw('COALESCE(SUM(f.veiculos_abordados), 0)              AS veiculos'),
+      db.raw('COALESCE(SUM(f.pessoas_detidas_qtd), 0)             AS detidos'),
+      db.raw('SUM(CASE WHEN f.multado THEN 1 ELSE 0 END)          AS multados'),
+      db.raw('SUM(CASE WHEN f.fechado THEN 1 ELSE 0 END)          AS fechados'),
+      db.raw('SUM(CASE WHEN f.lacrado THEN 1 ELSE 0 END)          AS lacrados')
+    )
+    .first() as any;
+
+  // ---- Itens (linhas) e Apreensões (fiscalizações com itens)
+  const aprAgg = await applyCommonWhere(
+    db('operacao_eventos as fe')
+      .leftJoin('evento_apreensao as a', 'a.fiscalizacao_evento_id', 'fe.id')
+      .where('fe.tipo', 'fiscalizacao'),
+    filters,
+    'fe'
+  )
+    .select(
+      db.raw('COUNT(a.evento_id)                       AS itens_apreendidos'),
+      db.raw('COUNT(DISTINCT a.fiscalizacao_evento_id) AS apreensoes')
+    )
+    .first() as any;
+
+  const cards = {
+    fiscalizacoes:    Number(kpis?.fiscalizacoes)       || 0,
+    pessoas:          Number(kpis?.pessoas)             || 0,
+    veiculos:         Number(kpis?.veiculos)            || 0,
+    detidos:          Number(kpis?.detidos)             || 0,
+    multados:         Number(kpis?.multados)            || 0,
+    fechados:         Number(kpis?.fechados)            || 0,
+    lacrados:         Number(kpis?.lacrados)            || 0,
+    itensApreendidos: Number(aprAgg?.itens_apreendidos) || 0,
+    apreensoes:       Number(aprAgg?.apreensoes)        || 0,
+  };
+
+  // ---- Por cidade
+  const porCidade = await applyCommonWhere(
+    db('operacao_eventos as e')
+      .join('evento_fiscalizacao as f', 'f.evento_id', 'e.id')
+      .leftJoin('cidades as c', 'c.id', 'e.cidade_id')
+      .leftJoin('evento_apreensao as a', 'a.fiscalizacao_evento_id', 'e.id')
+      .where('e.tipo', 'fiscalizacao'),
+    filters,
+    'e'
+  )
+    .select(
+      'c.id as cidade_id',
+      'c.nome as cidade',
+      db.raw('COUNT(e.id)                                  AS fiscalizacoes'),
+      db.raw('COALESCE(SUM(f.pessoas_abordadas), 0)        AS pessoas'),
+      db.raw('COALESCE(SUM(f.veiculos_abordados), 0)       AS veiculos'),
+      db.raw('COALESCE(SUM(f.pessoas_detidas_qtd), 0)      AS detidos'),
+      db.raw('SUM(CASE WHEN f.multado THEN 1 ELSE 0 END)   AS multados'),
+      db.raw('SUM(CASE WHEN f.fechado THEN 1 ELSE 0 END)   AS fechados'),
+      db.raw('SUM(CASE WHEN f.lacrado THEN 1 ELSE 0 END)   AS lacrados'),
+      db.raw('COUNT(a.evento_id)                           AS itens_apreendidos'),
+      db.raw('COUNT(DISTINCT a.fiscalizacao_evento_id)     AS apreensoes')
+    )
+    .groupBy('c.id', 'c.nome')
+    .orderBy('c.nome', 'asc');
+
+  // ---- Top locais
+  const topLocais = await applyCommonWhere(
+    db('operacao_eventos as e')
+      .join('evento_fiscalizacao as f', 'f.evento_id', 'e.id')
+      .where('e.tipo', 'fiscalizacao')
+      .whereNotNull('f.local_nome'),
+    filters,
+    'e'
+  )
+    .select('f.local_nome', db.raw('COUNT(*) AS qtd'))
+    .groupBy('f.local_nome')
+    .orderBy('qtd', 'desc')
+    .limit(10);
+
+  // ---- Subconsulta: itens por fiscalização
+  // (sem usar a.id; ordenando por a.evento_id, que existe)
+  const itensPorFis = applyCommonWhere(
+    db('evento_apreensao as a')
+      .innerJoin('operacao_eventos as fe', 'fe.id', 'a.fiscalizacao_evento_id')
+      .where('fe.tipo', 'fiscalizacao'),
+    filters,
+    'fe'
+  )
+    .select(
+      'a.fiscalizacao_evento_id',
+      db.raw(`
+        json_agg(
+          json_build_object(
+            'tipo', a.tipo,
+            'quantidade', a.quantidade,
+            'unidade', a.unidade
+          )
+          ORDER BY a.evento_id
+        ) AS itens
+      `)
+    )
+    .groupBy('a.fiscalizacao_evento_id')
+    .as('itens_por_fis');
+
+  // ---- Lista de fiscalizações (cards)
+  const fiscList = await applyCommonWhere(
+    db('operacao_eventos as e')
+      .innerJoin('evento_fiscalizacao as f', 'f.evento_id', 'e.id')
+      .leftJoin('cidades as c', 'c.id', 'e.cidade_id')
+      .leftJoin('usuarios as u', 'u.id', 'e.user_id')
+      .leftJoin('evento_apreensao as a', 'a.fiscalizacao_evento_id', 'e.id')
+      .leftJoin(itensPorFis, 'itens_por_fis.fiscalizacao_evento_id', 'e.id')
+      .where('e.tipo', 'fiscalizacao'),
+    filters,
+    'e'
+  )
+    .select(
+      'e.id as evento_id',
+      'e.ts',
+      'c.nome as cidade',
+      'u.nome as usuario',
+      'f.tipo_local',
+      'f.local_nome',
+      'f.local_endereco',
+      'f.pessoas_abordadas',
+      'f.veiculos_abordados',
+      'f.pessoas_detidas_qtd',
+      'f.multado',
+      'f.fechado',
+      'f.lacrado',
+      db.raw("COALESCE(itens_por_fis.itens, '[]'::json) as itens")
+    )
+    .count({ itens_apreendidos: 'a.evento_id' })
+    .groupBy(
+      'e.id','e.ts','c.nome','u.nome',
+      'f.tipo_local','f.local_nome','f.local_endereco',
+      'f.pessoas_abordadas','f.veiculos_abordados','f.pessoas_detidas_qtd',
+      'f.multado','f.fechado','f.lacrado',
+      'itens_por_fis.itens'
+    )
+    .orderBy('e.ts', 'desc');
+
+  return { cards, porCidade, topLocais, fiscList };
+}
+
+
 // -----------------------------
 // Helper: informações da operação (para cabeçalho)
 // -----------------------------
