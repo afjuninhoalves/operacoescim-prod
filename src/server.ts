@@ -3060,7 +3060,7 @@ async function buildRelatoriosData(filters: ReportFilters) {
       .leftJoin('evento_apreensao as a', 'a.fiscalizacao_evento_id', 'fe.id')
       .where('fe.tipo', 'fiscalizacao'),
     filters,
-    'fe' // <-- importante para não referenciar 'e' aqui
+    'fe' // <-- importante: usa 'fe' aqui
   )
     .select(
       db.raw('COUNT(a.evento_id)                       AS itens_apreendidos'),
@@ -3069,36 +3069,18 @@ async function buildRelatoriosData(filters: ReportFilters) {
     .first() as any;
 
   const cards = {
-    fiscalizacoes:    Number(kpis?.fiscalizacoes)    || 0,
-    pessoas:          Number(kpis?.pessoas)          || 0,
-    veiculos:         Number(kpis?.veiculos)         || 0,
-    detidos:          Number(kpis?.detidos)          || 0,
-    multados:         Number(kpis?.multados)         || 0,
-    fechados:         Number(kpis?.fechados)         || 0,
-    lacrados:         Number(kpis?.lacrados)         || 0,
+    fiscalizacoes:    Number(kpis?.fiscalizacoes)       || 0,
+    pessoas:          Number(kpis?.pessoas)             || 0,
+    veiculos:         Number(kpis?.veiculos)            || 0,
+    detidos:          Number(kpis?.detidos)             || 0,
+    multados:         Number(kpis?.multados)            || 0,
+    fechados:         Number(kpis?.fechados)            || 0,
+    lacrados:         Number(kpis?.lacrados)            || 0,
     itensApreendidos: Number(aprAgg?.itens_apreendidos) || 0,
     apreensoes:       Number(aprAgg?.apreensoes)        || 0,
   };
 
-  // ---- Série temporal por dia
-  const serie = await applyCommonWhere(
-    db('operacao_eventos as e')
-      .join('evento_fiscalizacao as f', 'f.evento_id', 'e.id')
-      .where('e.tipo', 'fiscalizacao'),
-    filters,
-    'e'
-  )
-    .select(
-      db.raw("date_trunc('day', e.ts)::date AS dia"),
-      db.raw('COUNT(e.id)                                  AS fiscalizacoes'),
-      db.raw('COALESCE(SUM(f.pessoas_abordadas), 0)        AS pessoas'),
-      db.raw('COALESCE(SUM(f.veiculos_abordados), 0)       AS veiculos'),
-      db.raw('COALESCE(SUM(f.pessoas_detidas_qtd), 0)      AS detidos')
-    )
-    .groupByRaw('1')
-    .orderBy('dia', 'asc');
-
-  // ---- Por cidade
+  // ---- Por cidade (tabela)
   const porCidade = await applyCommonWhere(
     db('operacao_eventos as e')
       .join('evento_fiscalizacao as f', 'f.evento_id', 'e.id')
@@ -3138,8 +3120,9 @@ async function buildRelatoriosData(filters: ReportFilters) {
     .orderBy('qtd', 'desc')
     .limit(10);
 
-  return { cards, serie, porCidade, topLocais };
-} // <-- fecha buildRelatoriosData
+  // sem série temporal
+  return { cards, porCidade, topLocais };
+}
 
 // ---- Página de relatórios
 app.get('/relatorios', requireAdminOrGestor, async (req, res, next) => {
@@ -3223,7 +3206,6 @@ app.get('/relatorios/export.csv', requireAdminOrGestor, async (req, res, next) =
     next(err);
   }
 });
-
 
 
 

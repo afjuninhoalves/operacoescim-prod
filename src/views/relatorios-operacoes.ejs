@@ -6,12 +6,12 @@
   <title>Relatórios — Operações</title>
   <style>
     :root{--bg:#0b1220;--panel:#0f172a;--panel2:#111827;--border:#1f2937;--text:#e5e7eb;--muted:#9ca3af}
-    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial}
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial}
     .container{max-width:1160px;margin:0 auto;padding:20px}
     .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--border);border-radius:14px;padding:14px}
     .grid{display:grid;gap:12px}
-    .grid-2{grid-template-columns:1fr 1fr}
-    .kpi{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px}
+    .kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
     .kpi .box{padding:12px;border:1px solid var(--border);border-radius:12px}
     .muted{color:var(--muted)}
     table{width:100%;border-collapse:collapse;margin-top:8px}
@@ -57,9 +57,10 @@
       <a id="btnCsv" class="btn" href="#">Exportar CSV (por cidade)</a>
     </form>
 
+    <!-- KPIs -->
     <div class="kpi" style="margin:12px 0">
       <div class="box"><div class="muted">Fiscalizações</div><div id="k-fisc" style="font-size:24px;font-weight:700">—</div></div>
-      <div class="box"><div class="muted">Pessoas</div><div id="k-pes" style="font-size:24px;font-weight:700">—</div></div>
+      <div class="box"><div class="muted">Pessoas</div><div id="k-pes"  style="font-size:24px;font-weight:700">—</div></div>
       <div class="box"><div class="muted">Veículos</div><div id="k-vei" style="font-size:24px;font-weight:700">—</div></div>
       <div class="box"><div class="muted">Detidos</div><div id="k-det" style="font-size:24px;font-weight:700">—</div></div>
       <div class="box"><div class="muted">Itens apreendidos</div><div id="k-itens" style="font-size:24px;font-weight:700">—</div></div>
@@ -69,20 +70,16 @@
       <div class="box"><div class="muted">Lacrados</div><div id="k-lac" style="font-size:24px;font-weight:700">—</div></div>
     </div>
 
-    <div class="grid grid-2">
-      <div class="card">
-        <div class="muted">Série temporal</div>
-        <canvas id="chart"></canvas>
-      </div>
-      <div class="card">
-        <div class="muted">Top locais fiscalizados</div>
-        <table id="tblTop">
-          <thead><tr><th>Local</th><th>Qtd.</th></tr></thead>
-          <tbody></tbody>
-        </table>
-      </div>
+    <!-- Top locais -->
+    <div class="card">
+      <div class="muted">Top locais fiscalizados</div>
+      <table id="tblTop">
+        <thead><tr><th>Local</th><th>Qtd.</th></tr></thead>
+        <tbody></tbody>
+      </table>
     </div>
 
+    <!-- Distribuição por cidade -->
     <div class="card" style="margin-top:12px">
       <div style="font-weight:700;margin-bottom:6px">Distribuição por cidade</div>
       <table id="tblCidade">
@@ -105,10 +102,8 @@
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
   <script>
     const qs = (s)=>document.querySelector(s);
-    let chart;
 
     function linkCsv(){
       const fd = new FormData(qs('#filtros'));
@@ -132,7 +127,12 @@
 
     function renderTopLocais(rows){
       const tb = qs('#tblTop tbody');
-      tb.innerHTML = rows.map(r=>`<tr><td>${r.local_nome||r.local||r.local_nome}</td><td style="text-align:right">${fmt(r.qtd)}</td></tr>`).join('');
+      tb.innerHTML = rows.map(r=>`
+        <tr>
+          <td>${r.local_nome || '-'}</td>
+          <td style="text-align:right">${fmt(r.qtd)}</td>
+        </tr>
+      `).join('');
     }
 
     function renderPorCidade(rows){
@@ -153,31 +153,6 @@
       `).join('');
     }
 
-    function renderChart(rows){
-      const labels = rows.map(r=> r.dia);
-      const mk = (k,label,color)=>({
-        label, data: rows.map(r=> Number(r[k]||0)), backgroundColor: color, borderColor: color, borderWidth:1, borderRadius:6, maxBarThickness:36
-      });
-      if(chart) chart.destroy();
-      chart = new Chart(qs('#chart').getContext('2d'), {
-        type:'bar',
-        data:{
-          labels,
-          datasets:[
-            mk('fiscalizacoes','Fiscalizações','#60a5fa'),
-            mk('pessoas','Pessoas','#f87171'),
-            mk('veiculos','Veículos','#34d399'),
-            mk('detidos','Detidos','#06b6d4'),
-          ]
-        },
-        options:{
-          responsive:true, maintainAspectRatio:false, animation:false,
-          scales:{ x:{grid:{display:false}, ticks:{color:'#e5e7eb'}}, y:{beginAtZero:true, ticks:{precision:0,color:'#e5e7eb'}, grid:{color:'rgba(229,231,235,.1)'}} },
-          plugins:{legend:{labels:{color:'#e5e7eb'}}}
-        }
-      });
-    }
-
     async function load(){
       const fd = new FormData(qs('#filtros'));
       const params = new URLSearchParams(fd);
@@ -185,7 +160,6 @@
       const res = await fetch('/relatorios/data?' + params.toString(), { cache:'no-store' });
       const data = await res.json();
       renderKPIs(data.cards||{});
-      renderChart((data.serie||[]).map(r => ({...r, dia: (new Date(r.dia)).toISOString().slice(0,10)})));
       renderTopLocais(data.topLocais||[]);
       renderPorCidade(data.porCidade||[]);
     }
