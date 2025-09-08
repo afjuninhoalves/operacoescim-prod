@@ -2531,7 +2531,7 @@ function applyCommonWhere(q, f, alias = 'e') {
     return q;
 }
 async function buildRelatoriosData(filters) {
-    // Se não vier opId, devolve tudo vazio (frontend já evita buscar sem opId)
+    // Se chamado sem opId, devolvemos tudo zerado/vazio:
     if (!filters.opId) {
         return {
             cards: {
@@ -2543,7 +2543,7 @@ async function buildRelatoriosData(filters) {
             fiscList: []
         };
     }
-    // ---- Totais / KPIs (a partir de fiscalizações)
+    // ---- Totais / KPIs
     const baseFis = applyCommonWhere(db('operacao_eventos as e')
         .join('evento_fiscalizacao as f', 'f.evento_id', 'e.id')
         .where('e.tipo', 'fiscalizacao'), filters, 'e');
@@ -2551,8 +2551,8 @@ async function buildRelatoriosData(filters) {
         .clone()
         .select(db.raw('COUNT(e.id)                                         AS fiscalizacoes'), db.raw('COALESCE(SUM(f.pessoas_abordadas), 0)               AS pessoas'), db.raw('COALESCE(SUM(f.veiculos_abordados), 0)              AS veiculos'), db.raw('COALESCE(SUM(f.pessoas_detidas_qtd), 0)             AS detidos'), db.raw('SUM(CASE WHEN f.multado THEN 1 ELSE 0 END)          AS multados'), db.raw('SUM(CASE WHEN f.fechado THEN 1 ELSE 0 END)          AS fechados'), db.raw('SUM(CASE WHEN f.lacrado THEN 1 ELSE 0 END)          AS lacrados'))
         .first();
-    // ---- Itens apreendidos (linhas) e Apreensões (DISTINCT fiscalização com itens)
-    const aprAgg = await applyCommonWhere(db('operacao_eventos as fe') // alias = fe (evento da fiscalização)
+    // ---- Itens apreendidos (linhas) e Apreensões (fiscalizações com itens)
+    const aprAgg = await applyCommonWhere(db('operacao_eventos as fe')
         .leftJoin('evento_apreensao as a', 'a.fiscalizacao_evento_id', 'fe.id')
         .where('fe.tipo', 'fiscalizacao'), filters, 'fe')
         .select(db.raw('COUNT(a.evento_id)                       AS itens_apreendidos'), db.raw('COUNT(DISTINCT a.fiscalizacao_evento_id) AS apreensoes'))
@@ -2586,24 +2586,25 @@ async function buildRelatoriosData(filters) {
         .groupBy('f.local_nome')
         .orderBy('qtd', 'desc')
         .limit(10);
-    // ---- Subconsulta: itens por fiscalização (SEM usar a.obs)
+    // ---- Subconsulta: itens por fiscalização (sem a.id; filtros no evento-pai 'fe')
     const itensPorFis = applyCommonWhere(db('evento_apreensao as a')
-        .innerJoin('operacao_eventos as e', 'e.id', 'a.evento_id')
-        .where('e.tipo', 'fiscalizacao'), filters, 'e')
+        .innerJoin('operacao_eventos as fe', 'fe.id', 'a.fiscalizacao_evento_id')
+        .where('fe.tipo', 'fiscalizacao'), filters, 'fe')
         .select('a.fiscalizacao_evento_id', db.raw(`
         json_agg(
           json_build_object(
             'tipo', a.tipo,
             'quantidade', a.quantidade,
             'unidade', a.unidade
-          ) ORDER BY a.id
+          )
+          ORDER BY a.evento_id
         ) AS itens
       `))
         .groupBy('a.fiscalizacao_evento_id')
         .as('itens_por_fis');
-    // ---- Lista de fiscalizações (cards) + itens agregados
+    // ---- Lista de fiscalizações (cards)
     const fiscList = await applyCommonWhere(db('operacao_eventos as e')
-        .join('evento_fiscalizacao as f', 'f.evento_id', 'e.id')
+        .innerJoin('evento_fiscalizacao as f', 'f.evento_id', 'e.id')
         .leftJoin('cidades as c', 'c.id', 'e.cidade_id')
         .leftJoin('usuarios as u', 'u.id', 'e.user_id')
         .leftJoin('evento_apreensao as a', 'a.fiscalizacao_evento_id', 'e.id')
@@ -2615,65 +2616,6 @@ async function buildRelatoriosData(filters) {
         .orderBy('e.ts', 'desc');
     return { cards, porCidade, topLocais, fiscList };
 }
-// ---- Página de relatórios
-app.get('/relatorios', requireAdminOrGestor, async (req, res, next) => {
-    try {
-        const ops = await db('operacoes').select('id', 'nome').orderBy('id', 'desc');
-        const cidades = await db('cidades').select('id', 'nome').orderBy('nome');
-        // default: últimos 30 dias (inputs mostram isso, mas só busca após escolher opId)
-        const today = new Date();
-        const from = new Date(today);
-        from.setDate(today.getDate() - 30);
-        const fmt = (d) => d.toISOString().slice(0, 10);
-        res.render('relatorios-operacoes', {
-            filtrosInit: { from: fmt(from), to: fmt(today), opId: '', cidadeId: '' },
-            ops, cidades
-        });
-    }
-    catch (err) {
-        next(err);
-    }
-});
-// ---- JSON (dados dos relatórios)
-app.get('/relatorios/data', requireAdminOrGestor, async (req, res, next) => {
-    try {
-        const f = {
-            from: String(req.query.from || ''),
-            to: String(req.query.to || ''),
-            opId: req.query.opId ? Number(req.query.opId) : undefined,
-            cidadeId: req.query.cidadeId ? Number(req.query.cidadeId) : undefined,
-        };
-        const data = await buildRelatoriosData(f);
-        res.set('Cache-Control', 'no-store').json(data);
-    }
-    catch (err) {
-        next(err);
-    }
-});
-// ---- CSV export (por cidade)
-app.get('/relatorios/export.csv', requireAdminOrGestor, async (req, res, next) => {
-    try {
-        const f = {
-            from: String(req.query.from || ''),
-            to: String(req.query.to || ''),
-            opId: req.query.opId ? Number(req.query.opId) : undefined,
-            cidadeId: req.query.cidadeId ? Number(req.query.cidadeId) : undefined,
-        };
-        const { porCidade } = await buildRelatoriosData(f);
-        const header = [
-            'cidade', 'fiscalizacoes', 'pessoas', 'veiculos', 'detidos',
-            'multados', 'fechados', 'lacrados', 'itens_apreendidos', 'apreensoes'
-        ];
-        const rows = porCidade.map((r) => [r.cidade, r.fiscalizacoes, r.pessoas, r.veiculos, r.detidos, r.multados, r.fechados, r.lacrados, r.itens_apreendidos, r.apreensoes].join(','));
-        const csv = [header.join(','), ...rows].join('\n');
-        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-        res.setHeader('Content-Disposition', 'attachment; filename="relatorio_por_cidade.csv"');
-        res.send(csv);
-    }
-    catch (err) {
-        next(err);
-    }
-});
 // =============================================================================
 // 404
 // =============================================================================
