@@ -3010,6 +3010,188 @@ async function runGeoBackfill(opId?: number) {
   return { opId: opId ?? 'ALL', candidates: rows.length, updated };
 }
 
+// =============================
+// RELATÓRIOS — PÁGINA + DATA
+// =============================
+type ReportFilters = {
+  from?: string;  // 'YYYY-MM-DD'
+  to?: string;    // 'YYYY-MM-DD'
+  opId?: number;  // operação específica (opcional)
+  cidadeId?: number; // cidade específica (opcional)
+};
+
+function applyCommonWhere(q: any, f: ReportFilters) {
+  if (f.from) q.where('e.ts', '>=', new Date(`${f.from}T00:00:00Z`));
+  if (f.to)   q.where('e.ts', '<',  new Date(`${f.to}T23:59:59.999Z`));
+  if (f.opId) q.where('e.operacao_id', f.opId);
+  if (f.cidadeId) q.where('e.cidade_id', f.cidadeId);
+  return q;
+}
+
+async function buildRelatoriosData(filters: ReportFilters) {
+  // ---- Totais / KPIs (a partir de fiscalizações)
+  const baseFis = applyCommonWhere(
+    db('operacao_eventos as e')
+      .join('evento_fiscalizacao as f', 'f.evento_id', 'e.id')
+      .where('e.tipo', 'fiscalizacao'),
+    filters
+  );
+
+  const kpis = await baseFis
+    .clone()
+    .select(
+      db.raw('COUNT(e.id)                                         AS fiscalizacoes'),
+      db.raw('COALESCE(SUM(f.pessoas_abordadas), 0)               AS pessoas'),
+      db.raw('COALESCE(SUM(f.veiculos_abordados), 0)              AS veiculos'),
+      db.raw('COALESCE(SUM(f.pessoas_detidas_qtd), 0)             AS detidos'),
+      db.raw('SUM(CASE WHEN f.multado THEN 1 ELSE 0 END)          AS multados'),
+      db.raw('SUM(CASE WHEN f.fechado THEN 1 ELSE 0 END)          AS fechados'),
+      db.raw('SUM(CASE WHEN f.lacrado THEN 1 ELSE 0 END)          AS lacrados')
+    )
+    .first() as any;
+
+  // Itens apreendidos (linhas) e Apreensões (DISTINCT fiscalização que tem itens)
+  const aprAgg = await applyCommonWhere(
+    db('operacao_eventos as fe') // fiscalização (evento pai)
+      .leftJoin('evento_apreensao as a', 'a.fiscalizacao_evento_id', 'fe.id')
+      .where('fe.tipo', 'fiscalizacao'),
+    filters
+  )
+    .select(
+      db.raw('COUNT(a.evento_id)                       AS itens_apreendidos'),
+      db.raw('COUNT(DISTINCT a.fiscalizacao_evento_id) AS apreensoes')
+    )
+    .first() as any;
+
+  const cards = {
+    fiscalizacoes: Number(kpis?.fiscalizacoes) || 0,
+    pessoas:       Number(kpis?.pessoas) || 0,
+    veiculos:      Number(kpis?.veiculos) || 0,
+    detidos:       Number(kpis?.detidos) || 0,
+    multados:      Number(kpis?.multados) || 0,
+    fechados:      Number(kpis?.fechados) || 0,
+    lacrados:      Number(kpis?.lacrados) || 0,
+    itensApreendidos: Number(aprAgg?.itens_apreendidos) || 0,
+    apreensoes:       Number(aprAgg?.apreensoes) || 0,
+  };
+
+  // ---- Série temporal por dia
+  const serie = await applyCommonWhere(
+    db('operacao_eventos as e')
+      .join('evento_fiscalizacao as f', 'f.evento_id', 'e.id')
+      .where('e.tipo', 'fiscalizacao'),
+    filters
+  )
+    .select(
+      db.raw("date_trunc('day', e.ts)::date AS dia"),
+      db.raw('COUNT(e.id)                                  AS fiscalizacoes'),
+      db.raw('COALESCE(SUM(f.pessoas_abordadas), 0)        AS pessoas'),
+      db.raw('COALESCE(SUM(f.veiculos_abordados), 0)       AS veiculos'),
+      db.raw('COALESCE(SUM(f.pessoas_detidas_qtd), 0)      AS detidos')
+    )
+    .groupByRaw("1")
+    .orderBy('dia', 'asc');
+
+  // ---- Por cidade
+  const porCidade = await applyCommonWhere(
+    db('operacao_eventos as e')
+      .join('evento_fiscalizacao as f', 'f.evento_id', 'e.id')
+      .leftJoin('cidades as c', 'c.id', 'e.cidade_id')
+      .leftJoin('evento_apreensao as a', 'a.fiscalizacao_evento_id', 'e.id') // para contar itens/apreensões
+      .where('e.tipo', 'fiscalizacao'),
+    filters
+  )
+    .select(
+      'c.id as cidade_id',
+      'c.nome as cidade',
+      db.raw('COUNT(e.id)                                  AS fiscalizacoes'),
+      db.raw('COALESCE(SUM(f.pessoas_abordadas), 0)        AS pessoas'),
+      db.raw('COALESCE(SUM(f.veiculos_abordados), 0)       AS veiculos'),
+      db.raw('COALESCE(SUM(f.pessoas_detidas_qtd), 0)      AS detidos'),
+      db.raw('SUM(CASE WHEN f.multado THEN 1 ELSE 0 END)   AS multados'),
+      db.raw('SUM(CASE WHEN f.fechado THEN 1 ELSE 0 END)   AS fechados'),
+      db.raw('SUM(CASE WHEN f.lacrado THEN 1 ELSE 0 END)   AS lacrados'),
+      db.raw('COUNT(a.evento_id)                           AS itens_apreendidos'),
+      db.raw('COUNT(DISTINCT a.fiscalizacao_evento_id)     AS apreensoes')
+    )
+    .groupBy('c.id', 'c.nome')
+    .orderBy('c.nome', 'asc');
+
+  // ---- Top locais fiscalizados (nome) / ranking
+  const topLocais = await applyCommonWhere(
+    db('operacao_eventos as e')
+      .join('evento_fiscalizacao as f', 'f.evento_id', 'e.id')
+      .where('e.tipo', 'fiscalizacao')
+      .whereNotNull('f.local_nome'),
+    filters
+  )
+    .select(
+      'f.local_nome',
+      db.raw('COUNT(*) AS qtd')
+    )
+    .groupBy('f.local_nome')
+    .orderBy('qtd', 'desc')
+    .limit(10);
+
+  return { cards, serie, porCidade, topLocais };
+}
+
+// ---- Página de relatórios
+app.get('/relatorios', requireAdminOrGestor, async (req, res, next) => {
+  try {
+    const ops = await db('operacoes').select('id','nome').orderBy('id','desc');
+    const cidades = await db('cidades').select('id','nome').orderBy('nome');
+
+    // default: últimos 30 dias
+    const today = new Date();
+    const from = new Date(today); from.setDate(today.getDate() - 30);
+    const fmt = (d: Date) => d.toISOString().slice(0,10);
+
+    res.render('relatorios-operacoes', {
+      filtrosInit: { from: fmt(from), to: fmt(today), opId: '', cidadeId: '' },
+      ops, cidades
+    });
+  } catch (err) { next(err); }
+});
+
+// ---- JSON para filtros
+app.get('/relatorios/data', requireAdminOrGestor, async (req, res, next) => {
+  try {
+    const f: ReportFilters = {
+      from: String(req.query.from || ''),
+      to: String(req.query.to || ''),
+      opId: req.query.opId ? Number(req.query.opId) : undefined,
+      cidadeId: req.query.cidadeId ? Number(req.query.cidadeId) : undefined,
+    };
+    const data = await buildRelatoriosData(f);
+    res.set('Cache-Control','no-store').json(data);
+  } catch (err) { next(err); }
+});
+
+// ---- CSV export (por cidade)
+app.get('/relatorios/export.csv', requireAdminOrGestor, async (req,res,next) => {
+  try {
+    const f: ReportFilters = {
+      from: String(req.query.from || ''),
+      to: String(req.query.to || ''),
+      opId: req.query.opId ? Number(req.query.opId) : undefined,
+      cidadeId: req.query.cidadeId ? Number(req.query.cidadeId) : undefined,
+    };
+    const { porCidade } = await buildRelatoriosData(f);
+    const header = [
+      'cidade','fiscalizacoes','pessoas','veiculos','detidos',
+      'multados','fechados','lacrados','itens_apreendidos','apreensoes'
+    ];
+    const rows = porCidade.map((r:any)=>
+      [r.cidade,r.fiscalizacoes,r.pessoas,r.veiculos,r.detidos,r.multados,r.fechados,r.lacrados,r.itens_apreendidos,r.apreensoes].join(',')
+    );
+    const csv = [header.join(','), ...rows].join('\n');
+    res.setHeader('Content-Type','text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition','attachment; filename="relatorio_por_cidade.csv"');
+    res.send(csv);
+  } catch (err) { next(err); }
+});
+
 
 
 

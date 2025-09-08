@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Relatórios — Operações</title>
+  <style>
+    :root{--bg:#0b1220;--panel:#0f172a;--panel2:#111827;--border:#1f2937;--text:#e5e7eb;--muted:#9ca3af}
+    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial}
+    .container{max-width:1160px;margin:0 auto;padding:20px}
+    .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--border);border-radius:14px;padding:14px}
+    .grid{display:grid;gap:12px}
+    .grid-2{grid-template-columns:1fr 1fr}
+    .kpi{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px}
+    .kpi .box{padding:12px;border:1px solid var(--border);border-radius:12px}
+    .muted{color:var(--muted)}
+    table{width:100%;border-collapse:collapse;margin-top:8px}
+    th,td{padding:8px;border-bottom:1px solid var(--border);text-align:center}
+    th:first-child,td:first-child{text-align:left}
+    .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+    input,select{background:#0f172a;color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px}
+    .btn{padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:#111826;color:#fff}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2 style="margin:0 0 12px">Relatórios — Operações</h2>
+
+    <form id="filtros" class="card toolbar">
+      <div>
+        <label>De<br/><input type="date" name="from" value="<%= filtrosInit.from %>"></label>
+      </div>
+      <div>
+        <label>Até<br/><input type="date" name="to" value="<%= filtrosInit.to %>"></label>
+      </div>
+      <div>
+        <label>Operação<br/>
+          <select name="opId">
+            <option value="">Todas</option>
+            <% (ops||[]).forEach(o=>{ %>
+              <option value="<%= o.id %>"><%= o.id %> — <%= o.nome %></option>
+            <% }) %>
+          </select>
+        </label>
+      </div>
+      <div>
+        <label>Cidade<br/>
+          <select name="cidadeId">
+            <option value="">Todas</option>
+            <% (cidades||[]).forEach(c=>{ %>
+              <option value="<%= c.id %>"><%= c.nome %></option>
+            <% }) %>
+          </select>
+        </label>
+      </div>
+      <button class="btn" type="submit">Aplicar</button>
+      <a id="btnCsv" class="btn" href="#">Exportar CSV (por cidade)</a>
+    </form>
+
+    <div class="kpi" style="margin:12px 0">
+      <div class="box"><div class="muted">Fiscalizações</div><div id="k-fisc" style="font-size:24px;font-weight:700">—</div></div>
+      <div class="box"><div class="muted">Pessoas</div><div id="k-pes" style="font-size:24px;font-weight:700">—</div></div>
+      <div class="box"><div class="muted">Veículos</div><div id="k-vei" style="font-size:24px;font-weight:700">—</div></div>
+      <div class="box"><div class="muted">Detidos</div><div id="k-det" style="font-size:24px;font-weight:700">—</div></div>
+      <div class="box"><div class="muted">Itens apreendidos</div><div id="k-itens" style="font-size:24px;font-weight:700">—</div></div>
+      <div class="box"><div class="muted">Apreensões</div><div id="k-apr" style="font-size:24px;font-weight:700">—</div></div>
+      <div class="box"><div class="muted">Multados</div><div id="k-mul" style="font-size:24px;font-weight:700">—</div></div>
+      <div class="box"><div class="muted">Fechados</div><div id="k-fec" style="font-size:24px;font-weight:700">—</div></div>
+      <div class="box"><div class="muted">Lacrados</div><div id="k-lac" style="font-size:24px;font-weight:700">—</div></div>
+    </div>
+
+    <div class="grid grid-2">
+      <div class="card">
+        <div class="muted">Série temporal</div>
+        <canvas id="chart"></canvas>
+      </div>
+      <div class="card">
+        <div class="muted">Top locais fiscalizados</div>
+        <table id="tblTop">
+          <thead><tr><th>Local</th><th>Qtd.</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:12px">
+      <div style="font-weight:700;margin-bottom:6px">Distribuição por cidade</div>
+      <table id="tblCidade">
+        <thead>
+          <tr>
+            <th>Cidade</th>
+            <th>Fiscalizações</th>
+            <th>Pessoas</th>
+            <th>Veículos</th>
+            <th>Detidos</th>
+            <th>Itens</th>
+            <th>Apreensões</th>
+            <th>Multados</th>
+            <th>Fechados</th>
+            <th>Lacrados</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <script>
+    const qs = (s)=>document.querySelector(s);
+    let chart;
+
+    function linkCsv(){
+      const fd = new FormData(qs('#filtros'));
+      const p  = new URLSearchParams(fd);
+      qs('#btnCsv').href = '/relatorios/export.csv?' + p.toString();
+    }
+
+    function fmt(n){ return (n ?? 0).toLocaleString('pt-BR'); }
+
+    function renderKPIs(c){
+      qs('#k-fisc').textContent = fmt(c.fiscalizacoes);
+      qs('#k-pes').textContent  = fmt(c.pessoas);
+      qs('#k-vei').textContent  = fmt(c.veiculos);
+      qs('#k-det').textContent  = fmt(c.detidos);
+      qs('#k-itens').textContent= fmt(c.itensApreendidos);
+      qs('#k-apr').textContent  = fmt(c.apreensoes);
+      qs('#k-mul').textContent  = fmt(c.multados);
+      qs('#k-fec').textContent  = fmt(c.fechados);
+      qs('#k-lac').textContent  = fmt(c.lacrados);
+    }
+
+    function renderTopLocais(rows){
+      const tb = qs('#tblTop tbody');
+      tb.innerHTML = rows.map(r=>`<tr><td>${r.local_nome||r.local||r.local_nome}</td><td style="text-align:right">${fmt(r.qtd)}</td></tr>`).join('');
+    }
+
+    function renderPorCidade(rows){
+      const tb = qs('#tblCidade tbody');
+      tb.innerHTML = rows.map(r=>`
+        <tr>
+          <td>${r.cidade||'-'}</td>
+          <td style="text-align:right">${fmt(r.fiscalizacoes)}</td>
+          <td style="text-align:right">${fmt(r.pessoas)}</td>
+          <td style="text-align:right">${fmt(r.veiculos)}</td>
+          <td style="text-align:right">${fmt(r.detidos)}</td>
+          <td style="text-align:right">${fmt(r.itens_apreendidos)}</td>
+          <td style="text-align:right">${fmt(r.apreensoes)}</td>
+          <td style="text-align:right">${fmt(r.multados)}</td>
+          <td style="text-align:right">${fmt(r.fechados)}</td>
+          <td style="text-align:right">${fmt(r.lacrados)}</td>
+        </tr>
+      `).join('');
+    }
+
+    function renderChart(rows){
+      const labels = rows.map(r=> r.dia);
+      const mk = (k,label,color)=>({
+        label, data: rows.map(r=> Number(r[k]||0)), backgroundColor: color, borderColor: color, borderWidth:1, borderRadius:6, maxBarThickness:36
+      });
+      if(chart) chart.destroy();
+      chart = new Chart(qs('#chart').getContext('2d'), {
+        type:'bar',
+        data:{
+          labels,
+          datasets:[
+            mk('fiscalizacoes','Fiscalizações','#60a5fa'),
+            mk('pessoas','Pessoas','#f87171'),
+            mk('veiculos','Veículos','#34d399'),
+            mk('detidos','Detidos','#06b6d4'),
+          ]
+        },
+        options:{
+          responsive:true, maintainAspectRatio:false, animation:false,
+          scales:{ x:{grid:{display:false}, ticks:{color:'#e5e7eb'}}, y:{beginAtZero:true, ticks:{precision:0,color:'#e5e7eb'}, grid:{color:'rgba(229,231,235,.1)'}} },
+          plugins:{legend:{labels:{color:'#e5e7eb'}}}
+        }
+      });
+    }
+
+    async function load(){
+      const fd = new FormData(qs('#filtros'));
+      const params = new URLSearchParams(fd);
+      linkCsv();
+      const res = await fetch('/relatorios/data?' + params.toString(), { cache:'no-store' });
+      const data = await res.json();
+      renderKPIs(data.cards||{});
+      renderChart((data.serie||[]).map(r => ({...r, dia: (new Date(r.dia)).toISOString().slice(0,10)})));
+      renderTopLocais(data.topLocais||[]);
+      renderPorCidade(data.porCidade||[]);
+    }
+
+    qs('#filtros').addEventListener('submit', ev => { ev.preventDefault(); load(); });
+    // inicial
+    load();
+  </script>
+</body>
+</html>
