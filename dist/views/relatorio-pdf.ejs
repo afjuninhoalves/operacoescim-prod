@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Relatório — Operação <%= op?.nome || '' %></title>
+  <style>
+    :root{--text:#0b1220;--muted:#444;--border:#dcdcdc}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial;color:#111}
+    .wrap{padding:22px}
+    .center{text-align:center}
+    .h1{font-size:20px;font-weight:800;margin:6px 0 2px 0}
+    .h2{font-size:14px;font-weight:700;margin:0 0 10px}
+    .muted{color:#666}
+    .card{border:1px solid var(--border);border-radius:10px;padding:12px;margin:10px 0}
+    .kv{display:grid;grid-template-columns:160px 1fr;gap:6px 12px;font-size:13px}
+    .kv .k{color:#333}
+    .pill{display:inline-block;padding:2px 8px;border-radius:999px;background:#eee;border:1px solid #ddd;font-size:12px;margin-right:6px}
+    .cards-grid{display:grid;grid-template-columns:1fr;gap:10px}
+    .list{margin-top:6px;font-size:13px}
+    .list div{margin-bottom:2px}
+    hr{border:none;border-top:1px solid var(--border);margin:14px 0}
+    table{width:100%;border-collapse:collapse;font-size:12px;margin-top:6px}
+    th,td{padding:6px;border-bottom:1px solid #eee;text-align:left}
+    .right{text-align:right}
+    img.logo{height:38px; margin-bottom:4px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+
+    <!-- topo com logo e títulos -->
+    <div class="center">
+      <img class="logo" src="/img/cim-logo.png" alt="CIM">
+      <div class="h1">C.I.M</div>
+      <div class="muted">Centro de Inteligência Metropolitana</div>
+    </div>
+
+    <!-- card da operação -->
+    <div class="card">
+      <div class="h2">Informações da operação</div>
+      <div class="kv">
+        <div class="k">Nome</div><div><%= op?.nome || '-' %></div>
+        <div class="k">Descrição</div><div><%= op?.descricao || '-' %></div>
+        <div class="k">Início agendado</div>
+        <div><%= op?.inicio_agendado ? new Date(op.inicio_agendado).toLocaleString('pt-BR') : '-' %></div>
+        <div class="k">Período do relatório</div>
+        <div><%= (filtros?.from||'—') %> a <%= (filtros?.to||'—') %></div>
+        <div class="k">Cidade(s)</div>
+        <div>
+          <% if (cidadeFiltro) { %>
+            <%= cidadeFiltro %>
+          <% } else { %>
+            <% (porCidade||[]).forEach((c,i)=> { %><%= c.cidade %><%= (i<(porCidade.length-1))?', ':'' %><% }) %>
+            <% if (!porCidade || porCidade.length===0) { %>—<% } %>
+          <% } %>
+        </div>
+      </div>
+    </div>
+
+    <!-- cards das fiscalizações -->
+    <div class="h2">Fiscalizações</div>
+    <% if ((fiscList||[]).length === 0) { %>
+      <div class="muted">Nenhuma fiscalização para os filtros informados.</div>
+    <% } %>
+    <div class="cards-grid">
+      <% (fiscList||[]).forEach(r=>{ %>
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div><strong>#<%= r.evento_id %></strong> — <%= r.cidade || '-' %></div>
+            <div class="muted"><%= new Date(r.ts).toLocaleString('pt-BR') %></div>
+          </div>
+
+          <div style="margin-top:6px">
+            <% if (r.multado) { %><span class="pill">Multado</span><% } %>
+            <% if (r.fechado) { %><span class="pill">Fechado</span><% } %>
+            <% if (r.lacrado) { %><span class="pill">Lacrado</span><% } %>
+          </div>
+
+          <div class="kv" style="margin-top:8px">
+            <div class="k">Tipo do local</div><div><%= r.tipo_local || '-' %></div>
+            <div class="k">Nome</div><div><%= r.local_nome || '-' %></div>
+            <div class="k">Endereço</div><div><%= r.local_endereco || '-' %></div>
+            <div class="k">Pessoas abordadas</div><div><%= r.pessoas_abordadas ?? 0 %></div>
+            <div class="k">Veículos abordados</div><div><%= r.veiculos_abordados ?? 0 %></div>
+            <div class="k">Pessoas detidas</div><div><%= r.pessoas_detidas_qtd ?? 0 %></div>
+            <div class="k">Usuário</div><div><%= r.usuario || '-' %></div>
+          </div>
+
+          <% if ((r.itens||[]).length) { %>
+            <hr/>
+            <div class="h2" style="margin:0 0 6px">Itens apreendidos</div>
+            <table>
+              <thead><tr><th>Tipo</th><th class="right">Qtd.</th><th>Unid.</th><th>Obs.</th></tr></thead>
+              <tbody>
+                <% r.itens.forEach(i=>{ %>
+                  <tr>
+                    <td><%= i.tipo || 'Item' %></td>
+                    <td class="right"><%= i.quantidade ?? '' %></td>
+                    <td><%= i.unidade || '' %></td>
+                    <td><%= i.obs || '' %></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          <% } %>
+        </div>
+      <% }) %>
+    </div>
+  </div>
+</body>
+</html>
