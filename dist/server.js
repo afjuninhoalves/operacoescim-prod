@@ -2659,18 +2659,19 @@ app.get('/relatorios/export.csv', requireAdminOrGestor, async (req, res, next) =
         res.setHeader('Content-Disposition', 'attachment; filename="relatorio_por_cidade.csv"');
         res.send(csv);
     }
-    finally { }
-    cat;
-    // =============================================================================
-    // 404
-    // =============================================================================
-    app.use((_req, res) => res.status(404).send('Não encontrado'));
-    // =============================================================================
-    // BOOT
-    // =============================================================================
-    ensureSchemaAndAdmin().then(() => {
-        app.listen(PORT, () => {
-            console.log(`operacoescim rodando na porta ${PORT} (${NODE_ENV})`);
-        });
+    catch (err) {
+        next(err);
+    }
+});
+// =============================================================================
+// 404
+// =============================================================================
+app.use((_req, res) => res.status(404).send('Não encontrado'));
+// =============================================================================
+// BOOT
+// =============================================================================
+ensureSchemaAndAdmin().then(() => {
+    app.listen(PORT, () => {
+        console.log(`operacoescim rodando na porta ${PORT} (${NODE_ENV})`);
     });
 });

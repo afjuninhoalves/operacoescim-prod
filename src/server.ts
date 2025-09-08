@@ -3218,7 +3218,10 @@ app.get('/relatorios/export.csv', requireAdminOrGestor, async (req, res, next) =
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', 'attachment; filename="relatorio_por_cidade.csv"');
     res.send(csv);
-  } cat
+  } catch (err) {
+    next(err);
+  }
+});
 
 
 
