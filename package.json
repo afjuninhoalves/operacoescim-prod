@@ -4,7 +4,9 @@
   "private": true,
   "description": "Operações CIM",
   "type": "commonjs",
-  "engines": { "node": ">=18" },
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "build": "tsc",
@@ -19,6 +21,7 @@
     "csurf": "^1.11.0",
     "dotenv": "^16.4.5",
     "ejs": "^3.1.10",
+    "exceljs": "^4.4.0",
     "express": "^5.1.0",
     "express-rate-limit": "^8.0.1",
     "express-session": "^1.18.2",
@@ -27,6 +30,7 @@
     "morgan": "^1.10.1",
     "multer": "^2.0.2",
     "pg": "^8.11.5",
+    "puppeteer": "^24.19.0",
     "sqlite3": "^5.1.7"
   },
   "devDependencies": {
