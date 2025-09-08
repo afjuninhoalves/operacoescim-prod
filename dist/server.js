@@ -53,8 +53,6 @@ const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const csurf_1 = __importDefault(require("csurf"));
 const cookie_parser_1 = __importDefault(require("cookie-parser"));
 const multer_1 = __importDefault(require("multer"));
-const exceljs_1 = __importDefault(require("exceljs"));
-const puppeteer_1 = __importDefault(require("puppeteer"));
 const app = (0, express_1.default)();
 // rota de teste para confirmar conexão com Neon
 app.get('/debug/db-version', async (_req, res) => {
@@ -2533,7 +2531,7 @@ function applyCommonWhere(q, f, alias = 'e') {
     return q;
 }
 async function buildRelatoriosData(filters) {
-    // Se vier sem opId, devolvemos vazio (o front já bloqueia, mas evita chamadas diretas)
+    // Sem opId: devolve vazio (front já bloqueia, mas evita chamada direta)
     if (!filters.opId) {
         return {
             cards: {
@@ -2545,7 +2543,7 @@ async function buildRelatoriosData(filters) {
             fiscList: [],
         };
     }
-    // ---- KPIs a partir de fiscalizações
+    // ---- KPIs
     const baseFis = applyCommonWhere(db('operacao_eventos as e')
         .join('evento_fiscalizacao as f', 'f.evento_id', 'e.id')
         .where('e.tipo', 'fiscalizacao'), filters, 'e');
@@ -2588,8 +2586,7 @@ async function buildRelatoriosData(filters) {
         .groupBy('f.local_nome')
         .orderBy('qtd', 'desc')
         .limit(10);
-    // ---- Subconsulta: itens por fiscalização
-    // (sem usar a.id; ordenando por a.evento_id, que existe)
+    // ---- Subconsulta: itens por fiscalização (gera um array JSON por e.id)
     const itensPorFis = applyCommonWhere(db('evento_apreensao as a')
         .innerJoin('operacao_eventos as fe', 'fe.id', 'a.fiscalizacao_evento_id')
         .where('fe.tipo', 'fiscalizacao'), filters, 'fe')
@@ -2606,206 +2603,18 @@ async function buildRelatoriosData(filters) {
         .groupBy('a.fiscalizacao_evento_id')
         .as('itens_por_fis');
     // ---- Lista de fiscalizações (cards)
+    // IMPORTANTE: sem GROUP BY aqui e sem join direto com 'a';
+    // usamos o array JSON para contar itens_apreendidos.
     const fiscList = await applyCommonWhere(db('operacao_eventos as e')
         .innerJoin('evento_fiscalizacao as f', 'f.evento_id', 'e.id')
         .leftJoin('cidades as c', 'c.id', 'e.cidade_id')
         .leftJoin('usuarios as u', 'u.id', 'e.user_id')
-        .leftJoin('evento_apreensao as a', 'a.fiscalizacao_evento_id', 'e.id')
         .leftJoin(itensPorFis, 'itens_por_fis.fiscalizacao_evento_id', 'e.id')
         .where('e.tipo', 'fiscalizacao'), filters, 'e')
-        .select('e.id as evento_id', 'e.ts', 'c.nome as cidade', 'u.nome as usuario', 'f.tipo_local', 'f.local_nome', 'f.local_endereco', 'f.pessoas_abordadas', 'f.veiculos_abordados', 'f.pessoas_detidas_qtd', 'f.multado', 'f.fechado', 'f.lacrado', db.raw("COALESCE(itens_por_fis.itens, '[]'::json) as itens"))
-        .count({ itens_apreendidos: 'a.evento_id' })
-        .groupBy('e.id', 'e.ts', 'c.nome', 'u.nome', 'f.tipo_local', 'f.local_nome', 'f.local_endereco', 'f.pessoas_abordadas', 'f.veiculos_abordados', 'f.pessoas_detidas_qtd', 'f.multado', 'f.fechado', 'f.lacrado', 'itens_por_fis.itens')
+        .select('e.id as evento_id', 'e.ts', 'c.nome as cidade', 'u.nome as usuario', 'f.tipo_local', 'f.local_nome', 'f.local_endereco', 'f.pessoas_abordadas', 'f.veiculos_abordados', 'f.pessoas_detidas_qtd', 'f.multado', 'f.fechado', 'f.lacrado', db.raw("COALESCE(itens_por_fis.itens, '[]'::json) as itens"), db.raw("COALESCE(json_array_length(itens_por_fis.itens), 0) as itens_apreendidos"))
         .orderBy('e.ts', 'desc');
     return { cards, porCidade, topLocais, fiscList };
 }
-// -----------------------------
-// Helper: informações da operação (para cabeçalho)
-// -----------------------------
-async function loadOpHeader(opId, cidadeId) {
-    const op = await db('operacoes').where({ id: opId }).first();
-    if (!op)
-        throw new Error('Operação não encontrada');
-    let cidadesParticipantes = [];
-    if (cidadeId) {
-        const c = await db('cidades').where({ id: cidadeId }).first('nome');
-        cidadesParticipantes = c ? [c.nome] : [];
-    }
-    else {
-        const rows = await db('operacao_cidades as oc')
-            .join('cidades as c', 'c.id', 'oc.cidade_id')
-            .where('oc.operacao_id', opId)
-            .orderBy('c.nome')
-            .select('c.nome');
-        cidadesParticipantes = rows.map((r) => r.nome);
-    }
-    return {
-        id: op.id,
-        nome: op.nome,
-        descricao: op.descricao || '',
-        inicio_agendado_fmt: op.inicio_agendado
-            ? new Date(op.inicio_agendado).toLocaleString('pt-BR')
-            : '-',
-        cidades_participantes: cidadesParticipantes.join(', ')
-    };
-}
-// -----------------------------
-// RELATÓRIOS — ROTAS
-// -----------------------------
-// Página HTML (não carrega dados até escolher a operação)
-app.get('/relatorios', requireAdminOrGestor, async (req, res, next) => {
-    try {
-        const ops = await db('operacoes').select('id', 'nome').orderBy('id', 'desc');
-        const cidades = await db('cidades').select('id', 'nome').orderBy('nome');
-        // datas padrão só para preencher os inputs
-        const today = new Date();
-        const from = new Date(today);
-        from.setDate(today.getDate() - 30);
-        const fmt = (d) => d.toISOString().slice(0, 10);
-        res.render('relatorios-operacoes', {
-            filtrosInit: { from: fmt(from), to: fmt(today), opId: '', cidadeId: '' },
-            ops,
-            cidades,
-        });
-    }
-    catch (err) {
-        next(err);
-    }
-});
-// Dados JSON (se vier sem opId, buildRelatoriosData devolve vazio)
-app.get('/relatorios/data', requireAdminOrGestor, async (req, res, next) => {
-    try {
-        const f = {
-            from: String(req.query.from || ''),
-            to: String(req.query.to || ''),
-            opId: req.query.opId ? Number(req.query.opId) : undefined,
-            cidadeId: req.query.cidadeId ? Number(req.query.cidadeId) : undefined,
-        };
-        const data = await buildRelatoriosData(f);
-        let opHeader = null;
-        if (f.opId) {
-            opHeader = await loadOpHeader(f.opId, f.cidadeId);
-        }
-        res.set('Cache-Control', 'no-store').json({ ...data, opHeader });
-    }
-    catch (err) {
-        next(err);
-    }
-});
-// Export CSV (por cidade)
-app.get('/relatorios/export.csv', requireAdminOrGestor, async (req, res, next) => {
-    try {
-        const f = {
-            from: String(req.query.from || ''),
-            to: String(req.query.to || ''),
-            opId: req.query.opId ? Number(req.query.opId) : undefined,
-            cidadeId: req.query.cidadeId ? Number(req.query.cidadeId) : undefined,
-        };
-        const { porCidade } = await buildRelatoriosData(f);
-        const header = [
-            'cidade', 'fiscalizacoes', 'pessoas', 'veiculos', 'detidos',
-            'multados', 'fechados', 'lacrados', 'itens_apreendidos', 'apreensoes'
-        ];
-        const rows = porCidade.map((r) => [
-            r.cidade, r.fiscalizacoes, r.pessoas, r.veiculos, r.detidos,
-            r.multados, r.fechados, r.lacrados, r.itens_apreendidos, r.apreensoes
-        ].join(','));
-        const csv = [header.join(','), ...rows].join('\n');
-        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-        res.setHeader('Content-Disposition', 'attachment; filename="relatorio_por_cidade.csv"');
-        res.send(csv);
-    }
-    catch (err) {
-        next(err);
-    }
-});
-// Export Excel (xlsx) — resumo por cidade + KPIs
-app.get('/relatorios/export.xlsx', requireAdminOrGestor, async (req, res, next) => {
-    try {
-        const f = {
-            from: String(req.query.from || ''),
-            to: String(req.query.to || ''),
-            opId: req.query.opId ? Number(req.query.opId) : undefined,
-            cidadeId: req.query.cidadeId ? Number(req.query.cidadeId) : undefined,
-        };
-        if (!f.opId)
-            return res.status(400).send('opId obrigatório');
-        const { porCidade, cards } = await buildRelatoriosData(f);
-        const wb = new exceljs_1.default.Workbook();
-        const ws1 = wb.addWorksheet('Resumo por cidade');
-        const header = [
-            'Cidade', 'Fiscalizações', 'Pessoas', 'Veículos', 'Detidos',
-            'Multados', 'Fechados', 'Lacrados', 'Itens apreendidos', 'Apreensões'
-        ];
-        ws1.addRow(header);
-        ws1.getRow(1).font = { bold: true };
-        porCidade.forEach((r) => {
-            ws1.addRow([
-                r.cidade, r.fiscalizacoes, r.pessoas, r.veiculos, r.detidos,
-                r.multados, r.fechados, r.lacrados, r.itens_apreendidos, r.apreensoes
-            ]);
-        });
-        // auto width simples
-        ws1.columns.forEach((col) => {
-            let max = 10;
-            col.eachCell?.((cell) => {
-                const len = String(cell.value ?? '').length;
-                if (len > max)
-                    max = len;
-            });
-            col.width = Math.min(max + 2, 40);
-        });
-        const ws2 = wb.addWorksheet('KPIs');
-        Object.entries(cards).forEach(([k, v]) => ws2.addRow([k, Number(v || 0)]));
-        ws2.getColumn(1).font = { bold: true };
-        ws2.columns.forEach((c) => (c.width = 24));
-        const buf = await wb.xlsx.writeBuffer();
-        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        res.setHeader('Content-Disposition', 'attachment; filename="relatorio_operacao.xlsx"');
-        res.send(Buffer.from(buf));
-    }
-    catch (err) {
-        next(err);
-    }
-});
-// Export PDF — usa views/relatorio-pdf.ejs
-app.get('/relatorios/export.pdf', requireAdminOrGestor, async (req, res, next) => {
-    try {
-        const f = {
-            from: String(req.query.from || ''),
-            to: String(req.query.to || ''),
-            opId: req.query.opId ? Number(req.query.opId) : undefined,
-            cidadeId: req.query.cidadeId ? Number(req.query.cidadeId) : undefined,
-        };
-        if (!f.opId)
-            return res.status(400).send('opId obrigatório');
-        const { cards, porCidade, fiscList } = await buildRelatoriosData(f);
-        const opHeader = await loadOpHeader(f.opId, f.cidadeId);
-        // logo (coloque o arquivo em public/img/logo-cim.png)
-        const logoUrl = `${req.protocol}://${req.get('host')}/img/logo-cim.png`;
-        // Renderiza HTML do PDF a partir do EJS
-        const html = await new Promise((resolve, reject) => {
-            res.render('relatorio-pdf', { logoUrl, opHeader, filtros: f, cards, porCidade, fiscList }, (err, str) => (err ? reject(err) : resolve(str)));
-        });
-        const browser = await puppeteer_1.default.launch({
-            args: ['--no-sandbox', '--disable-setuid-sandbox'],
-        });
-        const page = await browser.newPage();
-        await page.setContent(html, { waitUntil: 'networkidle0' });
-        const pdf = await page.pdf({
-            format: 'A4',
-            printBackground: true,
-            margin: { top: '20mm', right: '15mm', bottom: '20mm', left: '15mm' },
-        });
-        await browser.close();
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename="relatorio_operacao_${opHeader.id}.pdf"`);
-        res.send(pdf);
-    }
-    catch (err) {
-        next(err);
-    }
-});
 // =============================================================================
 // 404
 // =============================================================================
