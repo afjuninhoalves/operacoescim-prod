@@ -3,12 +3,13 @@
   "version": "1.0.0",
   "private": true,
   "type": "commonjs",
-  "engines": { "node": ">=18" },
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "build": "tsc",
     "postbuild": "node scripts/postbuild.cjs",
-    "postinstall": "node scripts/postinstall-puppeteer.cjs",
     "start": "node dist/server.js"
   },
   "dependencies": {
@@ -28,7 +29,6 @@
     "morgan": "^1.10.1",
     "multer": "^2.0.2",
     "pg": "^8.11.5",
-    "puppeteer": "^24.19.0",
     "sqlite3": "^5.1.7"
   },
   "devDependencies": {

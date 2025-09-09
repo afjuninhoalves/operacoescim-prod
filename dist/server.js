@@ -54,7 +54,6 @@ const csurf_1 = __importDefault(require("csurf"));
 const cookie_parser_1 = __importDefault(require("cookie-parser"));
 const multer_1 = __importDefault(require("multer"));
 const exceljs_1 = __importDefault(require("exceljs"));
-const puppeteer_1 = __importDefault(require("puppeteer"));
 const app = (0, express_1.default)();
 // rota de teste para confirmar conexão com Neon
 app.get('/debug/db-version', async (_req, res) => {
@@ -2762,44 +2761,7 @@ app.get('/relatorios/export.xlsx', requireAdminOrGestor, async (req, res, next) 
         next(err);
     }
 });
-// ---- PDF — usa views/relatorio-pdf.ejs (logo em /public/img/logo-cim.png)
-app.get('/relatorios/export.pdf', requireAdminOrGestor, async (req, res, next) => {
-    try {
-        const f = {
-            from: String(req.query.from || ''),
-            to: String(req.query.to || ''),
-            opId: req.query.opId ? Number(req.query.opId) : undefined,
-            cidadeId: req.query.cidadeId ? Number(req.query.cidadeId) : undefined,
-        };
-        if (!f.opId)
-            return res.status(400).send('opId obrigatório');
-        const { cards, porCidade, fiscList } = await buildRelatoriosData(f);
-        const opHeader = await loadOpHeader(f.opId, f.cidadeId);
-        const logoUrl = `${req.protocol}://${req.get('host')}/img/logo-cim.png`;
-        const html = await new Promise((resolve, reject) => {
-            res.render('relatorio-pdf', { logoUrl, opHeader, filtros: f, cards, porCidade, fiscList }, (err, str) => (err ? reject(err) : resolve(str)));
-        });
-        const browser = await puppeteer_1.default.launch({
-            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || puppeteer_1.default.executablePath(),
-            headless: true,
-            args: ['--no-sandbox', '--disable-setuid-sandbox'],
-        });
-        const page = await browser.newPage();
-        await page.setContent(html, { waitUntil: 'networkidle0' });
-        const pdf = await page.pdf({
-            format: 'A4',
-            printBackground: true,
-            margin: { top: '20mm', right: '15mm', bottom: '20mm', left: '15mm' }
-        });
-        await browser.close();
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename="relatorio_operacao_${opHeader.id}.pdf"`);
-        res.send(pdf);
-    }
-    catch (err) {
-        next(err);
-    }
-});
+// PDF — /relatorios/export.pdf
 // =============================================================================
 // 404
 // =============================================================================

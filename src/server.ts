@@ -3338,79 +3338,7 @@ app.get('/relatorios/export.xlsx', requireAdminOrGestor, async (req, res, next) 
 });
 
 // PDF — /relatorios/export.pdf
-app.get('/relatorios/export.pdf', requireAdminOrGestor, async (req, res, next) => {
-  try {
-    const f: ReportFilters = {
-      from: String(req.query.from || ''),
-      to: String(req.query.to || ''),
-      opId: req.query.opId ? Number(req.query.opId) : undefined,
-      cidadeId: req.query.cidadeId ? Number(req.query.cidadeId) : undefined,
-    };
-    if (!f.opId) return res.status(400).send('opId obrigatório');
 
-    const { cards, porCidade, fiscList } = await buildRelatoriosData(f);
-    const opHeader = await loadOpHeader(f.opId!, f.cidadeId);
-
-    // logo (coloque o arquivo em public/img/logo-cim.png)
-    const logoUrl = `${req.protocol}://${req.get('host')}/img/logo-cim.png`;
-
-    // Renderiza o HTML do PDF a partir do EJS
-    const html: string = await new Promise((resolve, reject) => {
-      res.render(
-        'relatorio-pdf',
-        { logoUrl, opHeader, filtros: f, cards, porCidade, fiscList },
-        (err, str) => (err ? reject(err) : resolve(String(str)))
-      );
-    });
-
-    // Puppeteer: tenta usar o binário baixado; se não existir, faz fallback
-    const launchOpts: any = {
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    };
-
-    try {
-      const execPath = puppeteer.executablePath();
-      if (execPath && fs.existsSync(execPath)) {
-        launchOpts.executablePath = execPath;
-      } else {
-        console.warn('[pdf] Chrome não encontrado em', execPath, '— tentando sem executablePath');
-      }
-    } catch (e: any) {
-      console.warn('[pdf] Não foi possível resolver executablePath:', e?.message || e);
-    }
-
-    let browser;
-    try {
-      browser = await puppeteer.launch(launchOpts);
-    } catch (e) {
-      // Segunda tentativa sem executablePath (caso o primeiro falhe)
-      console.warn('[pdf] 1ª tentativa de launch falhou, tentando sem executablePath…');
-      delete launchOpts.executablePath;
-      browser = await puppeteer.launch(launchOpts);
-    }
-
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'networkidle0', timeout: 60000 });
-
-    const pdf = await page.pdf({
-      format: 'A4',
-      printBackground: true,
-      margin: { top: '20mm', right: '15mm', bottom: '20mm', left: '15mm' },
-    });
-
-    await browser.close();
-
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename="relatorio_operacao_${opHeader.id}.pdf"`
-    );
-    res.send(pdf);
-  } catch (err) {
-    next(err);
-  }
-});
 
 
 
