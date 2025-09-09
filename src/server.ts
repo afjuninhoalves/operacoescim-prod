@@ -3237,33 +3237,6 @@ app.get('/relatorios/export.csv', requireAdminOrGestor, async (req, res, next) =
 // -----------------------------
 // Helper: informações da operação (para o cabeçalho do PDF cliente, se precisar)
 // -----------------------------
-async function loadOpHeader(opId: number, cidadeId?: number) {
-  const op = await db('operacoes').where({ id: opId }).first();
-  if (!op) throw new Error('Operação não encontrada');
-
-  let cidadesParticipantes: string[] = [];
-  if (cidadeId) {
-    const c = await db('cidades').where({ id: cidadeId }).first('nome');
-    cidadesParticipantes = c ? [c.nome] : [];
-  } else {
-    const rows = await db('operacao_cidades as oc')
-      .join('cidades as c', 'c.id', 'oc.cidade_id')
-      .where('oc.operacao_id', opId)
-      .orderBy('c.nome')
-      .select('c.nome');
-    cidadesParticipantes = rows.map((r: any) => r.nome);
-  }
-
-  return {
-    id: op.id,
-    nome: op.nome,
-    descricao: op.descricao || '',
-    inicio_agendado_fmt: op.inicio_agendado
-      ? new Date(op.inicio_agendado).toLocaleString('pt-BR')
-      : '-',
-    cidades_participantes: cidadesParticipantes.join(', ')
-  };
-}
 
 // ---- Excel (.xlsx)
 app.get('/relatorios/export.xlsx', requireAdminOrGestor, async (req, res, next) => {
