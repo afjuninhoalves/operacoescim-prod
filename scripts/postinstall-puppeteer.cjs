@@ -1,22 +1,30 @@
 // scripts/postinstall-puppeteer.cjs
+'use strict';
+
 const { spawnSync } = require('child_process');
 
-if (process.platform === 'win32') {
-  console.log('[postinstall] Windows detectado — pulando download do Chrome (ok para desenvolvimento).');
+const isLinux = process.platform === 'linux';
+
+// Em dev (Windows/macOS), não precisa baixar Chromium
+if (!isLinux) {
+  console.log('[postinstall] Windows/macOS detectado — pulando download do Chromium (ok para dev).');
   process.exit(0);
 }
 
+// No Render (Linux), baixar o Chromium pinado pelo Puppeteer
 const env = {
   ...process.env,
-  // No Render, vamos usar esse cache (não quebra em dev/local)
-  PUPPETEER_CACHE_DIR: process.env.PUPPETEER_CACHE_DIR || '/opt/render/.cache/puppeteer'
+  PUPPETEER_CACHE_DIR: '/opt/render/.cache/puppeteer',
+  PUPPETEER_SKIP_DOWNLOAD: '', // não pular download
 };
 
-console.log('[postinstall] Instalando Chrome para o Puppeteer...');
-const r = spawnSync('npx', ['puppeteer', 'browsers', 'install', 'chrome'], {
+console.log('[postinstall] Instalando Chromium pinado pelo puppeteer...');
+const res = spawnSync(process.execPath, ['node_modules/puppeteer/install.js'], {
   stdio: 'inherit',
   env,
-  shell: true
 });
-
-process.exit(r.status ?? 0);
+if (res.status !== 0) {
+  console.error('[postinstall] Falha ao baixar Chromium. Código:', res.status);
+  process.exit(res.status || 1);
+}
+console.log('[postinstall] Chromium instalado com sucesso.');
