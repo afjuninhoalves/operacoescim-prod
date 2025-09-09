@@ -23,8 +23,8 @@
     tfoot th, tfoot td{font-weight:700}
     .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
     input,select{background:#0f172a;color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px}
-    .btn{padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:#111826;color:#fff}
-    .btn[aria-disabled="true"]{opacity:.5;pointer-events:none}
+    .btn{padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:#111826;color:#fff;cursor:pointer}
+    .btn[aria-disabled="true"]{opacity:.5;cursor:not-allowed}
     .hidden{display:none}
 
     /* Cards de fiscalizações */
@@ -34,10 +34,8 @@
     .kv .k{color:var(--muted)}
   </style>
 
-  <!-- Geração de PDF no cliente -->
-  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"
-          integrity="sha512-YcsIPB2f3O7w0pFzGA9Kp6N3m8hB2ZJzJ8u9nX8N3u4a0v8G7Qm3L2l6s2g9w0m9YgCwz0w7z0w6E7r1o5QFhA=="
-          crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <!-- html2pdf (gera PDF no cliente) -->
+  <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
 </head>
 <body>
   <div class="container">
@@ -71,10 +69,13 @@
           </select>
         </label>
       </div>
+
       <button class="btn" type="submit">Aplicar</button>
-      <a id="btnCsv" class="btn" href="#" aria-disabled="true">CSV (por cidade)</a>
+
+      <!-- Exportações -->
+      <a id="btnCsv"  class="btn" href="#" aria-disabled="true">CSV (por cidade)</a>
       <a id="btnXlsx" class="btn" href="#" aria-disabled="true">Excel (.xlsx)</a>
-      <button id="btnPdf" class="btn" type="button" aria-disabled="true">PDF</button>
+      <a id="btnPdf"  class="btn" href="#" aria-disabled="true">PDF</a>
     </form>
 
     <!-- Conteúdo: oculto até escolher operação -->
@@ -154,43 +155,31 @@
     </div>
   </div>
 
-  <!-- Container oculto que usamos para montar o HTML do PDF -->
-  <div id="pdf-root" class="hidden"></div>
-
   <script>
+    // ======= helpers =======
     const qs = (s)=>document.querySelector(s);
     const fmt = (n)=> (n ?? 0).toLocaleString('pt-BR');
+    const LOGO_URL = '/public/images/operaco.jpg'; // <- ajuste se o seu logo tiver outro caminho
 
-    let lastData = null;   // guarda o JSON carregado (/relatorios/data)
-    let lastFilters = null; // guarda labels úteis (nome da operação/cidade etc.)
-
-    function getSelectedText(sel){
-      const el = typeof sel === 'string' ? qs(sel) : sel;
-      const i = el.selectedIndex;
-      return i >= 0 ? el.options[i].textContent : '';
+    function setDisabled(el, disabled){
+      if(!el) return;
+      if(disabled){ el.setAttribute('aria-disabled','true'); el.classList.add('muted'); }
+      else        { el.removeAttribute('aria-disabled');     el.classList.remove('muted'); }
     }
 
-    function enableExports(opSelected){
-      const btnCsv  = qs('#btnCsv');
-      const btnXlsx = qs('#btnXlsx');
-      const btnPdf  = qs('#btnPdf');
-
-      if(opSelected){
-        btnCsv.removeAttribute('aria-disabled');
-        btnXlsx.removeAttribute('aria-disabled');
-        btnPdf.removeAttribute('aria-disabled');
-      }else{
-        btnCsv.setAttribute('aria-disabled','true');
-        btnXlsx.setAttribute('aria-disabled','true');
-        btnPdf.setAttribute('aria-disabled','true');
-      }
+    function enableExports(enabled){
+      setDisabled(qs('#btnCsv'),  !enabled);
+      setDisabled(qs('#btnXlsx'), !enabled);
+      setDisabled(qs('#btnPdf'),  !enabled);
     }
 
-    function linkExports(){
+    function linkCsv(){
       const fd = new FormData(qs('#filtros'));
-      const p  = new URLSearchParams(fd);
-      qs('#btnCsv').href  = '/relatorios/export.csv?'  + p.toString();
-      qs('#btnXlsx').href = '/relatorios/export.xlsx?' + p.toString();
+      qs('#btnCsv').href = '/relatorios/export.csv?' + new URLSearchParams(fd).toString();
+    }
+    function linkXlsx(){
+      const fd = new FormData(qs('#filtros'));
+      qs('#btnXlsx').href = '/relatorios/export.xlsx?' + new URLSearchParams(fd).toString();
     }
 
     function renderKPIs(c){
@@ -293,110 +282,60 @@
       }).join('');
     }
 
-    function buildPdfHtml(){
-      const d   = lastData || {};
-      const hdr = lastFilters || {};
-      const logoSrc = '/public/images/operaco.jpg'; // ajuste se necessário
+    // ======= PDF (cliente) =======
+    async function generatePdf(){
+      const btn = qs('#btnPdf');
+      if(btn.getAttribute('aria-disabled') === 'true') return;
 
-      // Cabeçalho central com logo + textos
-      const header = `
-        <div style="text-align:center;margin-bottom:10mm;">
-          <img src="${logoSrc}" style="max-height:70px;object-fit:contain" />
-          <div style="font-size:22px;font-weight:800;margin-top:6px">C.I.M</div>
-          <div style="font-size:14px;margin-top:2px">Centro de Inteligência Metropolitana</div>
+      const opSel = qs('#opId');
+      const cidSel = qs('#cidadeId');
+      const from = qs('input[name="from"]').value || '-';
+      const to   = qs('input[name="to"]').value   || '-';
+      const opId = opSel.value;
+      const opText = opSel.value ? opSel.options[opSel.selectedIndex].textContent : '-';
+      const cidadeText = cidSel.value ? cidSel.options[cidSel.selectedIndex].textContent : 'Todas';
+
+      // wrapper com cabeçalho + card da operação + conteúdo atual
+      const wrapper = document.createElement('div');
+      wrapper.style.padding = '16px';
+      wrapper.style.maxWidth = '900px';
+      wrapper.style.margin = '0 auto';
+      wrapper.innerHTML = `
+        <div style="text-align:center;margin-bottom:8px">
+          <img src="${LOGO_URL}" alt="Logo" style="height:64px;object-fit:contain"/>
         </div>
-      `;
+        <div style="text-align:center;font-weight:800;font-size:22px;margin:2px 0">C.I.M</div>
+        <div style="text-align:center;font-size:14px;margin-bottom:8px">Centro de Inteligência Metropolitana</div>
 
-      // Card da Operação
-      const opCard = `
-        <div style="border:1px solid #dcdcdc;border-radius:10px;padding:10px;margin-bottom:8mm;">
+        <div style="border:1px solid #ccc;border-radius:10px;padding:12px;margin:10px 0">
           <div style="font-weight:700;margin-bottom:6px">Operação</div>
           <div style="display:grid;grid-template-columns:auto 1fr;gap:4px 8px;font-size:13px">
-            <div style="color:#444">ID</div>            <div>${hdr.opId || '-'}</div>
-            <div style="color:#444">Nome</div>          <div>${hdr.opNome || '-'}</div>
-            <div style="color:#444">Período</div>       <div>${hdr.from || '-'} a ${hdr.to || '-'}</div>
-            <div style="color:#444">Cidades</div>       <div>${hdr.cidadeNome || 'Todas'}</div>
-            <div style="color:#444">Fiscalizações</div> <div>${fmt(d.cards?.fiscalizacoes)}</div>
-            <div style="color:#444">Pessoas</div>       <div>${fmt(d.cards?.pessoas)}</div>
-            <div style="color:#444">Veículos</div>      <div>${fmt(d.cards?.veiculos)}</div>
-            <div style="color:#444">Detidos</div>       <div>${fmt(d.cards?.detidos)}</div>
-            <div style="color:#444">Itens</div>         <div>${fmt(d.cards?.itensApreendidos)}</div>
-            <div style="color:#444">Apreensões</div>    <div>${fmt(d.cards?.apreensoes)}</div>
-            <div style="color:#444">Multados</div>      <div>${fmt(d.cards?.multados)}</div>
-            <div style="color:#444">Fechados</div>      <div>${fmt(d.cards?.fechados)}</div>
-            <div style="color:#444">Lacrados</div>      <div>${fmt(d.cards?.lacrados)}</div>
+            <div style="color:#555">Selecionada</div><div>${opText}</div>
+            <div style="color:#555">Período</div><div>${from} — ${to}</div>
+            <div style="color:#555">Cidade</div><div>${cidadeText}</div>
           </div>
         </div>
       `;
-
-      // Cards de fiscalizações
-      const cards = (d.fiscList||[]).map(r => {
-        const flags = [
-          r.multado  ? '<span style="display:inline-block;padding:2px 8px;border:1px solid #ddd;border-radius:999px;margin-right:6px;font-size:11px">Multado</span>'   : '',
-          r.fechado  ? '<span style="display:inline-block;padding:2px 8px;border:1px solid #ddd;border-radius:999px;margin-right:6px;font-size:11px">Fechado</span>'   : '',
-          r.lacrado  ? '<span style="display:inline-block;padding:2px 8px;border:1px solid #ddd;border-radius:999px;margin-right:6px;font-size:11px">Lacrado</span>'   : '',
-        ].join('');
-        const det   = Number(r.pessoas_detidas_qtd)||0;
-        const itens = Number(r.itens_apreendidos)||0;
-
-        // Se no futuro você adicionar a lista de itens no JSON (ex: r.itens = [{tipo, quantidade, unidade}...]),
-        // dá pra listar assim:
-        const itensList = (r.itens && r.itens.length)
-          ? `<ul style="margin:4px 0 0 18px;padding:0">${r.itens.map(i=>`<li>${i.tipo} — ${fmt(i.quantidade)} ${i.unidade||''}</li>`).join('')}</ul>`
-          : '';
-
-        return `
-          <div style="border:1px solid #dcdcdc;border-radius:10px;padding:10px;margin-bottom:8px;page-break-inside:avoid">
-            <div style="display:flex;justify-content:space-between;align-items:center">
-              <div><strong>#${r.evento_id}</strong> — ${r.cidade || '-'}</div>
-              <div style="color:#666;font-size:12px">${new Date(r.ts).toLocaleString('pt-BR')}</div>
-            </div>
-            <div style="margin-top:6px">${flags}</div>
-            <div style="display:grid;grid-template-columns:auto 1fr;gap:4px 8px;font-size:13px;margin-top:6px">
-              <div style="color:#444">Tipo do local</div><div>${r.tipo_local || '-'}</div>
-              <div style="color:#444">Nome</div><div>${r.local_nome || '-'}</div>
-              <div style="color:#444">Endereço</div><div>${r.local_endereco || '-'}</div>
-              <div style="color:#444">Pessoas</div><div>${fmt(r.pessoas_abordadas)}</div>
-              <div style="color:#444">Veículos</div><div>${fmt(r.veiculos_abordados)}</div>
-              <div style="color:#444">Detidos</div><div>${fmt(det)}</div>
-              <div style="color:#444">Itens apreendidos</div><div>${fmt(itens)}</div>
-              <div style="color:#444">Usuário</div><div>${r.usuario || '-'}</div>
-            </div>
-            ${itensList}
-          </div>
-        `;
-      }).join('');
-
-      return `
-        <div style="font-family:Arial,Helvetica,sans-serif;color:#0b1220;">
-          ${header}
-          ${opCard}
-          <div>${cards || '<div style="color:#666">Nenhuma fiscalização no período.</div>'}</div>
-        </div>
-      `;
-    }
-
-    async function printPdf(){
-      if(!lastData) return;
-
-      const root = qs('#pdf-root');
-      root.innerHTML = buildPdfHtml();
-      root.classList.remove('hidden');
+      // clona o conteúdo atual (KPIs, tabelas e cards)
+      const contentClone = qs('#content').cloneNode(true);
+      // tira possíveis "hidden" do clone
+      contentClone.classList.remove('hidden');
+      wrapper.appendChild(contentClone);
 
       const opt = {
-        margin:       10, // mm
-        filename:     `relatorio_operacao_${(lastFilters?.opId||'')}.pdf`,
+        margin:       [10,10,10,10],
+        filename:     `relatorio_operacao_${opId||'filtro'}.pdf`,
         image:        { type: 'jpeg', quality: 0.98 },
         html2canvas:  { scale: 2, useCORS: true },
         jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
       };
 
-      await html2pdf().set(opt).from(root).save();
-
-      root.classList.add('hidden');
-      root.innerHTML = '';
+      await html2pdf().set(opt).from(wrapper).save();
+      // remove o wrapper temporário
+      wrapper.remove();
     }
 
+    // ======= carregamento =======
     async function load(){
       const opId = qs('#opId').value;
       if(!opId){
@@ -407,22 +346,13 @@
       const fd = new FormData(qs('#filtros'));
       const params = new URLSearchParams(fd);
 
+      // habilita exportações e aponta os links
       enableExports(true);
-      linkExports();
+      linkCsv();
+      linkXlsx();
 
       const res  = await fetch('/relatorios/data?' + params.toString(), { cache:'no-store' });
       const data = await res.json();
-      lastData = data;
-
-      // Captura labels úteis para o PDF
-      lastFilters = {
-        opId,
-        opNome:    getSelectedText('#opId').split('—').slice(1).join('—').trim() || getSelectedText('#opId'),
-        cidadeId:  qs('#cidadeId').value || '',
-        cidadeNome:getSelectedText('#cidadeId') || 'Todas',
-        from:      qs('input[name="from"]').value,
-        to:        qs('input[name="to"]').value,
-      };
 
       qs('#content').classList.remove('hidden');
       renderKPIs(data.cards||{});
@@ -433,9 +363,14 @@
 
     // eventos
     qs('#filtros').addEventListener('submit', ev => { ev.preventDefault(); load(); });
-    qs('#btnPdf').addEventListener('click', () => { if(!qs('#btnPdf').hasAttribute('aria-disabled')) printPdf(); });
 
-    // inicial: não carregar nada
+    // PDF (cliente)
+    qs('#btnPdf').addEventListener('click', (ev) => {
+      ev.preventDefault();
+      generatePdf();
+    });
+
+    // estados iniciais
     enableExports(false);
   </script>
 </body>
