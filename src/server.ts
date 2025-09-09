@@ -43,6 +43,7 @@ app.get('/debug/db-version', async (_req: Request, res: Response) => {
 });
 dotenv.config();
 
+
 const STORAGE_LOGOS = (process.env.STORAGE_LOGOS || 'disk').toLowerCase(); // 'db' | 'disk'
 
 const PORT = Number(process.env.PORT || 3000);
@@ -3316,61 +3317,42 @@ app.get('/relatorios/export.pdf', requireAdminOrGestor, async (req, res, next) =
     if (!f.opId) return res.status(400).send('opId obrigatório');
 
     const { cards, porCidade, fiscList } = await buildRelatoriosData(f);
-
-    // Cabeçalho da operação
-    const op = await db('operacoes').where({ id: f.opId }).first();
-    if (!op) return res.status(404).send('Operação não encontrada');
-
-    let cidadesParticipantes: string[] = [];
-    if (f.cidadeId) {
-      const c = await db('cidades').where({ id: f.cidadeId }).first('nome');
-      cidadesParticipantes = c ? [c.nome] : [];
-    } else {
-      const rows = await db('operacao_cidades as oc')
-        .join('cidades as c', 'c.id', 'oc.cidade_id')
-        .where('oc.operacao_id', f.opId)
-        .orderBy('c.nome')
-        .select('c.nome');
-      cidadesParticipantes = rows.map((r: any) => r.nome);
-    }
-
-    const opHeader = {
-      id: op.id,
-      nome: op.nome,
-      descricao: op.descricao || '',
-      inicio_agendado_fmt: op.inicio_agendado
-        ? new Date(op.inicio_agendado).toLocaleString('pt-BR')
-        : '-',
-      cidades_participantes: cidadesParticipantes.join(', ')
-    };
+    const opHeader = await loadOpHeader(f.opId!, f.cidadeId);
 
     const logoUrl = `${req.protocol}://${req.get('host')}/img/logo-cim.png`;
 
-    // Renderiza HTML via EJS
     const html: string = await new Promise((resolve, reject) => {
-      res.render(
-        'relatorio-pdf',
+      res.render('relatorio-pdf',
         { logoUrl, opHeader, filtros: f, cards, porCidade, fiscList },
-        (err, str) => (err ? reject(err) : resolve(str as string))
+        (err, str) => err ? reject(err) : resolve(str as string)
       );
     });
 
-    const browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+    const browser = await puppeteer.launch({
+      executablePath: puppeteer.executablePath(),  // << chave para achar o Chrome baixado
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: 'networkidle0' });
 
     const pdf = await page.pdf({
       format: 'A4',
       printBackground: true,
-      margin: { top: '20mm', right: '15mm', bottom: '20mm', left: '15mm' },
+      margin: { top: '20mm', right: '15mm', bottom: '20mm', left: '15mm' }
     });
+
     await browser.close();
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="relatorio_operacao_${opHeader.id}.pdf"`);
     res.send(pdf);
-  } catch (err) { next(err); }
+  } catch (err) {
+    next(err);
+  }
 });
+
 
 
 // =============================================================================

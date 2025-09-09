@@ -4,14 +4,12 @@
   "private": true,
   "description": "Operações CIM",
   "type": "commonjs",
-  "engines": {
-    "node": ">=18"
-  },
+  "engines": { "node": ">=18" },
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "build": "tsc",
     "postbuild": "node scripts/postbuild.cjs",
-    "postinstall": "PUPPETEER_CACHE_DIR=.puppeteer-cache npx puppeteer browsers install chrome",
+    "postinstall": "node scripts/postinstall-puppeteer.cjs",
     "start": "node dist/server.js"
   },
   "dependencies": {
