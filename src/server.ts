@@ -1765,7 +1765,7 @@ async function buildMonitorData(id: number) {
     .count<{ locais: any }>({ locais: 'e.id' })
     .sum<{ pessoas: any }>({ pessoas: db.raw('COALESCE(f.pessoas_abordadas,0)') })
     .sum<{ veiculos: any }>({ veiculos: db.raw('COALESCE(f.veiculos_abordados,0)') })
-    .sum<{ detidos: any  }>({ detidos:  db.raw('COALESCE(f.pessoas_detidas_qtd,0)') })
+    .sum<{ detidos: any }>({ detidos: db.raw('COALESCE(f.pessoas_detidas_qtd,0)') })
     .first();
 
   // ===== Itens (linhas de evento_apreensao) e Apreensões (1 por fiscalização com ≥1 item)
@@ -1788,15 +1788,15 @@ async function buildMonitorData(id: number) {
     .first<{ multados: any; fechados: any; lacrados: any }>();
 
   const cards = {
-    locais:           Number(k?.locais) || 0,
-    pessoas:          Number(k?.pessoas) || 0,
-    veiculos:         Number(k?.veiculos) || 0,
+    locais: Number(k?.locais) || 0,
+    pessoas: Number(k?.pessoas) || 0,
+    veiculos: Number(k?.veiculos) || 0,
     itensApreendidos: Number(aggApr?.itens_apreendidos) || 0,
-    apreensoes:       Number(aggApr?.apreensoes) || 0,
-    multados:         Number(flags?.multados) || 0,
-    fechados:         Number(flags?.fechados) || 0,
-    lacrados:         Number(flags?.lacrados) || 0,
-    detidos:          Number(k?.detidos) || 0,
+    apreensoes: Number(aggApr?.apreensoes) || 0,
+    multados: Number(flags?.multados) || 0,
+    fechados: Number(flags?.fechados) || 0,
+    lacrados: Number(flags?.lacrados) || 0,
+    detidos: Number(k?.detidos) || 0,
   };
 
   // ===== Séries por cidade (fiscalizações + somas/flags + itens/apreensões)
@@ -1805,11 +1805,11 @@ async function buildMonitorData(id: number) {
     .where('e.operacao_id', id).andWhere('e.tipo', 'fiscalizacao')
     .select('e.cidade_id')
     .count({ fisc_cnt: 'e.id' })
-    .sum({ pes_sum:  db.raw('COALESCE(f.pessoas_abordadas,0)') })
-    .sum({ det_sum:  db.raw('COALESCE(f.pessoas_detidas_qtd,0)') })
-    .sum({ vei_sum:  db.raw('COALESCE(f.veiculos_abordados,0)') })
-    .sum({ lac_sum:  db.raw('CASE WHEN f.lacrado THEN 1 ELSE 0 END') })
-    .sum({ fec_sum:  db.raw('CASE WHEN f.fechado THEN 1 ELSE 0 END') })
+    .sum({ pes_sum: db.raw('COALESCE(f.pessoas_abordadas,0)') })
+    .sum({ det_sum: db.raw('COALESCE(f.pessoas_detidas_qtd,0)') })
+    .sum({ vei_sum: db.raw('COALESCE(f.veiculos_abordados,0)') })
+    .sum({ lac_sum: db.raw('CASE WHEN f.lacrado THEN 1 ELSE 0 END') })
+    .sum({ fec_sum: db.raw('CASE WHEN f.fechado THEN 1 ELSE 0 END') })
     .sum({ mult_sum: db.raw('CASE WHEN f.multado THEN 1 ELSE 0 END') })
     .groupBy('e.cidade_id')
     .as('sf');
@@ -1826,8 +1826,8 @@ async function buildMonitorData(id: number) {
 
   const seriesPorCidade = await db('operacao_cidades as oc')
     .join('cidades as c', 'c.id', 'oc.cidade_id')
-    .leftJoin(subF,  'sf.cidade_id', 'oc.cidade_id')
-    .leftJoin(subApr,'sa.cidade_id', 'oc.cidade_id')
+    .leftJoin(subF, 'sf.cidade_id', 'oc.cidade_id')
+    .leftJoin(subApr, 'sa.cidade_id', 'oc.cidade_id')
     .where('oc.operacao_id', id)
     .select(
       'c.id as cidade_id',
@@ -1858,13 +1858,13 @@ async function buildMonitorData(id: number) {
     .first();
 
   const efetivo = {
-    total_agentes:   Number(ef?.agentes) || 0,
-    total_viaturas:  Number(ef?.viaturas) || 0,
-    pc_agentes:      Number(ef?.pc_agentes) || 0,
-    pc_viaturas:     Number(ef?.pc_viaturas) || 0,
-    pm_agentes:      Number(ef?.pm_agentes) || 0,
-    pm_viaturas:     Number(ef?.pm_viaturas) || 0,
-    outros_agentes:  Number(ef?.outros_agentes) || 0,
+    total_agentes: Number(ef?.agentes) || 0,
+    total_viaturas: Number(ef?.viaturas) || 0,
+    pc_agentes: Number(ef?.pc_agentes) || 0,
+    pc_viaturas: Number(ef?.pc_viaturas) || 0,
+    pm_agentes: Number(ef?.pm_agentes) || 0,
+    pm_viaturas: Number(ef?.pm_viaturas) || 0,
+    outros_agentes: Number(ef?.outros_agentes) || 0,
     outros_viaturas: Number(ef?.outros_viaturas) || 0,
   };
 
@@ -1873,7 +1873,7 @@ async function buildMonitorData(id: number) {
     .join('cidades as c', 'c.id', 'oc.cidade_id')
     .leftJoin('operacao_efetivo as e', function () {
       this.on('e.operacao_id', '=', 'oc.operacao_id')
-          .andOn('e.cidade_id',   '=', 'oc.cidade_id');
+        .andOn('e.cidade_id', '=', 'oc.cidade_id');
     })
     .where('oc.operacao_id', id)
     .groupBy('oc.cidade_id', 'c.id', 'c.nome')
@@ -2106,7 +2106,7 @@ app.get('/operacoes/:opId/fiscalizacoes/:fiscId/editar',
       .first();
 
     // Apreensões (filhas) ligadas a esta fiscalização
-    
+
     const aprs = await db('evento_apreensao as ea')
       .leftJoin('operacao_eventos as oe', 'oe.id', 'ea.evento_id')
       .where('ea.fiscalizacao_evento_id', fiscId)
@@ -2161,8 +2161,8 @@ app.post('/operacoes/:opId/fiscalizacoes/:fiscId/editar',
   uploadFotosFields,          // ✅ parseia multipart/form-data (lê _csrf do body)
   csrfProtection,             // ✅ agora o csurf encontra o token
   async (req, res) => {
-    const user   = (req.session as any).user;
-    const opId   = Number(req.params.opId);
+    const user = (req.session as any).user;
+    const opId = Number(req.params.opId);
     const fiscId = Number(req.params.fiscId);
 
     const ev = await db('operacao_eventos')
@@ -2172,25 +2172,25 @@ app.post('/operacoes/:opId/fiscalizacoes/:fiscId/editar',
     const perm = await canEditEvento(user, opId, fiscId);
     if (!perm.ok) return res.status(perm.status || 403).send(perm.reason || 'Não autorizado.');
 
-    const toInt  = (v:any) => (v === '' || v == null) ? 0 : Math.max(0, Math.floor(Number(v) || 0));
-    const toBool = (v:any) => v === 'on' || v === 'true' || v === '1';
-    const S      = (v:any) => String(v ?? '').trim();
+    const toInt = (v: any) => (v === '' || v == null) ? 0 : Math.max(0, Math.floor(Number(v) || 0));
+    const toBool = (v: any) => v === 'on' || v === 'true' || v === '1';
+    const S = (v: any) => String(v ?? '').trim();
 
-    const tipo_local         = S(req.body.tipo_local);
+    const tipo_local = S(req.body.tipo_local);
     if (!tipo_local) return res.status(400).send('Informe o tipo de local.');
 
-    const local_nome         = S(req.body.local_nome) || null;
-    const local_endereco     = S(req.body.local_endereco) || null;
-    const obs                = S(req.body.obs) || null;
-    const pessoas_abordadas  = toInt(req.body.pessoas_abordadas);
+    const local_nome = S(req.body.local_nome) || null;
+    const local_endereco = S(req.body.local_endereco) || null;
+    const obs = S(req.body.obs) || null;
+    const pessoas_abordadas = toInt(req.body.pessoas_abordadas);
     const veiculos_abordados = toInt(req.body.veiculos_abordados);
-    const multado            = toBool(req.body.multado);
-    const fechado            = toBool(req.body.fechado);
-    const lacrado            = toBool(req.body.lacrado);
+    const multado = toBool(req.body.multado);
+    const fechado = toBool(req.body.fechado);
+    const lacrado = toBool(req.body.lacrado);
 
     // 🌟 novos campos
     const pessoas_detidas_flag = toBool(req.body.pessoas_detidas_flag);
-    const pessoas_detidas_qtd  = toInt(req.body.pessoas_detidas_qtd);
+    const pessoas_detidas_qtd = toInt(req.body.pessoas_detidas_qtd);
 
     // Geo (se enviado)
     const { lat, lng, acc } = getGeoFromBody(req);
@@ -3026,10 +3026,10 @@ type ReportFilters = {
 // Filtros comuns com alias configurável (default = 'e')
 function applyCommonWhere(q: any, f: ReportFilters, alias = 'e') {
   const t = alias;
-  if (f.from)     q.where(`${t}.ts`, '>=', new Date(`${f.from}T00:00:00Z`));
-  if (f.to)       q.where(`${t}.ts`, '<',  new Date(`${f.to}T23:59:59.999Z`));
-  if (f.opId)     q.where(`${t}.operacao_id`, f.opId);
-  if (f.cidadeId) q.where(`${t}.cidade_id`,   f.cidadeId);
+  if (f.from) q.where(`${t}.ts`, '>=', new Date(`${f.from}T00:00:00Z`));
+  if (f.to) q.where(`${t}.ts`, '<', new Date(`${f.to}T23:59:59.999Z`));
+  if (f.opId) q.where(`${t}.operacao_id`, f.opId);
+  if (f.cidadeId) q.where(`${t}.cidade_id`, f.cidadeId);
   return q;
 }
 
@@ -3085,15 +3085,15 @@ async function buildRelatoriosData(filters: ReportFilters) {
     .first() as any;
 
   const cards = {
-    fiscalizacoes:    Number(kpis?.fiscalizacoes)    || 0,
-    pessoas:          Number(kpis?.pessoas)          || 0,
-    veiculos:         Number(kpis?.veiculos)         || 0,
-    detidos:          Number(kpis?.detidos)          || 0,
-    multados:         Number(kpis?.multados)         || 0,
-    fechados:         Number(kpis?.fechados)         || 0,
-    lacrados:         Number(kpis?.lacrados)         || 0,
+    fiscalizacoes: Number(kpis?.fiscalizacoes) || 0,
+    pessoas: Number(kpis?.pessoas) || 0,
+    veiculos: Number(kpis?.veiculos) || 0,
+    detidos: Number(kpis?.detidos) || 0,
+    multados: Number(kpis?.multados) || 0,
+    fechados: Number(kpis?.fechados) || 0,
+    lacrados: Number(kpis?.lacrados) || 0,
     itensApreendidos: Number(aprAgg?.itens_apreendidos) || 0,
-    apreensoes:       Number(aprAgg?.apreensoes)        || 0,
+    apreensoes: Number(aprAgg?.apreensoes) || 0,
   };
 
   // ---- Por cidade
@@ -3164,10 +3164,10 @@ async function buildRelatoriosData(filters: ReportFilters) {
     )
     .count({ itens_apreendidos: 'a.evento_id' })
     .groupBy(
-      'e.id','e.ts','c.nome','u.nome',
-      'f.tipo_local','f.local_nome','f.local_endereco',
-      'f.pessoas_abordadas','f.veiculos_abordados','f.pessoas_detidas_qtd',
-      'f.multado','f.fechado','f.lacrado'
+      'e.id', 'e.ts', 'c.nome', 'u.nome',
+      'f.tipo_local', 'f.local_nome', 'f.local_endereco',
+      'f.pessoas_abordadas', 'f.veiculos_abordados', 'f.pessoas_detidas_qtd',
+      'f.multado', 'f.fechado', 'f.lacrado'
     )
     .orderBy('e.ts', 'desc');
 
@@ -3217,15 +3217,15 @@ app.get('/relatorios/export.csv', requireAdminOrGestor, async (req, res, next) =
     };
     const { porCidade } = await buildRelatoriosData(f);
     const header = [
-      'cidade','fiscalizacoes','pessoas','veiculos','detidos',
-      'multados','fechados','lacrados','itens_apreendidos','apreensoes'
+      'cidade', 'fiscalizacoes', 'pessoas', 'veiculos', 'detidos',
+      'multados', 'fechados', 'lacrados', 'itens_apreendidos', 'apreensoes'
     ];
-    const rows = porCidade.map((r:any)=>
-      [r.cidade,r.fiscalizacoes,r.pessoas,r.veiculos,r.detidos,r.multados,r.fechados,r.lacrados,r.itens_apreendidos,r.apreensoes].join(',')
+    const rows = porCidade.map((r: any) =>
+      [r.cidade, r.fiscalizacoes, r.pessoas, r.veiculos, r.detidos, r.multados, r.fechados, r.lacrados, r.itens_apreendidos, r.apreensoes].join(',')
     );
     const csv = [header.join(','), ...rows].join('\n');
-    res.setHeader('Content-Type','text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition','attachment; filename="relatorio_por_cidade.csv"');
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="relatorio_por_cidade.csv"');
     res.send(csv);
   } catch (err) { next(err); }
 });
@@ -3282,8 +3282,8 @@ app.get('/relatorios/export.xlsx', requireAdminOrGestor, async (req, res, next) 
     // Aba 1: Resumo por cidade
     const wsCidade = wb.addWorksheet('Resumo por cidade');
     wsCidade.addRow([
-      'Cidade','Fiscalizações','Pessoas','Veículos','Detidos',
-      'Multados','Fechados','Lacrados','Itens apreendidos','Apreensões'
+      'Cidade', 'Fiscalizações', 'Pessoas', 'Veículos', 'Detidos',
+      'Multados', 'Fechados', 'Lacrados', 'Itens apreendidos', 'Apreensões'
     ]);
     wsCidade.getRow(1).font = { bold: true };
     porCidade.forEach((r: any) => {
@@ -3301,8 +3301,8 @@ app.get('/relatorios/export.xlsx', requireAdminOrGestor, async (req, res, next) 
     // Aba 2: Fiscalizações (cards em linhas)
     const wsFisc = wb.addWorksheet('Fiscalizações');
     wsFisc.addRow([
-      'Evento','Data/Hora','Cidade','Tipo do local','Nome do local','Endereço',
-      'Pessoas','Veículos','Detidos','Multado','Fechado','Lacrado','Itens apreen.'
+      'Evento', 'Data/Hora', 'Cidade', 'Tipo do local', 'Nome do local', 'Endereço',
+      'Pessoas', 'Veículos', 'Detidos', 'Multado', 'Fechado', 'Lacrado', 'Itens apreen.'
     ]);
     wsFisc.getRow(1).font = { bold: true };
     fiscList.forEach((r: any) => {
@@ -3331,14 +3331,13 @@ app.get('/relatorios/export.xlsx', requireAdminOrGestor, async (req, res, next) 
     wsKpi.columns.forEach((c: any) => (c.width = 26));
 
     const buf = await wb.xlsx.writeBuffer();
-    res.setHeader('Content-Type','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition','attachment; filename="relatorio_operacao.xlsx"');
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="relatorio_operacao.xlsx"');
     res.send(Buffer.from(buf));
   } catch (err) { next(err); }
 });
 
-// ---- PDF — usa views/relatorio-pdf.ejs (logo em /public/img/logo-cim.png)
-
+// PDF — /relatorios/export.pdf
 app.get('/relatorios/export.pdf', requireAdminOrGestor, async (req, res, next) => {
   try {
     const f: ReportFilters = {
@@ -3352,35 +3351,61 @@ app.get('/relatorios/export.pdf', requireAdminOrGestor, async (req, res, next) =
     const { cards, porCidade, fiscList } = await buildRelatoriosData(f);
     const opHeader = await loadOpHeader(f.opId!, f.cidadeId);
 
+    // logo (coloque o arquivo em public/img/logo-cim.png)
     const logoUrl = `${req.protocol}://${req.get('host')}/img/logo-cim.png`;
 
+    // Renderiza o HTML do PDF a partir do EJS
     const html: string = await new Promise((resolve, reject) => {
       res.render(
         'relatorio-pdf',
         { logoUrl, opHeader, filtros: f, cards, porCidade, fiscList },
-        (err, str) => (err ? reject(err) : resolve(str as string))
+        (err, str) => (err ? reject(err) : resolve(String(str)))
       );
     });
 
-    const browser = await puppeteer.launch({
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || puppeteer.executablePath(),
+    // Puppeteer: tenta usar o binário baixado; se não existir, faz fallback
+    const launchOpts: any = {
       headless: true,
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    });
+    };
+
+    try {
+      const execPath = puppeteer.executablePath();
+      if (execPath && fs.existsSync(execPath)) {
+        launchOpts.executablePath = execPath;
+      } else {
+        console.warn('[pdf] Chrome não encontrado em', execPath, '— tentando sem executablePath');
+      }
+    } catch (e: any) {
+      console.warn('[pdf] Não foi possível resolver executablePath:', e?.message || e);
+    }
+
+    let browser;
+    try {
+      browser = await puppeteer.launch(launchOpts);
+    } catch (e) {
+      // Segunda tentativa sem executablePath (caso o primeiro falhe)
+      console.warn('[pdf] 1ª tentativa de launch falhou, tentando sem executablePath…');
+      delete launchOpts.executablePath;
+      browser = await puppeteer.launch(launchOpts);
+    }
 
     const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'networkidle0' });
+    await page.setContent(html, { waitUntil: 'networkidle0', timeout: 60000 });
 
     const pdf = await page.pdf({
       format: 'A4',
       printBackground: true,
-      margin: { top: '20mm', right: '15mm', bottom: '20mm', left: '15mm' }
+      margin: { top: '20mm', right: '15mm', bottom: '20mm', left: '15mm' },
     });
 
     await browser.close();
 
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="relatorio_operacao_${opHeader.id}.pdf"`);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="relatorio_operacao_${opHeader.id}.pdf"`
+    );
     res.send(pdf);
   } catch (err) {
     next(err);
