@@ -2752,6 +2752,36 @@ app.get('/relatorios/export.xlsx', requireAdminOrGestor, async (req, res, next) 
         next(err);
     }
 });
+// -----------------------------
+// Helper: informações da operação (para cabeçalho do PDF)
+// -----------------------------
+async function loadOpHeader(opId, cidadeId) {
+    const op = await db('operacoes').where({ id: opId }).first();
+    if (!op)
+        throw new Error('Operação não encontrada');
+    let cidadesParticipantes = [];
+    if (cidadeId) {
+        const c = await db('cidades').where({ id: cidadeId }).first('nome');
+        cidadesParticipantes = c ? [c.nome] : [];
+    }
+    else {
+        const rows = await db('operacao_cidades as oc')
+            .join('cidades as c', 'c.id', 'oc.cidade_id')
+            .where('oc.operacao_id', opId)
+            .orderBy('c.nome')
+            .select('c.nome');
+        cidadesParticipantes = rows.map((r) => r.nome);
+    }
+    return {
+        id: op.id,
+        nome: op.nome,
+        descricao: op.descricao || '',
+        inicio_agendado_fmt: op.inicio_agendado
+            ? new Date(op.inicio_agendado).toLocaleString('pt-BR')
+            : '-',
+        cidades_participantes: cidadesParticipantes.join(', ')
+    };
+}
 // rota pdf
 // ---- Excel (.xlsx) — resumo por cidade + lista de fiscalizações + KPIs
 app.get('/relatorios/export.xlsx', requireAdminOrGestor, async (req, res, next) => {
