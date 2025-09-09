@@ -2661,6 +2661,36 @@ app.get('/relatorios/export.csv', requireAdminOrGestor, async (req, res, next) =
         next(err);
     }
 });
+// -----------------------------
+// Helper: informações da operação (para cabeçalho do PDF)
+// -----------------------------
+async function loadOpHeader(opId, cidadeId) {
+    const op = await db('operacoes').where({ id: opId }).first();
+    if (!op)
+        throw new Error('Operação não encontrada');
+    let cidadesParticipantes = [];
+    if (cidadeId) {
+        const c = await db('cidades').where({ id: cidadeId }).first('nome');
+        cidadesParticipantes = c ? [c.nome] : [];
+    }
+    else {
+        const rows = await db('operacao_cidades as oc')
+            .join('cidades as c', 'c.id', 'oc.cidade_id')
+            .where('oc.operacao_id', opId)
+            .orderBy('c.nome')
+            .select('c.nome');
+        cidadesParticipantes = rows.map((r) => r.nome);
+    }
+    return {
+        id: op.id,
+        nome: op.nome,
+        descricao: op.descricao || '',
+        inicio_agendado_fmt: op.inicio_agendado
+            ? new Date(op.inicio_agendado).toLocaleString('pt-BR')
+            : '-',
+        cidades_participantes: cidadesParticipantes.join(', ')
+    };
+}
 // rota pdf
 // ---- Excel (.xlsx) — resumo por cidade + lista de fiscalizações + KPIs
 app.get('/relatorios/export.xlsx', requireAdminOrGestor, async (req, res, next) => {
@@ -2744,49 +2774,38 @@ app.get('/relatorios/export.pdf', requireAdminOrGestor, async (req, res, next) =
         if (!f.opId)
             return res.status(400).send('opId obrigatório');
         const { cards, porCidade, fiscList } = await buildRelatoriosData(f);
-        // Cabeçalho da operação
-        const op = await db('operacoes').where({ id: f.opId }).first();
-        if (!op)
-            return res.status(404).send('Operação não encontrada');
-        let cidadesParticipantes = [];
-        if (f.cidadeId) {
-            const c = await db('cidades').where({ id: f.cidadeId }).first('nome');
-            cidadesParticipantes = c ? [c.nome] : [];
-        }
-        else {
-            const rows = await db('operacao_cidades as oc')
-                .join('cidades as c', 'c.id', 'oc.cidade_id')
-                .where('oc.operacao_id', f.opId)
-                .orderBy('c.nome')
-                .select('c.nome');
-            cidadesParticipantes = rows.map((r) => r.nome);
-        }
-        const opHeader = {
-            id: op.id,
-            nome: op.nome,
-            descricao: op.descricao || '',
-            inicio_agendado_fmt: op.inicio_agendado
-                ? new Date(op.inicio_agendado).toLocaleString('pt-BR')
-                : '-',
-            cidades_participantes: cidadesParticipantes.join(', ')
-        };
+        const opHeader = await loadOpHeader(f.opId, f.cidadeId);
+        // logo absoluto (garante carregar no headless)
         const logoUrl = `${req.protocol}://${req.get('host')}/img/logo-cim.png`;
-        // Renderiza HTML via EJS
+        // Renderiza o HTML do PDF a partir do EJS
         const html = await new Promise((resolve, reject) => {
             res.render('relatorio-pdf', { logoUrl, opHeader, filtros: f, cards, porCidade, fiscList }, (err, str) => (err ? reject(err) : resolve(str)));
         });
-        const browser = await puppeteer_1.default.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] });
-        const page = await browser.newPage();
-        await page.setContent(html, { waitUntil: 'networkidle0' });
-        const pdf = await page.pdf({
-            format: 'A4',
-            printBackground: true,
-            margin: { top: '20mm', right: '15mm', bottom: '20mm', left: '15mm' },
-        });
-        await browser.close();
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename="relatorio_operacao_${opHeader.id}.pdf"`);
-        res.send(pdf);
+        // <<< IMPORTANTE: sem executablePath fixo >>>
+        const launchOpts = {
+            headless: true,
+            args: ['--no-sandbox', '--disable-setuid-sandbox'],
+        };
+        // Se você definir PUPPETEER_EXECUTABLE_PATH no Render, usamos:
+        if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+            launchOpts.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+        }
+        const browser = await puppeteer_1.default.launch(launchOpts);
+        try {
+            const page = await browser.newPage();
+            await page.setContent(html, { waitUntil: 'networkidle0' });
+            const pdf = await page.pdf({
+                format: 'A4',
+                printBackground: true,
+                margin: { top: '20mm', right: '15mm', bottom: '20mm', left: '15mm' },
+            });
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `attachment; filename="relatorio_operacao_${opHeader.id}.pdf"`);
+            return res.send(pdf);
+        }
+        finally {
+            await browser.close().catch(() => { });
+        }
     }
     catch (err) {
         next(err);

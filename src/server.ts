@@ -3351,39 +3351,53 @@ app.get('/relatorios/export.pdf', requireAdminOrGestor, async (req, res, next) =
     const { cards, porCidade, fiscList } = await buildRelatoriosData(f);
     const opHeader = await loadOpHeader(f.opId!, f.cidadeId);
 
+    // logo absoluto (garante carregar no headless)
     const logoUrl = `${req.protocol}://${req.get('host')}/img/logo-cim.png`;
 
+    // Renderiza o HTML do PDF a partir do EJS
     const html: string = await new Promise((resolve, reject) => {
-      res.render('relatorio-pdf',
+      res.render(
+        'relatorio-pdf',
         { logoUrl, opHeader, filtros: f, cards, porCidade, fiscList },
-        (err, str) => err ? reject(err) : resolve(str as string)
+        (err, str) => (err ? reject(err) : resolve(str as string))
       );
     });
 
-    const browser = await puppeteer.launch({
-      executablePath: puppeteer.executablePath(),  // << chave para achar o Chrome baixado
+    // <<< IMPORTANTE: sem executablePath fixo >>>
+    const launchOpts: any = {
       headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    };
+    // Se você definir PUPPETEER_EXECUTABLE_PATH no Render, usamos:
+    if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+      launchOpts.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+    }
 
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'networkidle0' });
+    const browser = await puppeteer.launch(launchOpts);
+    try {
+      const page = await browser.newPage();
+      await page.setContent(html, { waitUntil: 'networkidle0' });
 
-    const pdf = await page.pdf({
-      format: 'A4',
-      printBackground: true,
-      margin: { top: '20mm', right: '15mm', bottom: '20mm', left: '15mm' }
-    });
+      const pdf = await page.pdf({
+        format: 'A4',
+        printBackground: true,
+        margin: { top: '20mm', right: '15mm', bottom: '20mm', left: '15mm' },
+      });
 
-    await browser.close();
-
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="relatorio_operacao_${opHeader.id}.pdf"`);
-    res.send(pdf);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="relatorio_operacao_${opHeader.id}.pdf"`
+      );
+      return res.send(pdf);
+    } finally {
+      await browser.close().catch(() => {});
+    }
   } catch (err) {
     next(err);
   }
 });
+
 
 
 
