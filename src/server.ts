@@ -3136,13 +3136,55 @@ async function buildRelatoriosData(filters: ReportFilters) {
     .orderBy('qtd', 'desc')
     .limit(10);
 
-  // ---- Lista de fiscalizações (para os cards)
+  // ---- Subselect 1: DETALHES dos itens por fiscalização (JSONB)
+  // (usamos a.evento_id no ORDER BY para não depender de coluna a.id)
+  const itensPorFis = applyCommonWhere(
+    db('evento_apreensao as a')
+      .innerJoin('operacao_eventos as fe', 'fe.id', 'a.fiscalizacao_evento_id')
+      .where('fe.tipo', 'fiscalizacao'),
+    filters,
+    'fe'
+  )
+    .select(
+      'a.fiscalizacao_evento_id',
+      db.raw(`
+        jsonb_agg(
+          jsonb_build_object(
+            'tipo', a.tipo,
+            'quantidade', a.quantidade,
+            'unidade', a.unidade
+          )
+          ORDER BY a.evento_id
+        ) AS itens
+      `)
+    )
+    .groupBy('a.fiscalizacao_evento_id')
+    .as('itens_por_fis');
+
+  // ---- Subselect 2: CONTAGEM de itens por fiscalização
+  const itensCount = applyCommonWhere(
+    db('evento_apreensao as a')
+      .innerJoin('operacao_eventos as fe', 'fe.id', 'a.fiscalizacao_evento_id')
+      .where('fe.tipo', 'fiscalizacao'),
+    filters,
+    'fe'
+  )
+    .select(
+      'a.fiscalizacao_evento_id',
+      db.raw('COUNT(*) AS itens_apreendidos')
+    )
+    .groupBy('a.fiscalizacao_evento_id')
+    .as('itens_count');
+
+  // ---- Lista de fiscalizações (cards)
+  // Importante: agora NÃO usamos .count() nem .groupBy() aqui.
   const fiscList = await applyCommonWhere(
     db('operacao_eventos as e')
-      .join('evento_fiscalizacao as f', 'f.evento_id', 'e.id')
+      .innerJoin('evento_fiscalizacao as f', 'f.evento_id', 'e.id')
       .leftJoin('cidades as c', 'c.id', 'e.cidade_id')
       .leftJoin('usuarios as u', 'u.id', 'e.user_id')
-      .leftJoin('evento_apreensao as a', 'a.fiscalizacao_evento_id', 'e.id')
+      .leftJoin(itensPorFis, 'itens_por_fis.fiscalizacao_evento_id', 'e.id')
+      .leftJoin(itensCount, 'itens_count.fiscalizacao_evento_id', 'e.id')
       .where('e.tipo', 'fiscalizacao'),
     filters,
     'e'
@@ -3160,19 +3202,14 @@ async function buildRelatoriosData(filters: ReportFilters) {
       'f.pessoas_detidas_qtd',
       'f.multado',
       'f.fechado',
-      'f.lacrado'
-    )
-    .count({ itens_apreendidos: 'a.evento_id' })
-    .groupBy(
-      'e.id', 'e.ts', 'c.nome', 'u.nome',
-      'f.tipo_local', 'f.local_nome', 'f.local_endereco',
-      'f.pessoas_abordadas', 'f.veiculos_abordados', 'f.pessoas_detidas_qtd',
-      'f.multado', 'f.fechado', 'f.lacrado'
+      'f.lacrado',
+      db.raw('COALESCE(itens_count.itens_apreendidos, 0) AS itens_apreendidos'),
+      db.raw(`COALESCE(itens_por_fis.itens, '[]'::jsonb) AS itens`)
     )
     .orderBy('e.ts', 'desc');
 
   return { cards, porCidade, topLocais, fiscList };
-}
+
 
 // ---- Página de relatórios
 app.get('/relatorios', requireAdminOrGestor, async (req, res, next) => {
