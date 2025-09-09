@@ -3,111 +3,121 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Relatório — Operação <%= op?.nome || '' %></title>
+  <title>Relatório — Operação <%= (opHeader && opHeader.nome) || '' %></title>
   <style>
-    :root{--text:#0b1220;--muted:#444;--border:#dcdcdc}
+    :root{--text:#0b1220;--muted:#555;--border:#d9d9d9;--panel:#fff;--chip:#eef2ff}
     *{box-sizing:border-box}
-    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial;color:#111}
-    .wrap{padding:22px}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial;color:var(--text)}
+    .wrap{max-width:800px;margin:28px auto;padding:0 16px}
     .center{text-align:center}
-    .h1{font-size:20px;font-weight:800;margin:6px 0 2px 0}
-    .h2{font-size:14px;font-weight:700;margin:0 0 10px}
-    .muted{color:#666}
-    .card{border:1px solid var(--border);border-radius:10px;padding:12px;margin:10px 0}
-    .kv{display:grid;grid-template-columns:160px 1fr;gap:6px 12px;font-size:13px}
-    .kv .k{color:#333}
-    .pill{display:inline-block;padding:2px 8px;border-radius:999px;background:#eee;border:1px solid #ddd;font-size:12px;margin-right:6px}
-    .cards-grid{display:grid;grid-template-columns:1fr;gap:10px}
-    .list{margin-top:6px;font-size:13px}
-    .list div{margin-bottom:2px}
-    hr{border:none;border-top:1px solid var(--border);margin:14px 0}
-    table{width:100%;border-collapse:collapse;font-size:12px;margin-top:6px}
-    th,td{padding:6px;border-bottom:1px solid #eee;text-align:left}
-    .right{text-align:right}
-    img.logo{height:38px; margin-bottom:4px}
+    .logo{width:90px;height:auto;margin:8px auto 4px;display:block}
+    .org1{font-size:22px;font-weight:800;letter-spacing:2px}
+    .org2{font-size:14px;margin-top:2px}
+    .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px;margin-top:14px}
+    h2{font-size:16px;margin:0 0 8px}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:6px 8px;border-bottom:1px solid var(--border);vertical-align:top}
+    th{width:190px;text-align:left;color:var(--muted);font-weight:600}
+    .kv{margin-top:6px}
+    .kpi-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+    .kpi{border:1px solid var(--border);border-radius:10px;padding:10px}
+    .kpi .lbl{font-size:12px;color:var(--muted)}
+    .kpi .val{font-size:20px;font-weight:800;margin-top:2px}
+    .row-title{display:flex;justify-content:space-between;gap:12px;align-items:center}
+    .ts{color:var(--muted);font-size:12px;white-space:nowrap}
+    .chips{margin:6px 0 0}
+    .chip{display:inline-block;background:var(--chip);border:1px solid #c7d2fe;border-radius:999px;padding:2px 8px;margin-right:6px;font-size:12px}
+    .items th, .items td{text-align:left}
+    .items thead th{background:#f6f6f9}
+    .muted{color:var(--muted)}
+    @page { size: A4; margin: 20mm 15mm; }
   </style>
 </head>
 <body>
   <div class="wrap">
-
-    <!-- topo com logo e títulos -->
+    <!-- Cabeçalho -->
     <div class="center">
-      <img class="logo" src="/img/cim-logo.png" alt="CIM">
-      <div class="h1">C.I.M</div>
-      <div class="muted">Centro de Inteligência Metropolitana</div>
+      <img class="logo" src="<%= logoUrl %>" alt="Logo CIM"/>
+      <div class="org1">C.I.M</div>
+      <div class="org2">Centro de Inteligência Metropolitana</div>
     </div>
 
-    <!-- card da operação -->
+    <!-- Card: informações da operação -->
     <div class="card">
-      <div class="h2">Informações da operação</div>
-      <div class="kv">
-        <div class="k">Nome</div><div><%= op?.nome || '-' %></div>
-        <div class="k">Descrição</div><div><%= op?.descricao || '-' %></div>
-        <div class="k">Início agendado</div>
-        <div><%= op?.inicio_agendado ? new Date(op.inicio_agendado).toLocaleString('pt-BR') : '-' %></div>
-        <div class="k">Período do relatório</div>
-        <div><%= (filtros?.from||'—') %> a <%= (filtros?.to||'—') %></div>
-        <div class="k">Cidade(s)</div>
-        <div>
-          <% if (cidadeFiltro) { %>
-            <%= cidadeFiltro %>
-          <% } else { %>
-            <% (porCidade||[]).forEach((c,i)=> { %><%= c.cidade %><%= (i<(porCidade.length-1))?', ':'' %><% }) %>
-            <% if (!porCidade || porCidade.length===0) { %>—<% } %>
-          <% } %>
-        </div>
+      <h2>Informações da operação</h2>
+      <table class="kv">
+        <tr><th>Nome</th><td><%= (opHeader && opHeader.nome) || '-' %></td></tr>
+        <tr><th>Descrição</th><td><%= (opHeader && opHeader.descricao) || '-' %></td></tr>
+        <tr><th>Início agendado</th><td><%= (opHeader && opHeader.inicio_agendado_fmt) || '-' %></td></tr>
+        <tr><th>Cidades participantes</th><td><%= (opHeader && opHeader.cidades_participantes) || '-' %></td></tr>
+      </table>
+    </div>
+
+    <!-- KPIs principais -->
+    <div class="card">
+      <h2>Resumo</h2>
+      <div class="kpi-grid">
+        <div class="kpi"><div class="lbl">Fiscalizações</div><div class="val"><%= (cards && cards.fiscalizacoes) || 0 %></div></div>
+        <div class="kpi"><div class="lbl">Pessoas</div><div class="val"><%= (cards && cards.pessoas) || 0 %></div></div>
+        <div class="kpi"><div class="lbl">Veículos</div><div class="val"><%= (cards && cards.veiculos) || 0 %></div></div>
+        <div class="kpi"><div class="lbl">Detidos</div><div class="val"><%= (cards && cards.detidos) || 0 %></div></div>
+        <div class="kpi"><div class="lbl">Multados</div><div class="val"><%= (cards && cards.multados) || 0 %></div></div>
+        <div class="kpi"><div class="lbl">Fechados</div><div class="val"><%= (cards && cards.fechados) || 0 %></div></div>
+        <div class="kpi"><div class="lbl">Lacrados</div><div class="val"><%= (cards && cards.lacrados) || 0 %></div></div>
+        <div class="kpi"><div class="lbl">Itens apreendidos</div><div class="val"><%= (cards && cards.itensApreendidos) || 0 %></div></div>
+        <div class="kpi"><div class="lbl">Apreensões</div><div class="val"><%= (cards && cards.apreensoes) || 0 %></div></div>
       </div>
     </div>
 
-    <!-- cards das fiscalizações -->
-    <div class="h2">Fiscalizações</div>
-    <% if ((fiscList||[]).length === 0) { %>
-      <div class="muted">Nenhuma fiscalização para os filtros informados.</div>
-    <% } %>
-    <div class="cards-grid">
-      <% (fiscList||[]).forEach(r=>{ %>
-        <div class="card">
-          <div style="display:flex;justify-content:space-between;align-items:center">
-            <div><strong>#<%= r.evento_id %></strong> — <%= r.cidade || '-' %></div>
-            <div class="muted"><%= new Date(r.ts).toLocaleString('pt-BR') %></div>
-          </div>
-
-          <div style="margin-top:6px">
-            <% if (r.multado) { %><span class="pill">Multado</span><% } %>
-            <% if (r.fechado) { %><span class="pill">Fechado</span><% } %>
-            <% if (r.lacrado) { %><span class="pill">Lacrado</span><% } %>
-          </div>
-
-          <div class="kv" style="margin-top:8px">
-            <div class="k">Tipo do local</div><div><%= r.tipo_local || '-' %></div>
-            <div class="k">Nome</div><div><%= r.local_nome || '-' %></div>
-            <div class="k">Endereço</div><div><%= r.local_endereco || '-' %></div>
-            <div class="k">Pessoas abordadas</div><div><%= r.pessoas_abordadas ?? 0 %></div>
-            <div class="k">Veículos abordados</div><div><%= r.veiculos_abordados ?? 0 %></div>
-            <div class="k">Pessoas detidas</div><div><%= r.pessoas_detidas_qtd ?? 0 %></div>
-            <div class="k">Usuário</div><div><%= r.usuario || '-' %></div>
-          </div>
-
-          <% if ((r.itens||[]).length) { %>
-            <hr/>
-            <div class="h2" style="margin:0 0 6px">Itens apreendidos</div>
-            <table>
-              <thead><tr><th>Tipo</th><th class="right">Qtd.</th><th>Unid.</th><th>Obs.</th></tr></thead>
-              <tbody>
-                <% r.itens.forEach(i=>{ %>
-                  <tr>
-                    <td><%= i.tipo || 'Item' %></td>
-                    <td class="right"><%= i.quantidade ?? '' %></td>
-                    <td><%= i.unidade || '' %></td>
-                    <td><%= i.obs || '' %></td>
-                  </tr>
-                <% }) %>
-              </tbody>
-            </table>
-          <% } %>
+    <!-- Cards de cada fiscalização -->
+    <% (fiscList || []).forEach(function(r){ %>
+      <div class="card">
+        <div class="row-title">
+          <h2>#<%= r.evento_id %> — <%= r.cidade || '-' %></h2>
+          <div class="ts"><%= new Date(r.ts).toLocaleString('pt-BR') %></div>
         </div>
-      <% }) %>
-    </div>
+
+        <div class="chips">
+          <% if (r.multado) { %><span class="chip">Multado</span><% } %>
+          <% if (r.fechado) { %><span class="chip">Fechado</span><% } %>
+          <% if (r.lacrado) { %><span class="chip">Lacrado</span><% } %>
+        </div>
+
+        <table class="kv" style="margin-top:6px">
+          <tr><th>Tipo de local</th><td><%= r.tipo_local || '-' %></td></tr>
+          <tr><th>Nome do local</th><td><%= r.local_nome || '-' %></td></tr>
+          <tr><th>Endereço</th><td><%= r.local_endereco || '-' %></td></tr>
+          <tr><th>Pessoas</th><td><%= Number(r.pessoas_abordadas||0) %></td></tr>
+          <tr><th>Veículos</th><td><%= Number(r.veiculos_abordados||0) %></td></tr>
+          <tr><th>Pessoas detidas</th><td><%= Number(r.pessoas_detidas_qtd||0) %></td></tr>
+          <tr><th>Itens apreendidos (qtd.)</th><td><%= Number(r.itens_apreendidos||0) %></td></tr>
+          <tr><th>Usuário</th><td><%= r.usuario || '-' %></td></tr>
+        </table>
+
+        <% if (Array.isArray(r.itens) && r.itens.length) { %>
+          <h3 style="font-size:14px;margin:12px 0 6px">Itens apreendidos</h3>
+          <table class="items">
+            <thead>
+              <tr><th style="width:40px">#</th><th>Tipo</th><th style="width:120px">Quantidade</th><th style="width:120px">Unidade</th></tr>
+            </thead>
+            <tbody>
+              <% r.itens.forEach(function(i, idx){ %>
+                <tr>
+                  <td><%= idx+1 %></td>
+                  <td><%= i.tipo || '-' %></td>
+                  <td><%= (i.quantidade!=null ? i.quantidade : '-') %></td>
+                  <td><%= i.unidade || '-' %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        <% } %>
+      </div>
+    <% }) %>
+
+    <% if (!(fiscList && fiscList.length)) { %>
+      <div class="card"><span class="muted">Nenhuma fiscalização para os filtros selecionados.</span></div>
+    <% } %>
   </div>
 </body>
 </html>
