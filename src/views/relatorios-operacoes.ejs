@@ -23,7 +23,8 @@
     tfoot th, tfoot td{font-weight:700}
     .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
     input,select{background:#0f172a;color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px}
-    .btn{padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:#111826;color:#fff}
+    .btn{padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:#111826;color:#fff;text-decoration:none}
+    .btn[aria-disabled="true"]{opacity:.5;cursor:not-allowed}
     .hidden{display:none}
 
     /* Cards de fiscalizações */
@@ -66,9 +67,9 @@
         </label>
       </div>
       <button class="btn" type="submit">Aplicar</button>
-      <a id="btnCsv" class="btn" href="#" aria-disabled="true">CSV (por cidade)</a>
-      <a id="btnXlsx" class="btn" href="#" aria-disabled="true">Excel (.xlsx)</a>
-      <a id="btnPdf" class="btn" href="#" aria-disabled="true">PDF</a>
+      <a id="btnCsv"  class="btn muted" href="#" aria-disabled="true">CSV (por cidade)</a>
+      <a id="btnXlsx" class="btn muted" href="#" aria-disabled="true">Excel (.xlsx)</a>
+      <a id="btnPdf"  class="btn muted" href="#" aria-disabled="true">PDF</a>
     </form>
 
     <!-- Conteúdo: oculto até escolher operação -->
@@ -152,22 +153,39 @@
     const qs = (s)=>document.querySelector(s);
     const fmt = (n)=> (n ?? 0).toLocaleString('pt-BR');
 
-    function enableCsv(opSelected){
-      const a = qs('#btnCsv');
-      if(opSelected){
-        a.removeAttribute('aria-disabled');
-        a.classList.remove('muted');
-      }else{
+    // ----- habilitar/desabilitar botões
+    function setDisabled(a, disabled){
+      if(disabled){
         a.setAttribute('aria-disabled','true');
         a.classList.add('muted');
+        a.href = '#';
+      }else{
+        a.removeAttribute('aria-disabled');
+        a.classList.remove('muted');
       }
     }
-
-    function linkCsv(){
-      const fd = new FormData(qs('#filtros'));
-      const p  = new URLSearchParams(fd);
-      qs('#btnCsv').href = '/relatorios/export.csv?' + p.toString();
+    function enableExports(enabled){
+      setDisabled(qs('#btnCsv'),  !enabled);
+      setDisabled(qs('#btnXlsx'), !enabled);
+      setDisabled(qs('#btnPdf'),  !enabled);
     }
+    // impedir navegação quando desabilitado
+    ['#btnCsv','#btnXlsx','#btnPdf'].forEach(id=>{
+      qs(id).addEventListener('click', (e)=>{
+        if(e.currentTarget.getAttribute('aria-disabled') === 'true'){
+          e.preventDefault();
+        }
+      });
+    });
+
+    // ----- links de exportação
+    function paramsFromForm(){
+      const fd = new FormData(qs('#filtros'));
+      return new URLSearchParams(fd).toString();
+    }
+    function linkCsv(){  qs('#btnCsv').href  = '/relatorios/export.csv?'  + paramsFromForm(); }
+    function linkXlsx(){ qs('#btnXlsx').href = '/relatorios/export.xlsx?' + paramsFromForm(); }
+    function linkPdf(){  qs('#btnPdf').href  = '/relatorios/export.pdf?'  + paramsFromForm(); }
 
     function renderKPIs(c){
       qs('#k-fisc').textContent = fmt(c.fiscalizacoes);
@@ -270,20 +288,18 @@
     }
 
     async function load(){
-      // exige operação selecionada
       const opId = qs('#opId').value;
       if(!opId){
         qs('#content').classList.add('hidden');
-        enableCsv(false);
+        enableExports(false);
         return;
       }
-      const fd = new FormData(qs('#filtros'));
-      const params = new URLSearchParams(fd);
 
-      enableCsv(true);
-      linkCsv();
+      // habilita e atualiza os links de exportação
+      enableExports(true);
+      linkCsv(); linkXlsx(); linkPdf();
 
-      const res  = await fetch('/relatorios/data?' + params.toString(), { cache:'no-store' });
+      const res  = await fetch('/relatorios/data?' + paramsFromForm(), { cache:'no-store' });
       const data = await res.json();
 
       qs('#content').classList.remove('hidden');
@@ -295,9 +311,14 @@
 
     // eventos
     qs('#filtros').addEventListener('submit', ev => { ev.preventDefault(); load(); });
-    qs('#opId').addEventListener('change', () => { /* opcional: auto-carregar ao escolher op */ });
-    // inicial: não carregar nada
-    enableCsv(false);
+    qs('#filtros').addEventListener('change', () => {
+      const opId = qs('#opId').value;
+      enableExports(!!opId);
+      if(opId){ linkCsv(); linkXlsx(); linkPdf(); }
+    });
+
+    // inicial
+    enableExports(false);
   </script>
 </body>
 </html>
