@@ -32,6 +32,10 @@
     .pill{display:inline-block;padding:2px 8px;border-radius:999px;background:#1f2937;font-size:12px;margin-right:6px}
     .kv{display:grid;grid-template-columns:auto 1fr;gap:4px 8px;font-size:13px}
     .kv .k{color:var(--muted)}
+
+    /* Lista de itens apreendidos nos cards */
+    .itens{margin:6px 0 0 0;padding-left:18px}
+    .itens li{font-size:13px;line-height:1.3}
   </style>
 
   <!-- html2pdf (gera PDF no cliente) -->
@@ -159,7 +163,18 @@
     // ======= helpers =======
     const qs = (s)=>document.querySelector(s);
     const fmt = (n)=> (n ?? 0).toLocaleString('pt-BR');
-    const LOGO_URL = '/public/images/operaco.jpg'; // <- ajuste se o seu logo tiver outro caminho
+    const LOGO_URL = '/public/images/operaco.jpg'; // ajuste se necessário
+
+    // garante array mesmo que venha string/json
+    const safeArr = (v) => {
+      if (!v) return [];
+      if (Array.isArray(v)) return v;
+      if (typeof v === 'string') {
+        try { const j = JSON.parse(v); return Array.isArray(j) ? j : []; }
+        catch { return []; }
+      }
+      return Array.isArray(v) ? v : [];
+    };
 
     function setDisabled(el, disabled){
       if(!el) return;
@@ -240,49 +255,56 @@
       qs('#t-lac').textContent  = fmt(sum('lacrados'));
     }
 
-    function renderFiscCards(rows){
-      const wrap = qs('#fiscCards');
-      const empty = qs('#noFisc');
-      if(!rows || rows.length === 0){
-        wrap.innerHTML = '';
-        empty.style.display = 'block';
-        return;
-      }
-      empty.style.display = 'none';
-      wrap.innerHTML = rows.map(r => {
-        const flags = [
-          r.multado  ? '<span class="pill">Multado</span>'   : '',
-          r.fechado  ? '<span class="pill">Fechado</span>'   : '',
-          r.lacrado  ? '<span class="pill">Lacrado</span>'   : '',
-        ].join('');
-        const det = Number(r.pessoas_detidas_qtd)||0;
-        const itens = Number(r.itens_apreendidos)||0;
+   
+    // ======= PDF (cliente) =======function renderFiscCards(rows){
+  const wrap = qs('#fiscCards');
+  const empty = qs('#noFisc');
+  if(!rows || rows.length === 0){
+    wrap.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
 
-        return `
-          <div class="card">
-            <div style="display:flex;justify-content:space-between;align-items:center">
-              <div><strong>#${r.evento_id}</strong> — ${r.cidade || '-'} </div>
-              <div class="muted" style="font-size:12px">${new Date(r.ts).toLocaleString('pt-BR')}</div>
-            </div>
+  wrap.innerHTML = rows.map(r => {
+    const flags = [
+      r.multado  ? '<span class="pill">Multado</span>'   : '',
+      r.fechado  ? '<span class="pill">Fechado</span>'   : '',
+      r.lacrado  ? '<span class="pill">Lacrado</span>'   : '',
+    ].join('');
+    const det   = Number(r.pessoas_detidas_qtd)||0;
+    const itens = Number(r.itens_apreendidos)||0;
 
-            <div style="margin-top:6px">${flags}</div>
+    const itensArr  = Array.isArray(r.itens) ? r.itens : [];
+    const itensText = itensArr.length
+      ? itensArr.map(it => `${fmt(it.quantidade)} ${it.unidade||''} ${it.tipo||''}`.trim()).join(', ')
+      : '—';
 
-            <div class="kv" style="margin-top:8px">
-              <div class="k">Tipo do local</div><div>${r.tipo_local || '-'}</div>
-              <div class="k">Nome</div><div>${r.local_nome || '-'}</div>
-              <div class="k">Endereço</div><div>${r.local_endereco || '-'}</div>
-              <div class="k">Pessoas</div><div>${fmt(r.pessoas_abordadas)}</div>
-              <div class="k">Veículos</div><div>${fmt(r.veiculos_abordados)}</div>
-              <div class="k">Detidos</div><div>${fmt(det)}</div>
-              <div class="k">Itens apreendidos</div><div>${fmt(itens)}</div>
-              <div class="k">Usuário</div><div>${r.usuario || '-'}</div>
-            </div>
-          </div>
-        `;
-      }).join('');
-    }
+    return `
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div><strong>#${r.evento_id}</strong> — ${r.cidade || '-'}</div>
+          <div class="muted" style="font-size:12px">${new Date(r.ts).toLocaleString('pt-BR')}</div>
+        </div>
 
-    // ======= PDF (cliente) =======
+        <div style="margin-top:6px">${flags}</div>
+
+        <div class="kv" style="margin-top:8px">
+          <div class="k">Tipo do local</div><div>${r.tipo_local || '-'}</div>
+          <div class="k">Nome</div><div>${r.local_nome || '-'}</div>
+          <div class="k">Endereço</div><div>${r.local_endereco || '-'}</div>
+          <div class="k">Pessoas</div><div>${fmt(r.pessoas_abordadas)}</div>
+          <div class="k">Veículos</div><div>${fmt(r.veiculos_abordados)}</div>
+          <div class="k">Detidos</div><div>${fmt(det)}</div>
+          <div class="k">Itens apreendidos</div><div>${fmt(itens)}</div>
+          <div class="k">Itens (detalhe)</div><div>${itensText}</div>
+          <div class="k">Usuário</div><div>${r.usuario || '-'}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+
     async function generatePdf(){
       const btn = qs('#btnPdf');
       if(btn.getAttribute('aria-disabled') === 'true') return;
@@ -295,7 +317,6 @@
       const opText = opSel.value ? opSel.options[opSel.selectedIndex].textContent : '-';
       const cidadeText = cidSel.value ? cidSel.options[cidSel.selectedIndex].textContent : 'Todas';
 
-      // wrapper com cabeçalho + card da operação + conteúdo atual
       const wrapper = document.createElement('div');
       wrapper.style.padding = '16px';
       wrapper.style.maxWidth = '900px';
@@ -316,9 +337,7 @@
           </div>
         </div>
       `;
-      // clona o conteúdo atual (KPIs, tabelas e cards)
       const contentClone = qs('#content').cloneNode(true);
-      // tira possíveis "hidden" do clone
       contentClone.classList.remove('hidden');
       wrapper.appendChild(contentClone);
 
@@ -331,7 +350,6 @@
       };
 
       await html2pdf().set(opt).from(wrapper).save();
-      // remove o wrapper temporário
       wrapper.remove();
     }
 
@@ -346,7 +364,6 @@
       const fd = new FormData(qs('#filtros'));
       const params = new URLSearchParams(fd);
 
-      // habilita exportações e aponta os links
       enableExports(true);
       linkCsv();
       linkXlsx();
@@ -363,14 +380,9 @@
 
     // eventos
     qs('#filtros').addEventListener('submit', ev => { ev.preventDefault(); load(); });
+    qs('#btnPdf').addEventListener('click', (ev) => { ev.preventDefault(); generatePdf(); });
 
-    // PDF (cliente)
-    qs('#btnPdf').addEventListener('click', (ev) => {
-      ev.preventDefault();
-      generatePdf();
-    });
-
-    // estados iniciais
+    // estado inicial
     enableExports(false);
   </script>
 </body>

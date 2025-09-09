@@ -255,67 +255,56 @@
       qs('#t-lac').textContent  = fmt(sum('lacrados'));
     }
 
-    function renderFiscCards(rows){
-      const wrap = qs('#fiscCards');
-      const empty = qs('#noFisc');
-      if(!rows || rows.length === 0){
-        wrap.innerHTML = '';
-        empty.style.display = 'block';
-        return;
-      }
-      empty.style.display = 'none';
-      wrap.innerHTML = rows.map(r => {
-        const flags = [
-          r.multado  ? '<span class="pill">Multado</span>'   : '',
-          r.fechado  ? '<span class="pill">Fechado</span>'   : '',
-          r.lacrado  ? '<span class="pill">Lacrado</span>'   : '',
-        ].join('');
+   
+    // ======= PDF (cliente) =======function renderFiscCards(rows){
+  const wrap = qs('#fiscCards');
+  const empty = qs('#noFisc');
+  if(!rows || rows.length === 0){
+    wrap.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
 
-        const det        = Number(r.pessoas_detidas_qtd)||0;
-        const itensCount = Number(r.itens_apreendidos)||0;
-        const itensList  = safeArr(r.itens);
+  wrap.innerHTML = rows.map(r => {
+    const flags = [
+      r.multado  ? '<span class="pill">Multado</span>'   : '',
+      r.fechado  ? '<span class="pill">Fechado</span>'   : '',
+      r.lacrado  ? '<span class="pill">Lacrado</span>'   : '',
+    ].join('');
+    const det   = Number(r.pessoas_detidas_qtd)||0;
+    const itens = Number(r.itens_apreendidos)||0;
 
-        const itensHtml = itensList.length ? `
-          <div class="k">Itens (detalhes)</div>
-          <div>
-            <ul class="itens">
-              ${itensList.map(i => {
-                const q = (i.quantidade ?? 0);
-                const u = (i.unidade || '').trim();
-                const t = (i.tipo || '').trim();
-                const s = [fmt(q), u, t].filter(Boolean).join(' ');
-                return `<li>${s}</li>`;
-              }).join('')}
-            </ul>
-          </div>
-        ` : '';
+    const itensArr  = Array.isArray(r.itens) ? r.itens : [];
+    const itensText = itensArr.length
+      ? itensArr.map(it => `${fmt(it.quantidade)} ${it.unidade||''} ${it.tipo||''}`.trim()).join(', ')
+      : '—';
 
-        return `
-          <div class="card">
-            <div style="display:flex;justify-content:space-between;align-items:center">
-              <div><strong>#${r.evento_id}</strong> — ${r.cidade || '-'} </div>
-              <div class="muted" style="font-size:12px">${new Date(r.ts).toLocaleString('pt-BR')}</div>
-            </div>
+    return `
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div><strong>#${r.evento_id}</strong> — ${r.cidade || '-'}</div>
+          <div class="muted" style="font-size:12px">${new Date(r.ts).toLocaleString('pt-BR')}</div>
+        </div>
 
-            <div style="margin-top:6px">${flags}</div>
+        <div style="margin-top:6px">${flags}</div>
 
-            <div class="kv" style="margin-top:8px">
-              <div class="k">Tipo do local</div><div>${r.tipo_local || '-'}</div>
-              <div class="k">Nome</div><div>${r.local_nome || '-'}</div>
-              <div class="k">Endereço</div><div>${r.local_endereco || '-'}</div>
-              <div class="k">Pessoas</div><div>${fmt(r.pessoas_abordadas)}</div>
-              <div class="k">Veículos</div><div>${fmt(r.veiculos_abordados)}</div>
-              <div class="k">Detidos</div><div>${fmt(det)}</div>
-              <div class="k">Itens apreendidos</div><div>${fmt(itensCount)}</div>
-              ${itensHtml}
-              <div class="k">Usuário</div><div>${r.usuario || '-'}</div>
-            </div>
-          </div>
-        `;
-      }).join('');
-    }
+        <div class="kv" style="margin-top:8px">
+          <div class="k">Tipo do local</div><div>${r.tipo_local || '-'}</div>
+          <div class="k">Nome</div><div>${r.local_nome || '-'}</div>
+          <div class="k">Endereço</div><div>${r.local_endereco || '-'}</div>
+          <div class="k">Pessoas</div><div>${fmt(r.pessoas_abordadas)}</div>
+          <div class="k">Veículos</div><div>${fmt(r.veiculos_abordados)}</div>
+          <div class="k">Detidos</div><div>${fmt(det)}</div>
+          <div class="k">Itens apreendidos</div><div>${fmt(itens)}</div>
+          <div class="k">Itens (detalhe)</div><div>${itensText}</div>
+          <div class="k">Usuário</div><div>${r.usuario || '-'}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
 
-    // ======= PDF (cliente) =======
+
     async function generatePdf(){
       const btn = qs('#btnPdf');
       if(btn.getAttribute('aria-disabled') === 'true') return;
