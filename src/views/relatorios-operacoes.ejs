@@ -331,118 +331,118 @@
     </div>
 
     <script>
-  // ======= helpers =======
-  const qs  = (s) => document.querySelector(s);
-  const fmt = (n) => (n ?? 0).toLocaleString('pt-BR');
-  // 👇 ajuste o caminho do seu logo se for diferente
-  const LOGO_URL = '/public/images/operaco.jpg';
+        // ======= helpers =======
+        const qs = (s) => document.querySelector(s);
+        const fmt = (n) => (n ?? 0).toLocaleString('pt-BR');
+        // 👇 ajuste o caminho do seu logo se for diferente
+        const LOGO_URL = '/public/images/operaco.jpg';
 
-  function setDisabled(el, disabled){
-    if (!el) return;
-    if (disabled){ el.setAttribute('aria-disabled','true'); el.classList.add('muted'); }
-    else          { el.removeAttribute('aria-disabled');   el.classList.remove('muted'); }
-  }
-  function enableExports(enabled){
-    setDisabled(qs('#btnCsv'),  !enabled);
-    setDisabled(qs('#btnXlsx'), !enabled);
-    setDisabled(qs('#btnPdf'),  !enabled);
-  }
-  function linkCsv(){
-    const fd = new FormData(qs('#filtros'));
-    qs('#btnCsv').href = '/relatorios/export.csv?' + new URLSearchParams(fd).toString();
-  }
-  function linkXlsx(){
-    const fd = new FormData(qs('#filtros'));
-    qs('#btnXlsx').href = '/relatorios/export.xlsx?' + new URLSearchParams(fd).toString();
-  }
-  const escapeHtml = (s) => String(s ?? '').replace(/[&<>"']/g, m => ({
-    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
-  }[m]));
+        function setDisabled(el, disabled) {
+            if (!el) return;
+            if (disabled) { el.setAttribute('aria-disabled', 'true'); el.classList.add('muted'); }
+            else { el.removeAttribute('aria-disabled'); el.classList.remove('muted'); }
+        }
+        function enableExports(enabled) {
+            setDisabled(qs('#btnCsv'), !enabled);
+            setDisabled(qs('#btnXlsx'), !enabled);
+            setDisabled(qs('#btnPdf'), !enabled);
+        }
+        function linkCsv() {
+            const fd = new FormData(qs('#filtros'));
+            qs('#btnCsv').href = '/relatorios/export.csv?' + new URLSearchParams(fd).toString();
+        }
+        function linkXlsx() {
+            const fd = new FormData(qs('#filtros'));
+            qs('#btnXlsx').href = '/relatorios/export.xlsx?' + new URLSearchParams(fd).toString();
+        }
+        const escapeHtml = (s) => String(s ?? '').replace(/[&<>"']/g, m => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[m]));
 
-  // ======= renderizações =======
-  function renderKPIs(c){
-    qs('#k-fisc').textContent = fmt(c.fiscalizacoes);
-    qs('#k-pes').textContent  = fmt(c.pessoas);
-    qs('#k-vei').textContent  = fmt(c.veiculos);
-    qs('#k-det').textContent  = fmt(c.detidos);
-    qs('#k-itens').textContent= fmt(c.itensApreendidos);
-    qs('#k-apr').textContent  = fmt(c.apreensoes);
-    qs('#k-mul').textContent  = fmt(c.multados);
-    qs('#k-fec').textContent  = fmt(c.fechados);
-    qs('#k-lac').textContent  = fmt(c.lacrados);
-  }
+        // ======= renderizações =======
+        function renderKPIs(c) {
+            qs('#k-fisc').textContent = fmt(c.fiscalizacoes);
+            qs('#k-pes').textContent = fmt(c.pessoas);
+            qs('#k-vei').textContent = fmt(c.veiculos);
+            qs('#k-det').textContent = fmt(c.detidos);
+            qs('#k-itens').textContent = fmt(c.itensApreendidos);
+            qs('#k-apr').textContent = fmt(c.apreensoes);
+            qs('#k-mul').textContent = fmt(c.multados);
+            qs('#k-fec').textContent = fmt(c.fechados);
+            qs('#k-lac').textContent = fmt(c.lacrados);
+        }
 
-  function renderTopLocais(rows){
-    const tb = qs('#tblTop tbody');
-    tb.innerHTML = (rows||[]).map(r=>`
+        function renderTopLocais(rows) {
+            const tb = qs('#tblTop tbody');
+            tb.innerHTML = (rows || []).map(r => `
       <tr>
         <td>${escapeHtml(r.local_nome || '-')}</td>
         <td style="text-align:right">${fmt(Number(r.qtd || 0))}</td>
       </tr>
     `).join('');
-  }
+        }
 
-  function renderPorCidade(rows){
-    const tb = qs('#tblCidade tbody');
-    const totalFisc = (rows||[]).reduce((s,r)=> s + (Number(r.fiscalizacoes)||0), 0);
-    tb.innerHTML = (rows||[]).map(r=>{
-      const fisc = Number(r.fiscalizacoes)||0;
-      const part = totalFisc ? ((fisc/totalFisc)*100).toFixed(1)+'%' : '—';
-      return `
+        function renderPorCidade(rows) {
+            const tb = qs('#tblCidade tbody');
+            const totalFisc = (rows || []).reduce((s, r) => s + (Number(r.fiscalizacoes) || 0), 0);
+            tb.innerHTML = (rows || []).map(r => {
+                const fisc = Number(r.fiscalizacoes) || 0;
+                const part = totalFisc ? ((fisc / totalFisc) * 100).toFixed(1) + '%' : '—';
+                return `
         <tr>
-          <td>${escapeHtml(r.cidade||'-')}</td>
+          <td>${escapeHtml(r.cidade || '-')}</td>
           <td style="text-align:right">${fmt(fisc)}</td>
           <td style="text-align:right">${part}</td>
-          <td style="text-align:right">${fmt(Number(r.pessoas||0))}</td>
-          <td style="text-align:right">${fmt(Number(r.veiculos||0))}</td>
-          <td style="text-align:right">${fmt(Number(r.detidos||0))}</td>
-          <td style="text-align:right">${fmt(Number(r.itens_apreendidos||0))}</td>
-          <td style="text-align:right">${fmt(Number(r.apreensoes||0))}</td>
-          <td style="text-align:right">${fmt(Number(r.multados||0))}</td>
-          <td style="text-align:right">${fmt(Number(r.fechados||0))}</td>
-          <td style="text-align:right">${fmt(Number(r.lacrados||0))}</td>
+          <td style="text-align:right">${fmt(Number(r.pessoas || 0))}</td>
+          <td style="text-align:right">${fmt(Number(r.veiculos || 0))}</td>
+          <td style="text-align:right">${fmt(Number(r.detidos || 0))}</td>
+          <td style="text-align:right">${fmt(Number(r.itens_apreendidos || 0))}</td>
+          <td style="text-align:right">${fmt(Number(r.apreensoes || 0))}</td>
+          <td style="text-align:right">${fmt(Number(r.multados || 0))}</td>
+          <td style="text-align:right">${fmt(Number(r.fechados || 0))}</td>
+          <td style="text-align:right">${fmt(Number(r.lacrados || 0))}</td>
         </tr>`;
-    }).join('');
-    const sum = k => (rows||[]).reduce((s,r)=> s + (Number(r[k])||0), 0);
-    qs('#t-fisc').textContent = fmt(totalFisc);
-    qs('#t-pes').textContent  = fmt(sum('pessoas'));
-    qs('#t-vei').textContent  = fmt(sum('veiculos'));
-    qs('#t-det').textContent  = fmt(sum('detidos'));
-    qs('#t-itm').textContent  = fmt(sum('itens_apreendidos'));
-    qs('#t-apr').textContent  = fmt(sum('apreensoes'));
-    qs('#t-mul').textContent  = fmt(sum('multados'));
-    qs('#t-fec').textContent  = fmt(sum('fechados'));
-    qs('#t-lac').textContent  = fmt(sum('lacrados'));
-  }
+            }).join('');
+            const sum = k => (rows || []).reduce((s, r) => s + (Number(r[k]) || 0), 0);
+            qs('#t-fisc').textContent = fmt(totalFisc);
+            qs('#t-pes').textContent = fmt(sum('pessoas'));
+            qs('#t-vei').textContent = fmt(sum('veiculos'));
+            qs('#t-det').textContent = fmt(sum('detidos'));
+            qs('#t-itm').textContent = fmt(sum('itens_apreendidos'));
+            qs('#t-apr').textContent = fmt(sum('apreensoes'));
+            qs('#t-mul').textContent = fmt(sum('multados'));
+            qs('#t-fec').textContent = fmt(sum('fechados'));
+            qs('#t-lac').textContent = fmt(sum('lacrados'));
+        }
 
-  function renderFiscCards(rows){
-    const wrap = qs('#fiscCards');
-    const empty = qs('#noFisc');
-    if(!rows || rows.length === 0){
-      wrap.innerHTML = '';
-      empty.style.display = 'block';
-      return;
-    }
-    empty.style.display = 'none';
-    wrap.innerHTML = rows.map(r=>{
-      const flags = [
-        r.multado ? '<span class="pill">Multado</span>' : '',
-        r.fechado ? '<span class="pill">Fechado</span>' : '',
-        r.lacrado ? '<span class="pill">Lacrado</span>' : '',
-      ].join('');
-      const det   = Number(r.pessoas_detidas_qtd)||0;
-      const itens = Number(r.itens_apreendidos)||0;
-      const itensArr  = Array.isArray(r.itens) ? r.itens : [];
-      const itensHtml = itensArr.length
-        ? `<ul style="margin:6px 0 0 16px;padding:0">
-             ${itensArr.slice(0,5).map(it=>`
-               <li>${fmt(Number(it.quantidade||0))} ${escapeHtml(it.unidade||'')} ${escapeHtml(it.tipo||'')}</li>
+        function renderFiscCards(rows) {
+            const wrap = qs('#fiscCards');
+            const empty = qs('#noFisc');
+            if (!rows || rows.length === 0) {
+                wrap.innerHTML = '';
+                empty.style.display = 'block';
+                return;
+            }
+            empty.style.display = 'none';
+            wrap.innerHTML = rows.map(r => {
+                const flags = [
+                    r.multado ? '<span class="pill">Multado</span>' : '',
+                    r.fechado ? '<span class="pill">Fechado</span>' : '',
+                    r.lacrado ? '<span class="pill">Lacrado</span>' : '',
+                ].join('');
+                const det = Number(r.pessoas_detidas_qtd) || 0;
+                const itens = Number(r.itens_apreendidos) || 0;
+                const itensArr = Array.isArray(r.itens) ? r.itens : [];
+                const itensHtml = itensArr.length
+                    ? `<ul style="margin:6px 0 0 16px;padding:0">
+             ${itensArr.slice(0, 5).map(it => `
+               <li>${fmt(Number(it.quantidade || 0))} ${escapeHtml(it.unidade || '')} ${escapeHtml(it.tipo || '')}</li>
              `).join('')}
-             ${itensArr.length>5 ? `<li>+${itensArr.length-5} itens</li>` : ''}
+             ${itensArr.length > 5 ? `<li>+${itensArr.length - 5} itens</li>` : ''}
            </ul>`
-        : '—';
+                    : '—';
 
-      return `
+                return `
         <div class="card">
           <div style="display:flex;justify-content:space-between;align-items:center">
             <div><strong>#${r.evento_id}</strong> — ${escapeHtml(r.cidade || '-')}</div>
@@ -461,177 +461,177 @@
             <div class="k">Usuário</div><div>${escapeHtml(r.usuario || '-')}</div>
           </div>
         </div>`;
-    }).join('');
-  }
+            }).join('');
+        }
 
-  // ======= carregamento =======
-  async function load(){
-    const form = qs('#filtros');
-    const opId = qs('#opId').value;
+        // ======= carregamento =======
+        async function load() {
+            const form = qs('#filtros');
+            const opId = qs('#opId').value;
 
-    enableExports(!!opId);
-    linkCsv(); linkXlsx();
+            enableExports(!!opId);
+            linkCsv(); linkXlsx();
 
-    if(!opId){
-      qs('#content').classList.add('hidden');
-      return;
-    }
+            if (!opId) {
+                qs('#content').classList.add('hidden');
+                return;
+            }
 
-    try{
-      const btn = form.querySelector('button[type="submit"]'); if(btn) btn.disabled = true;
-      const params = new URLSearchParams(new FormData(form)).toString();
-      const res = await fetch('/relatorios/data?' + params, { cache:'no-store' });
-      if(!res.ok){ throw new Error('Erro ' + res.status + ': ' + await res.text()); }
-      const data = await res.json();
+            try {
+                const btn = form.querySelector('button[type="submit"]'); if (btn) btn.disabled = true;
+                const params = new URLSearchParams(new FormData(form)).toString();
+                const res = await fetch('/relatorios/data?' + params, { cache: 'no-store' });
+                if (!res.ok) { throw new Error('Erro ' + res.status + ': ' + await res.text()); }
+                const data = await res.json();
 
-      qs('#content').classList.remove('hidden');
-      renderKPIs(data.cards||{});
-      renderTopLocais(data.topLocais||[]);
-      renderPorCidade(data.porCidade||[]);
-      renderFiscCards(data.fiscList||[]);
-    }catch(e){
-      console.error('[relatorios/load]', e);
-      alert('Não foi possível carregar os dados dos relatórios.\n' + (e.message || e));
-    }finally{
-      const btn = qs('#filtros button[type="submit"]'); if(btn) btn.disabled = false;
-    }
-  }
+                qs('#content').classList.remove('hidden');
+                renderKPIs(data.cards || {});
+                renderTopLocais(data.topLocais || []);
+                renderPorCidade(data.porCidade || []);
+                renderFiscCards(data.fiscList || []);
+            } catch (e) {
+                console.error('[relatorios/load]', e);
+                alert('Não foi possível carregar os dados dos relatórios.\n' + (e.message || e));
+            } finally {
+                const btn = qs('#filtros button[type="submit"]'); if (btn) btn.disabled = false;
+            }
+        }
 
-  // eventos
-  qs('#filtros').addEventListener('submit', ev => { ev.preventDefault(); load(); });
-  qs('#opId').addEventListener('change', () => load());
-  qs('#btnPdf').addEventListener('click', (ev) => { ev.preventDefault(); generatePdf(); });
+        // eventos
+        qs('#filtros').addEventListener('submit', ev => { ev.preventDefault(); load(); });
+        qs('#opId').addEventListener('change', () => load());
+        qs('#btnPdf').addEventListener('click', (ev) => { ev.preventDefault(); generatePdf(); });
 
-  // estado inicial
-  enableExports(false);
+        // estado inicial
+        enableExports(false);
 
-  // ======= PDF (cliente) =======
-<script>
-async function generatePdf(){
-  const btn = document.querySelector('#btnPdf');
-  if (!btn || btn.getAttribute('aria-disabled') === 'true') return;
+        // ======= PDF (cliente) =======
+        //<script>
+        async function generatePdf() {
+            const btn = document.querySelector('#btnPdf');
+            if (!btn || btn.getAttribute('aria-disabled') === 'true') return;
 
-  if (typeof html2pdf === 'undefined') {
-    alert('PDF: biblioteca html2pdf não carregou. Verifique a rede/CSP.');
-    return;
-  }
+            if (typeof html2pdf === 'undefined') {
+                alert('PDF: biblioteca html2pdf não carregou. Verifique a rede/CSP.');
+                return;
+            }
 
-  // Filtros e rótulos
-  const form   = document.querySelector('#filtros');
-  const params = new URLSearchParams(new FormData(form)).toString();
+            // Filtros e rótulos
+            const form = document.querySelector('#filtros');
+            const params = new URLSearchParams(new FormData(form)).toString();
 
-  const opSel      = document.querySelector('#opId');
-  const cidSel     = document.querySelector('#cidadeId');
-  const from       = form.querySelector('input[name="from"]').value || '-';
-  const to         = form.querySelector('input[name="to"]').value   || '-';
-  const opId       = opSel.value || '';
-  const opText     = opSel.value ? opSel.options[opSel.selectedIndex].textContent.trim() : '-';
-  const cidadeText = cidSel.value ? cidSel.options[cidSel.selectedIndex].textContent.trim() : 'Todas';
+            const opSel = document.querySelector('#opId');
+            const cidSel = document.querySelector('#cidadeId');
+            const from = form.querySelector('input[name="from"]').value || '-';
+            const to = form.querySelector('input[name="to"]').value || '-';
+            const opId = opSel.value || '';
+            const opText = opSel.value ? opSel.options[opSel.selectedIndex].textContent.trim() : '-';
+            const cidadeText = cidSel.value ? cidSel.options[cidSel.selectedIndex].textContent.trim() : 'Todas';
 
-  // Busca dados "frescos" para o PDF
-  const res  = await fetch('/relatorios/data?' + params, { cache:'no-store' });
-  if (!res.ok) { alert('Falha ao carregar dados para o PDF'); return; }
-  const { cards = {}, porCidade = [], topLocais = [], fiscList = [] } = await res.json();
+            // Busca dados "frescos" para o PDF
+            const res = await fetch('/relatorios/data?' + params, { cache: 'no-store' });
+            if (!res.ok) { alert('Falha ao carregar dados para o PDF'); return; }
+            const { cards = {}, porCidade = [], topLocais = [], fiscList = [] } = await res.json();
 
-  // Helpers
-  const esc   = (s)=> String(s ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
-  const numBR = (n)=> (Number(n)||0).toLocaleString('pt-BR');
-  const bool  = (b)=> b ? '✓' : '';
+            // Helpers
+            const esc = (s) => String(s ?? '').replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
+            const numBR = (n) => (Number(n) || 0).toLocaleString('pt-BR');
+            const bool = (b) => b ? '✓' : '';
 
-  // HTML de impressão (fundo branco)
-  const html = `
-  <div id="pdf-wrap">
-    <style>
-      *{box-sizing:border-box}
-      body{margin:0}
-      .wrap{padding:20px 22px; color:#111; font: 12px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial; background:#fff}
-      .hdr{display:flex; align-items:center; gap:14px; border-bottom:2px solid #e5e7eb; padding-bottom:10px; margin-bottom:10px}
-      .hdr img{height:56px; object-fit:contain}
-      .title{font-size:20px; font-weight:800; margin:0}
-      .subtitle{color:#555; margin-top:2px}
-      .meta{display:grid; grid-template-columns:auto 1fr; gap:4px 10px; border:1px solid #e5e7eb; border-radius:10px; padding:10px; margin:12px 0}
-      .meta .k{color:#666}
-      .kpis{display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin:12px 0}
-      .kpi{border:1px solid #e5e7eb; border-radius:10px; padding:10px}
-      .kpi .lbl{font-size:11px; color:#666}
-      .kpi .val{font-size:18px; font-weight:800; margin-top:2px}
-      h3{font-size:14px; margin:16px 0 6px; border-left:3px solid #111; padding-left:8px}
-      table{width:100%; border-collapse:collapse; table-layout:fixed}
-      th,td{border:1px solid #e5e7eb; padding:6px 8px; vertical-align:top}
-      th{background:#f7f7f7; text-align:left; font-weight:700}
-      td.num, th.num{text-align:right}
-      .muted{color:#666}
-      .two-col{display:grid; grid-template-columns:1.2fr .8fr; gap:12px}
-      .page-break{page-break-before:always; margin-top:12px}
-      .nowrap{white-space:nowrap}
-      .w-120{width:120px}
-      .w-160{width:160px}
-      .w-220{width:220px}
-      .small{font-size:11px}
-    </style>
+            // HTML de impressão (fundo branco)
+            const html = `
+                <div id="pdf-wrap">
+                    <style>
+                        *{box - sizing:border-box}
+                        body{margin:0}
+                        .wrap{padding:20px 22px; color:#111; font: 12px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial; background:#fff}
+                        .hdr{display:flex; align-items:center; gap:14px; border-bottom:2px solid #e5e7eb; padding-bottom:10px; margin-bottom:10px}
+                        .hdr img{height:56px; object-fit:contain}
+                        .title{font - size:20px; font-weight:800; margin:0}
+                        .subtitle{color:#555; margin-top:2px}
+                        .meta{display:grid; grid-template-columns:auto 1fr; gap:4px 10px; border:1px solid #e5e7eb; border-radius:10px; padding:10px; margin:12px 0}
+                        .meta .k{color:#666}
+                        .kpis{display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin:12px 0}
+                        .kpi{border:1px solid #e5e7eb; border-radius:10px; padding:10px}
+                        .kpi .lbl{font - size:11px; color:#666}
+                        .kpi .val{font - size:18px; font-weight:800; margin-top:2px}
+                        h3{font - size:14px; margin:16px 0 6px; border-left:3px solid #111; padding-left:8px}
+                        table{width:100%; border-collapse:collapse; table-layout:fixed}
+                        th,td{border:1px solid #e5e7eb; padding:6px 8px; vertical-align:top}
+                        th{background:#f7f7f7; text-align:left; font-weight:700}
+                        td.num, th.num{text - align:right}
+                        .muted{color:#666}
+                        .two-col{display:grid; grid-template-columns:1.2fr .8fr; gap:12px}
+                        .page-break{page -break-before:always; margin-top:12px}
+                        .nowrap{white - space:nowrap}
+                        .w-120{width:120px}
+                        .w-160{width:160px}
+                        .w-220{width:220px}
+                        .small{font - size:11px}
+                    </style>
 
-    <div class="wrap">
-      <div class="hdr">
-        <img src="${esc(LOGO_URL)}" alt="Logo"/>
-        <div>
-          <h1 class="title">Relatório — Operação</h1>
-          <div class="subtitle">Centro de Inteligência Metropolitana</div>
-        </div>
-        <div style="margin-left:auto; text-align:right" class="small muted">
-          Emitido em ${esc(new Date().toLocaleString('pt-BR'))}
-        </div>
-      </div>
+                    <div class="wrap">
+                        <div class="hdr">
+                            <img src="${esc(LOGO_URL)}" alt="Logo" />
+                            <div>
+                                <h1 class="title">Relatório — Operação</h1>
+                                <div class="subtitle">Centro de Inteligência Metropolitana</div>
+                            </div>
+                            <div style="margin-left:auto; text-align:right" class="small muted">
+                                Emitido em ${esc(new Date().toLocaleString('pt-BR'))}
+                            </div>
+                        </div>
 
-      <div class="meta">
-        <div class="k">Operação</div><div>${esc(opText)}</div>
-        <div class="k">Período</div><div>${esc(from)} — ${esc(to)}</div>
-        <div class="k">Cidade</div><div>${esc(cidadeText)}</div>
-      </div>
+                        <div class="meta">
+                            <div class="k">Operação</div><div>${esc(opText)}</div>
+                            <div class="k">Período</div><div>${esc(from)} — ${esc(to)}</div>
+                            <div class="k">Cidade</div><div>${esc(cidadeText)}</div>
+                        </div>
 
-      <div class="kpis">
-        ${[
-          ['Fiscalizações', cards.fiscalizacoes],
-          ['Pessoas',       cards.pessoas],
-          ['Veículos',      cards.veiculos],
-          ['Detidos',       cards.detidos],
-          ['Itens apreen.', cards.itensApreendidos],
-          ['Apreensões',    cards.apreensoes],
-          ['Multados',      cards.multados],
-          ['Fechados',      cards.fechados],
-          ['Lacrados',      cards.lacrados]
-        ].map(([l,v])=>`
+                        <div class="kpis">
+                            ${[
+                    ['Fiscalizações', cards.fiscalizacoes],
+                    ['Pessoas', cards.pessoas],
+                    ['Veículos', cards.veiculos],
+                    ['Detidos', cards.detidos],
+                    ['Itens apreen.', cards.itensApreendidos],
+                    ['Apreensões', cards.apreensoes],
+                    ['Multados', cards.multados],
+                    ['Fechados', cards.fechados],
+                    ['Lacrados', cards.lacrados]
+                ].map(([l, v]) => `
           <div class="kpi"><div class="lbl">${esc(l)}</div><div class="val">${numBR(v)}</div></div>
         `).join('')}
-      </div>
+                        </div>
 
-      <div class="two-col">
-        <div>
-          <h3>Distribuição por cidade</h3>
-          <table>
-            <thead>
-              <tr>
-                <th>Cidade</th>
-                <th class="num">Fiscalizações</th>
-                <th class="num">% part.</th>
-                <th class="num">Pessoas</th>
-                <th class="num">Veículos</th>
-                <th class="num">Detidos</th>
-                <th class="num">Itens</th>
-                <th class="num">Apreensões</th>
-                <th class="num">Multados</th>
-                <th class="num">Fechados</th>
-                <th class="num">Lacrados</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${(()=>{
-                 const totalF = porCidade.reduce((s,r)=>s+(Number(r.fiscalizacoes)||0),0);
-                 return porCidade.map(r=>{
-                   const f = Number(r.fiscalizacoes)||0;
-                   const part = totalF ? (f/totalF*100).toFixed(1)+'%' : '—';
-                   return `
+                        <div class="two-col">
+                            <div>
+                                <h3>Distribuição por cidade</h3>
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Cidade</th>
+                                            <th class="num">Fiscalizações</th>
+                                            <th class="num">% part.</th>
+                                            <th class="num">Pessoas</th>
+                                            <th class="num">Veículos</th>
+                                            <th class="num">Detidos</th>
+                                            <th class="num">Itens</th>
+                                            <th class="num">Apreensões</th>
+                                            <th class="num">Multados</th>
+                                            <th class="num">Fechados</th>
+                                            <th class="num">Lacrados</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${(() => {
+                    const totalF = porCidade.reduce((s, r) => s + (Number(r.fiscalizacoes) || 0), 0);
+                    return porCidade.map(r => {
+                        const f = Number(r.fiscalizacoes) || 0;
+                        const part = totalF ? (f / totalF * 100).toFixed(1) + '%' : '—';
+                        return `
                      <tr>
-                       <td>${esc(r.cidade||'-')}</td>
+                       <td>${esc(r.cidade || '-')}</td>
                        <td class="num">${numBR(f)}</td>
                        <td class="num">${part}</td>
                        <td class="num">${numBR(r.pessoas)}</td>
@@ -643,60 +643,60 @@ async function generatePdf(){
                        <td class="num">${numBR(r.fechados)}</td>
                        <td class="num">${numBR(r.lacrados)}</td>
                      </tr>`;
-                 }).join('');
-              })()}
-            </tbody>
-          </table>
-        </div>
+                    }).join('');
+                })()}
+                                    </tbody>
+                                </table>
+                            </div>
 
-        <div>
-          <h3>Top locais fiscalizados</h3>
-          <table>
-            <thead><tr><th>Local</th><th class="num">Qtd.</th></tr></thead>
-            <tbody>
-              ${topLocais.map(r=>`
-                <tr><td>${esc(r.local_nome||'-')}</td><td class="num">${numBR(r.qtd)}</td></tr>
+                            <div>
+                                <h3>Top locais fiscalizados</h3>
+                                <table>
+                                    <thead><tr><th>Local</th><th class="num">Qtd.</th></tr></thead>
+                                    <tbody>
+                                        ${topLocais.map(r => `
+                <tr><td>${esc(r.local_nome || '-')}</td><td class="num">${numBR(r.qtd)}</td></tr>
               `).join('')}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
 
-      <div class="page-break"></div>
+                        <div class="page-break"></div>
 
-      <h3>Fiscalizações (detalhe)</h3>
-      <table>
-        <thead>
-          <tr>
-            <th class="w-120">Evento</th>
-            <th class="w-160">Data/Hora</th>
-            <th>Cidade</th>
-            <th>Tipo do local</th>
-            <th>Nome do local</th>
-            <th class="w-220">Endereço</th>
-            <th class="num">Pessoas</th>
-            <th class="num">Veículos</th>
-            <th class="num">Detidos</th>
-            <th class="num">Itens</th>
-            <th class="nowrap">Mult.</th>
-            <th class="nowrap">Fech.</th>
-            <th class="nowrap">Lacr.</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${fiscList.map(r=>{
-            const itensArr = Array.isArray(r.itens) ? r.itens : [];
-            const itensStr = itensArr.length
-              ? itensArr.map(it => `${numBR(it.quantidade)} ${esc(it.unidade||'')} ${esc(it.tipo||'')}`).join('; ')
-              : '—';
-            return `
+                        <h3>Fiscalizações (detalhe)</h3>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th class="w-120">Evento</th>
+                                    <th class="w-160">Data/Hora</th>
+                                    <th>Cidade</th>
+                                    <th>Tipo do local</th>
+                                    <th>Nome do local</th>
+                                    <th class="w-220">Endereço</th>
+                                    <th class="num">Pessoas</th>
+                                    <th class="num">Veículos</th>
+                                    <th class="num">Detidos</th>
+                                    <th class="num">Itens</th>
+                                    <th class="nowrap">Mult.</th>
+                                    <th class="nowrap">Fech.</th>
+                                    <th class="nowrap">Lacr.</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${fiscList.map(r => {
+                    const itensArr = Array.isArray(r.itens) ? r.itens : [];
+                    const itensStr = itensArr.length
+                        ? itensArr.map(it => `${numBR(it.quantidade)} ${esc(it.unidade || '')} ${esc(it.tipo || '')}`).join('; ')
+                        : '—';
+                    return `
               <tr>
                 <td>#${numBR(r.evento_id)}</td>
                 <td>${esc(new Date(r.ts).toLocaleString('pt-BR'))}</td>
-                <td>${esc(r.cidade||'-')}</td>
-                <td>${esc(r.tipo_local||'-')}</td>
-                <td>${esc(r.local_nome||'-')}</td>
-                <td>${esc(r.local_endereco||'-')}</td>
+                <td>${esc(r.cidade || '-')}</td>
+                <td>${esc(r.tipo_local || '-')}</td>
+                <td>${esc(r.local_nome || '-')}</td>
+                <td>${esc(r.local_endereco || '-')}</td>
                 <td class="num">${numBR(r.pessoas_abordadas)}</td>
                 <td class="num">${numBR(r.veiculos_abordados)}</td>
                 <td class="num">${numBR(r.pessoas_detidas_qtd)}</td>
@@ -709,30 +709,32 @@ async function generatePdf(){
                 <td colspan="13" class="small"><span class="muted">Itens (detalhe):</span> ${itensStr}</td>
               </tr>
             `;
-          }).join('')}
-        </tbody>
-      </table>
-    </div>
-  </div>`;
+                }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>`;
 
-  // Injeta, gera PDF e remove
-  const wrapper = document.createElement('div');
-  wrapper.innerHTML = html;
-  document.body.appendChild(wrapper);
+            // Injeta, gera PDF e remove
+            const wrapper = document.createElement('div');
+            wrapper.innerHTML = html;
+            document.body.appendChild(wrapper);
 
-  const opt = {
-    margin:[10,10,10,10],
-    filename:`relatorio_operacao_${opId || 'filtro'}.pdf`,
-    image:{ type:'jpeg', quality:0.98 },
-    html2canvas:{ scale:2, useCORS:true },
-    jsPDF:{ unit:'mm', format:'a4', orientation:'portrait' }
-  };
+            const opt = {
+                margin: [10, 10, 10, 10],
+                filename: `relatorio_operacao_${opId || 'filtro'}.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: true },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
 
-  await html2pdf().set(opt).from(wrapper.querySelector('#pdf-wrap')).save();
-  wrapper.remove();
-}
-</script>
+            await html2pdf().set(opt).from(wrapper.querySelector('#pdf-wrap')).save();
+            wrapper.remove();
+        }
+        // 
 
+
+    </script>
 
 
 </body>
