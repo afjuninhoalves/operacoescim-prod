@@ -335,57 +335,68 @@
         const qs = (s) => document.querySelector(s);
         const fmt = (n) => (n ?? 0).toLocaleString('pt-BR');
 
-        function setDisabled(el, disabled) {
-            if (!el) return;
-            if (disabled) { el.setAttribute('aria-disabled', 'true'); el.classList.add('muted'); }
-            else { el.removeAttribute('aria-disabled'); el.classList.remove('muted'); }
-        }
-        function enableExports(enabled) {
-            setDisabled(qs('#btnCsv'), !enabled);
-            setDisabled(qs('#btnXlsx'), !enabled);
-            setDisabled(qs('#btnPdf'), !enabled);
-        }
-        function linkCsv() {
-            const fd = new FormData(qs('#filtros'));
-            qs('#btnCsv').href = '/relatorios/export.csv?' + new URLSearchParams(fd).toString();
-        }
-        function linkXlsx() {
-            const fd = new FormData(qs('#filtros'));
-            qs('#btnXlsx').href = '/relatorios/export.xlsx?' + new URLSearchParams(fd).toString();
-        }
-        const escapeHtml = (s) => String(s ?? '').replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+        async function generatePdf() {
+            const btn = qs('#btnPdf');
+            if (!btn || btn.getAttribute('aria-disabled') === 'true') return;
 
-        // ======= renderizações =======
-        function renderKPIs(c) {
-            qs('#k-fisc').textContent = fmt(c.fiscalizacoes);
-            qs('#k-pes').textContent = fmt(c.pessoas);
-            qs('#k-vei').textContent = fmt(c.veiculos);
-            qs('#k-det').textContent = fmt(c.detidos);
-            qs('#k-itens').textContent = fmt(c.itensApreendidos);
-            qs('#k-apr').textContent = fmt(c.apreensoes);
-            qs('#k-mul').textContent = fmt(c.multados);
-            qs('#k-fec').textContent = fmt(c.fechados);
-            qs('#k-lac').textContent = fmt(c.lacrados);
+            // biblioteca não carregada?
+            if (typeof html2pdf === 'undefined') {
+                alert('PDF: biblioteca html2pdf não carregou. Verifique a rede/CSP.');
+                return;
+            }
         }
 
-        function renderTopLocais(rows) {
-            const tb = qs('#tblTop tbody');
-            tb.innerHTML = (rows || []).map(r => `
+            function setDisabled(el, disabled) {
+                if (!el) return;
+                if (disabled) { el.setAttribute('aria-disabled', 'true'); el.classList.add('muted'); }
+                else { el.removeAttribute('aria-disabled'); el.classList.remove('muted'); }
+            }
+            function enableExports(enabled) {
+                setDisabled(qs('#btnCsv'), !enabled);
+                setDisabled(qs('#btnXlsx'), !enabled);
+                setDisabled(qs('#btnPdf'), !enabled);
+            }
+            function linkCsv() {
+                const fd = new FormData(qs('#filtros'));
+                qs('#btnCsv').href = '/relatorios/export.csv?' + new URLSearchParams(fd).toString();
+            }
+            function linkXlsx() {
+                const fd = new FormData(qs('#filtros'));
+                qs('#btnXlsx').href = '/relatorios/export.xlsx?' + new URLSearchParams(fd).toString();
+            }
+            const escapeHtml = (s) => String(s ?? '').replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+
+            // ======= renderizações =======
+            function renderKPIs(c) {
+                qs('#k-fisc').textContent = fmt(c.fiscalizacoes);
+                qs('#k-pes').textContent = fmt(c.pessoas);
+                qs('#k-vei').textContent = fmt(c.veiculos);
+                qs('#k-det').textContent = fmt(c.detidos);
+                qs('#k-itens').textContent = fmt(c.itensApreendidos);
+                qs('#k-apr').textContent = fmt(c.apreensoes);
+                qs('#k-mul').textContent = fmt(c.multados);
+                qs('#k-fec').textContent = fmt(c.fechados);
+                qs('#k-lac').textContent = fmt(c.lacrados);
+            }
+
+            function renderTopLocais(rows) {
+                const tb = qs('#tblTop tbody');
+                tb.innerHTML = (rows || []).map(r => `
       <tr>
         <td>${escapeHtml(r.local_nome || '-')}</td>
         <td style="text-align:right">${fmt(Number(r.qtd || 0))}</td>
       </tr>
     `).join('');
-        }
+            }
 
-        function renderPorCidade(rows) {
-            const tb = qs('#tblCidade tbody');
-            const totalFisc = (rows || []).reduce((s, r) => s + (Number(r.fiscalizacoes) || 0), 0);
+            function renderPorCidade(rows) {
+                const tb = qs('#tblCidade tbody');
+                const totalFisc = (rows || []).reduce((s, r) => s + (Number(r.fiscalizacoes) || 0), 0);
 
-            tb.innerHTML = (rows || []).map(r => {
-                const fisc = Number(r.fiscalizacoes) || 0;
-                const part = totalFisc ? ((fisc / totalFisc) * 100).toFixed(1) + '%' : '—';
-                return `
+                tb.innerHTML = (rows || []).map(r => {
+                    const fisc = Number(r.fiscalizacoes) || 0;
+                    const part = totalFisc ? ((fisc / totalFisc) * 100).toFixed(1) + '%' : '—';
+                    return `
         <tr>
           <td>${escapeHtml(r.cidade || '-')}</td>
           <td style="text-align:right">${fmt(fisc)}</td>
@@ -400,52 +411,52 @@
           <td style="text-align:right">${fmt(Number(r.lacrados || 0))}</td>
         </tr>
       `;
-            }).join('');
+                }).join('');
 
-            const sum = k => (rows || []).reduce((s, r) => s + (Number(r[k]) || 0), 0);
-            qs('#t-fisc').textContent = fmt(totalFisc);
-            qs('#t-pes').textContent = fmt(sum('pessoas'));
-            qs('#t-vei').textContent = fmt(sum('veiculos'));
-            qs('#t-det').textContent = fmt(sum('detidos'));
-            qs('#t-itm').textContent = fmt(sum('itens_apreendidos'));
-            qs('#t-apr').textContent = fmt(sum('apreensoes'));
-            qs('#t-mul').textContent = fmt(sum('multados'));
-            qs('#t-fec').textContent = fmt(sum('fechados'));
-            qs('#t-lac').textContent = fmt(sum('lacrados'));
-        }
-
-        function renderFiscCards(rows) {
-            const wrap = qs('#fiscCards');
-            const empty = qs('#noFisc');
-            if (!rows || rows.length === 0) {
-                wrap.innerHTML = '';
-                empty.style.display = 'block';
-                return;
+                const sum = k => (rows || []).reduce((s, r) => s + (Number(r[k]) || 0), 0);
+                qs('#t-fisc').textContent = fmt(totalFisc);
+                qs('#t-pes').textContent = fmt(sum('pessoas'));
+                qs('#t-vei').textContent = fmt(sum('veiculos'));
+                qs('#t-det').textContent = fmt(sum('detidos'));
+                qs('#t-itm').textContent = fmt(sum('itens_apreendidos'));
+                qs('#t-apr').textContent = fmt(sum('apreensoes'));
+                qs('#t-mul').textContent = fmt(sum('multados'));
+                qs('#t-fec').textContent = fmt(sum('fechados'));
+                qs('#t-lac').textContent = fmt(sum('lacrados'));
             }
-            empty.style.display = 'none';
 
-            wrap.innerHTML = rows.map(r => {
-                const flags = [
-                    r.multado ? '<span class="pill">Multado</span>' : '',
-                    r.fechado ? '<span class="pill">Fechado</span>' : '',
-                    r.lacrado ? '<span class="pill">Lacrado</span>' : '',
-                ].join('');
+            function renderFiscCards(rows) {
+                const wrap = qs('#fiscCards');
+                const empty = qs('#noFisc');
+                if (!rows || rows.length === 0) {
+                    wrap.innerHTML = '';
+                    empty.style.display = 'block';
+                    return;
+                }
+                empty.style.display = 'none';
 
-                const det = Number(r.pessoas_detidas_qtd) || 0;
-                const itens = Number(r.itens_apreendidos) || 0;
+                wrap.innerHTML = rows.map(r => {
+                    const flags = [
+                        r.multado ? '<span class="pill">Multado</span>' : '',
+                        r.fechado ? '<span class="pill">Fechado</span>' : '',
+                        r.lacrado ? '<span class="pill">Lacrado</span>' : '',
+                    ].join('');
 
-                // Detalhe dos itens (array retornado pelo backend)
-                const itensArr = Array.isArray(r.itens) ? r.itens : [];
-                const itensHtml = itensArr.length
-                    ? `<ul style="margin:6px 0 0 16px;padding:0">
+                    const det = Number(r.pessoas_detidas_qtd) || 0;
+                    const itens = Number(r.itens_apreendidos) || 0;
+
+                    // Detalhe dos itens (array retornado pelo backend)
+                    const itensArr = Array.isArray(r.itens) ? r.itens : [];
+                    const itensHtml = itensArr.length
+                        ? `<ul style="margin:6px 0 0 16px;padding:0">
              ${itensArr.slice(0, 5).map(it => `
                <li>${fmt(Number(it.quantidade || 0))} ${escapeHtml(it.unidade || '')} ${escapeHtml(it.tipo || '')}</li>
              `).join('')}
              ${itensArr.length > 5 ? `<li>+${itensArr.length - 5} itens</li>` : ''}
            </ul>`
-                    : '—';
+                        : '—';
 
-                return `
+                    return `
         <div class="card">
           <div style="display:flex;justify-content:space-between;align-items:center">
             <div><strong>#${r.evento_id}</strong> — ${escapeHtml(r.cidade || '-')}</div>
@@ -467,82 +478,82 @@
           </div>
         </div>
       `;
-            }).join('');
-        }
-
-        // ======= carregamento =======
-        async function load() {
-            const form = qs('#filtros');
-            const opId = qs('#opId').value;
-
-            // habilita/atualiza exportações
-            enableExports(!!opId);
-            linkCsv();
-            linkXlsx();
-
-            if (!opId) {
-                qs('#content').classList.add('hidden');
-                return;
+                }).join('');
             }
 
-            try {
-                const btn = form.querySelector('button[type="submit"]');
-                if (btn) btn.disabled = true;
+            // ======= carregamento =======
+            async function load() {
+                const form = qs('#filtros');
+                const opId = qs('#opId').value;
 
-                const params = new URLSearchParams(new FormData(form)).toString();
-                const res = await fetch('/relatorios/data?' + params, { cache: 'no-store' });
+                // habilita/atualiza exportações
+                enableExports(!!opId);
+                linkCsv();
+                linkXlsx();
 
-                if (!res.ok) {
-                    const txt = await res.text();
-                    throw new Error(`Erro ${res.status}: ${txt}`);
+                if (!opId) {
+                    qs('#content').classList.add('hidden');
+                    return;
                 }
 
-                const data = await res.json();
+                try {
+                    const btn = form.querySelector('button[type="submit"]');
+                    if (btn) btn.disabled = true;
 
-                qs('#content').classList.remove('hidden');
-                renderKPIs(data.cards || {});
-                renderTopLocais(data.topLocais || []);
-                renderPorCidade(data.porCidade || []);
-                renderFiscCards(data.fiscList || []);
-            } catch (e) {
-                console.error('[relatorios/load]', e);
-                alert('Não foi possível carregar os dados dos relatórios.\n' + (e.message || e));
-            } finally {
-                const btn = qs('#filtros button[type="submit"]');
-                if (btn) btn.disabled = false;
+                    const params = new URLSearchParams(new FormData(form)).toString();
+                    const res = await fetch('/relatorios/data?' + params, { cache: 'no-store' });
+
+                    if (!res.ok) {
+                        const txt = await res.text();
+                        throw new Error(`Erro ${res.status}: ${txt}`);
+                    }
+
+                    const data = await res.json();
+
+                    qs('#content').classList.remove('hidden');
+                    renderKPIs(data.cards || {});
+                    renderTopLocais(data.topLocais || []);
+                    renderPorCidade(data.porCidade || []);
+                    renderFiscCards(data.fiscList || []);
+                } catch (e) {
+                    console.error('[relatorios/load]', e);
+                    alert('Não foi possível carregar os dados dos relatórios.\n' + (e.message || e));
+                } finally {
+                    const btn = qs('#filtros button[type="submit"]');
+                    if (btn) btn.disabled = false;
+                }
             }
-        }
 
-        // eventos
-        qs('#filtros').addEventListener('submit', ev => { ev.preventDefault(); load(); });
-        qs('#opId').addEventListener('change', () => load()); // carrega ao trocar operação
-        qs('#btnPdf').addEventListener('click', (ev) => {
-            ev.preventDefault();
-            generatePdf();
-        });
+            // eventos
+            qs('#filtros').addEventListener('submit', ev => { ev.preventDefault(); load(); });
+            qs('#opId').addEventListener('change', () => load()); // carrega ao trocar operação
+            qs('#btnPdf').addEventListener('click', (ev) => {
+                ev.preventDefault();
+                generatePdf();
+            });
 
-        // estado inicial
-        enableExports(false);
+            // estado inicial
+            enableExports(false);
 
-        // ======= PDF (cliente) =======
-        async function generatePdf() {
-            const btn = qs('#btnPdf');
-            if (!btn || btn.getAttribute('aria-disabled') === 'true') return;
+            // ======= PDF (cliente) =======
+            async function generatePdf() {
+                const btn = qs('#btnPdf');
+                if (!btn || btn.getAttribute('aria-disabled') === 'true') return;
 
-            const opSel = qs('#opId');
-            const cidSel = qs('#cidadeId');
-            const from = qs('input[name="from"]').value || '-';
-            const to = qs('input[name="to"]').value || '-';
-            const opId = opSel.value;
-            const opText = opSel.value ? opSel.options[opSel.selectedIndex].textContent : '-';
-            const cidadeText = cidSel.value ? cidSel.options[cidSel.selectedIndex].textContent : 'Todas';
+                const opSel = qs('#opId');
+                const cidSel = qs('#cidadeId');
+                const from = qs('input[name="from"]').value || '-';
+                const to = qs('input[name="to"]').value || '-';
+                const opId = opSel.value;
+                const opText = opSel.value ? opSel.options[opSel.selectedIndex].textContent : '-';
+                const cidadeText = cidSel.value ? cidSel.options[cidSel.selectedIndex].textContent : 'Todas';
 
-            // wrapper com cabeçalho e conteúdo atual
-            const wrapper = document.createElement('div');
-            wrapper.style.padding = '16px';
-            wrapper.style.maxWidth = '900px';
-            wrapper.style.margin = '0 auto';
-            wrapper.innerHTML = `
+                // wrapper com cabeçalho e conteúdo atual
+                const wrapper = document.createElement('div');
+                wrapper.style.padding = '16px';
+                wrapper.style.maxWidth = '900px';
+                wrapper.style.margin = '0 auto';
+                wrapper.innerHTML = `
     <div style="text-align:center;margin-bottom:8px">
       <img src="${LOGO_URL}" alt="Logo" style="height:64px;object-fit:contain"/>
     </div>
@@ -559,21 +570,21 @@
     </div>
   `;
 
-            const contentClone = qs('#content').cloneNode(true);
-            contentClone.classList.remove('hidden');
-            wrapper.appendChild(contentClone);
+                const contentClone = qs('#content').cloneNode(true);
+                contentClone.classList.remove('hidden');
+                wrapper.appendChild(contentClone);
 
-            const opt = {
-                margin: [10, 10, 10, 10],
-                filename: `relatorio_operacao_${opId || 'filtro'}.pdf`,
-                image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { scale: 2, useCORS: true },
-                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-            };
+                const opt = {
+                    margin: [10, 10, 10, 10],
+                    filename: `relatorio_operacao_${opId || 'filtro'}.pdf`,
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: { scale: 2, useCORS: true },
+                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                };
 
-            await html2pdf().set(opt).from(wrapper).save();
-            wrapper.remove();
-        }
+                await html2pdf().set(opt).from(wrapper).save();
+                wrapper.remove();
+            }
 
     </script>
 
