@@ -330,12 +330,18 @@
         </div>
     </div>
 
-    <script>
+  <script>
   // ======= helpers =======
   const qs  = (s) => document.querySelector(s);
   const fmt = (n) => (n ?? 0).toLocaleString('pt-BR');
-  // 👇 ajuste o caminho do seu logo se for diferente
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, m => (
+    {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]
+  ));
+  // ajuste o caminho do seu logo se for diferente
   const LOGO_URL = '/public/images/operaco.jpg';
+
+  // vamos guardar o último payload para o PDF
+  let __relatorioData = null;
 
   function setDisabled(el, disabled){
     if (!el) return;
@@ -355,11 +361,8 @@
     const fd = new FormData(qs('#filtros'));
     qs('#btnXlsx').href = '/relatorios/export.xlsx?' + new URLSearchParams(fd).toString();
   }
-  const escapeHtml = (s) => String(s ?? '').replace(/[&<>"']/g, m => ({
-    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
-  }[m]));
 
-  // ======= renderizações =======
+  // ======= renderizações (tela) =======
   function renderKPIs(c){
     qs('#k-fisc').textContent = fmt(c.fiscalizacoes);
     qs('#k-pes').textContent  = fmt(c.pessoas);
@@ -376,7 +379,7 @@
     const tb = qs('#tblTop tbody');
     tb.innerHTML = (rows||[]).map(r=>`
       <tr>
-        <td>${escapeHtml(r.local_nome || '-')}</td>
+        <td>${esc(r.local_nome || '-')}</td>
         <td style="text-align:right">${fmt(Number(r.qtd || 0))}</td>
       </tr>
     `).join('');
@@ -390,7 +393,7 @@
       const part = totalFisc ? ((fisc/totalFisc)*100).toFixed(1)+'%' : '—';
       return `
         <tr>
-          <td>${escapeHtml(r.cidade||'-')}</td>
+          <td>${esc(r.cidade||'-')}</td>
           <td style="text-align:right">${fmt(fisc)}</td>
           <td style="text-align:right">${part}</td>
           <td style="text-align:right">${fmt(Number(r.pessoas||0))}</td>
@@ -436,7 +439,7 @@
       const itensHtml = itensArr.length
         ? `<ul style="margin:6px 0 0 16px;padding:0">
              ${itensArr.slice(0,5).map(it=>`
-               <li>${fmt(Number(it.quantidade||0))} ${escapeHtml(it.unidade||'')} ${escapeHtml(it.tipo||'')}</li>
+               <li>${fmt(Number(it.quantidade||0))} ${esc(it.unidade||'')} ${esc(it.tipo||'')}</li>
              `).join('')}
              ${itensArr.length>5 ? `<li>+${itensArr.length-5} itens</li>` : ''}
            </ul>`
@@ -445,20 +448,20 @@
       return `
         <div class="card">
           <div style="display:flex;justify-content:space-between;align-items:center">
-            <div><strong>#${r.evento_id}</strong> — ${escapeHtml(r.cidade || '-')}</div>
+            <div><strong>#${r.evento_id}</strong> — ${esc(r.cidade || '-')}</div>
             <div class="muted" style="font-size:12px">${new Date(r.ts).toLocaleString('pt-BR')}</div>
           </div>
           <div style="margin-top:6px">${flags}</div>
           <div class="kv" style="margin-top:8px">
-            <div class="k">Tipo do local</div><div>${escapeHtml(r.tipo_local || '-')}</div>
-            <div class="k">Nome</div><div>${escapeHtml(r.local_nome || '-')}</div>
-            <div class="k">Endereço</div><div>${escapeHtml(r.local_endereco || '-')}</div>
+            <div class="k">Tipo do local</div><div>${esc(r.tipo_local || '-')}</div>
+            <div class="k">Nome</div><div>${esc(r.local_nome || '-')}</div>
+            <div class="k">Endereço</div><div>${esc(r.local_endereco || '-')}</div>
             <div class="k">Pessoas</div><div>${fmt(Number(r.pessoas_abordadas || 0))}</div>
             <div class="k">Veículos</div><div>${fmt(Number(r.veiculos_abordados || 0))}</div>
             <div class="k">Detidos</div><div>${fmt(det)}</div>
             <div class="k">Itens apreendidos</div><div>${fmt(itens)}</div>
             <div class="k">Itens (detalhe)</div><div>${itensHtml}</div>
-            <div class="k">Usuário</div><div>${escapeHtml(r.usuario || '-')}</div>
+            <div class="k">Usuário</div><div>${esc(r.usuario || '-')}</div>
           </div>
         </div>`;
     }).join('');
@@ -484,6 +487,9 @@
       if(!res.ok){ throw new Error('Erro ' + res.status + ': ' + await res.text()); }
       const data = await res.json();
 
+      // guarda para o PDF “clean”
+      __relatorioData = data;
+
       qs('#content').classList.remove('hidden');
       renderKPIs(data.cards||{});
       renderTopLocais(data.topLocais||[]);
@@ -505,7 +511,7 @@
   // estado inicial
   enableExports(false);
 
-  // ======= PDF (cliente) =======
+  // ======= PDF (cliente) — layout branco profissional =======
   async function generatePdf(){
     const btn = qs('#btnPdf');
     if (!btn || btn.getAttribute('aria-disabled') === 'true') return;
@@ -514,51 +520,208 @@
       alert('PDF: biblioteca html2pdf não carregou.');
       return;
     }
-
-    try{
-      const opSel = qs('#opId');
-      const cidSel = qs('#cidadeId');
-      const from = qs('input[name="from"]').value || '-';
-      const to   = qs('input[name="to"]').value   || '-';
-      const opId = opSel.value;
-      const opText = opSel.value ? opSel.options[opSel.selectedIndex].textContent : '-';
-      const cidadeText = cidSel.value ? cidSel.options[cidSel.selectedIndex].textContent : 'Todas';
-
-      const wrapper = document.createElement('div');
-      wrapper.style.padding = '16px';
-      wrapper.style.maxWidth = '900px';
-      wrapper.style.margin = '0 auto';
-      wrapper.innerHTML = `
-        <div style="text-align:center;margin-bottom:8px">
-          <img src="${LOGO_URL}" alt="Logo" style="height:64px;object-fit:contain"/>
-        </div>
-        <div style="text-align:center;font-weight:800;font-size:22px;margin:2px 0">C.I.M</div>
-        <div style="text-align:center;font-size:14px;margin-bottom:8px">Centro de Inteligência Metropolitana</div>
-        <div style="border:1px solid #ccc;border-radius:10px;padding:12px;margin:10px 0">
-          <div style="font-weight:700;margin-bottom:6px">Operação</div>
-          <div style="display:grid;grid-template-columns:auto 1fr;gap:4px 8px;font-size:13px">
-            <div style="color:#555">Selecionada</div><div>${opText}</div>
-            <div style="color:#555">Período</div><div>${from} — ${to}</div>
-            <div style="color:#555">Cidade</div><div>${cidadeText}</div>
-          </div>
-        </div>`;
-      const contentClone = qs('#content').cloneNode(true);
-      contentClone.classList.remove('hidden');
-      wrapper.appendChild(contentClone);
-
-      await html2pdf().set({
-        margin: [10,10,10,10],
-        filename: `relatorio_operacao_${opId || 'filtro'}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-      }).from(wrapper).save();
-
-      wrapper.remove();
-    }catch(err){
-      console.error('[pdf] erro ao gerar', err);
-      alert('Não consegui gerar o PDF. Veja o console (F12) para detalhes.');
+    if (!__relatorioData){
+      alert('Carregue os dados (Aplicar) antes de gerar o PDF.');
+      return;
     }
+
+    const form   = qs('#filtros');
+    const opSel  = qs('#opId');
+    const cidSel = qs('#cidadeId');
+    const from   = form.querySelector('input[name="from"]').value || '-';
+    const to     = form.querySelector('input[name="to"]').value   || '-';
+    const opId   = opSel.value;
+    const opText = opSel.value ? opSel.options[opSel.selectedIndex].textContent.trim() : '-';
+    const cidadeText = cidSel.value ? cidSel.options[cidSel.selectedIndex].textContent.trim() : 'Todas';
+
+    const {cards={}, porCidade=[], topLocais=[], fiscList=[]} = __relatorioData;
+
+    // prepara blocos de HTML
+    const kpiHtml = [
+      ['Fiscalizações', cards.fiscalizacoes],
+      ['Pessoas',       cards.pessoas],
+      ['Veículos',      cards.veiculos],
+      ['Detidos',       cards.detidos],
+      ['Itens apreen.', cards.itensApreendidos],
+      ['Apreensões',    cards.apreensoes],
+      ['Multados',      cards.multados],
+      ['Fechados',      cards.fechados],
+      ['Lacrados',      cards.lacrados],
+    ].map(([l,v]) => `
+      <div class="kpi"><div class="lbl">${esc(l)}</div><div class="val">${fmt(v)}</div></div>
+    `).join('');
+
+    const totalF = porCidade.reduce((s,r)=>s+(Number(r.fiscalizacoes)||0),0);
+    const porCidadeRows = porCidade.map(r=>{
+      const f = Number(r.fiscalizacoes)||0;
+      const part = totalF ? (f/totalF*100).toFixed(1)+'%' : '—';
+      return `
+        <tr>
+          <td>${esc(r.cidade||'-')}</td>
+          <td class="num">${fmt(f)}</td>
+          <td class="num">${part}</td>
+          <td class="num">${fmt(r.pessoas)}</td>
+          <td class="num">${fmt(r.veiculos)}</td>
+          <td class="num">${fmt(r.detidos)}</td>
+          <td class="num">${fmt(r.itens_apreendidos)}</td>
+          <td class="num">${fmt(r.apreensoes)}</td>
+          <td class="num">${fmt(r.multados)}</td>
+          <td class="num">${fmt(r.fechados)}</td>
+          <td class="num">${fmt(r.lacrados)}</td>
+        </tr>`;
+    }).join('');
+
+    const topLocaisRows = topLocais.map(r =>
+      `<tr><td>${esc(r.local_nome||'-')}</td><td class="num">${fmt(r.qtd)}</td></tr>`
+    ).join('');
+
+    const fiscRows = fiscList.map(r=>{
+      const itensArr = Array.isArray(r.itens) ? r.itens : [];
+      const itensStr = itensArr.length
+        ? itensArr.map(it => `${fmt(it.quantidade)} ${esc(it.unidade||'')} ${esc(it.tipo||'')}`).join('; ')
+        : '—';
+      const check = (b)=> b ? '✓' : '';
+      return `
+        <tr>
+          <td>#${fmt(r.evento_id)}</td>
+          <td>${esc(new Date(r.ts).toLocaleString('pt-BR'))}</td>
+          <td>${esc(r.cidade||'-')}</td>
+          <td>${esc(r.tipo_local||'-')}</td>
+          <td>${esc(r.local_nome||'-')}</td>
+          <td>${esc(r.local_endereco||'-')}</td>
+          <td class="num">${fmt(r.pessoas_abordadas)}</td>
+          <td class="num">${fmt(r.veiculos_abordados)}</td>
+          <td class="num">${fmt(r.pessoas_detidas_qtd)}</td>
+          <td class="num">${fmt(r.itens_apreendidos)}</td>
+          <td class="num">${check(r.multado)}</td>
+          <td class="num">${check(r.fechado)}</td>
+          <td class="num">${check(r.lacrado)}</td>
+        </tr>
+        <tr><td colspan="13" class="small"><span class="muted">Itens (detalhe):</span> ${itensStr}</td></tr>
+      `;
+    }).join('');
+
+    const html = `
+      <div id="pdf-wrap">
+        <style>
+          *{box-sizing:border-box}
+          body{margin:0}
+          .wrap{padding:20px 22px; color:#111; font:12px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial; background:#fff}
+          .hdr{display:flex; align-items:center; gap:14px; border-bottom:2px solid #e5e7eb; padding-bottom:10px; margin-bottom:10px}
+          .hdr img{height:56px; object-fit:contain}
+          .title{font-size:20px; font-weight:800; margin:0}
+          .subtitle{color:#555; margin-top:2px}
+          .meta{display:grid; grid-template-columns:auto 1fr; gap:4px 10px; border:1px solid #e5e7eb; border-radius:10px; padding:10px; margin:12px 0}
+          .meta .k{color:#666}
+          .kpis{display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin:12px 0}
+          .kpi{border:1px solid #e5e7eb; border-radius:10px; padding:10px}
+          .kpi .lbl{font-size:11px; color:#666}
+          .kpi .val{font-size:18px; font-weight:800; margin-top:2px}
+          h3{font-size:14px; margin:16px 0 6px; border-left:3px solid #111; padding-left:8px}
+          table{width:100%; border-collapse:collapse; table-layout:fixed}
+          th,td{border:1px solid #e5e7eb; padding:6px 8px; vertical-align:top}
+          th{background:#f7f7f7; text-align:left; font-weight:700}
+          td.num, th.num{text-align:right}
+          .muted{color:#666}
+          .two-col{display:grid; grid-template-columns:1.2fr .8fr; gap:12px}
+          .page-break{page-break-before:always; margin-top:12px}
+          .nowrap{white-space:nowrap}
+          .w-120{width:120px}.w-160{width:160px}.w-220{width:220px}
+          .small{font-size:11px}
+        </style>
+
+        <div class="wrap">
+          <div class="hdr">
+            <img src="${esc(LOGO_URL)}" alt="Logo"/>
+            <div>
+              <h1 class="title">Relatório — Operação</h1>
+              <div class="subtitle">Centro de Inteligência Metropolitana</div>
+            </div>
+            <div style="margin-left:auto; text-align:right" class="small muted">
+              Emitido em ${esc(new Date().toLocaleString('pt-BR'))}
+            </div>
+          </div>
+
+          <div class="meta">
+            <div class="k">Operação</div><div>${esc(opText)}</div>
+            <div class="k">Período</div><div>${esc(from)} — ${esc(to)}</div>
+            <div class="k">Cidade</div><div>${esc(cidadeText)}</div>
+          </div>
+
+          <div class="kpis">${kpiHtml}</div>
+
+          <div class="two-col">
+            <div>
+              <h3>Distribuição por cidade</h3>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Cidade</th>
+                    <th class="num">Fiscalizações</th>
+                    <th class="num">% part.</th>
+                    <th class="num">Pessoas</th>
+                    <th class="num">Veículos</th>
+                    <th class="num">Detidos</th>
+                    <th class="num">Itens</th>
+                    <th class="num">Apreensões</th>
+                    <th class="num">Multados</th>
+                    <th class="num">Fechados</th>
+                    <th class="num">Lacrados</th>
+                  </tr>
+                </thead>
+                <tbody>${porCidadeRows}</tbody>
+              </table>
+            </div>
+
+            <div>
+              <h3>Top locais fiscalizados</h3>
+              <table>
+                <thead><tr><th>Local</th><th class="num">Qtd.</th></tr></thead>
+                <tbody>${topLocaisRows}</tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="page-break"></div>
+
+          <h3>Fiscalizações (detalhe)</h3>
+          <table>
+            <thead>
+              <tr>
+                <th class="w-120">Evento</th>
+                <th class="w-160">Data/Hora</th>
+                <th>Cidade</th>
+                <th>Tipo do local</th>
+                <th>Nome do local</th>
+                <th class="w-220">Endereço</th>
+                <th class="num">Pessoas</th>
+                <th class="num">Veículos</th>
+                <th class="num">Detidos</th>
+                <th class="num">Itens</th>
+                <th class="nowrap">Mult.</th>
+                <th class="nowrap">Fech.</th>
+                <th class="nowrap">Lacr.</th>
+              </tr>
+            </thead>
+            <tbody>${fiscRows}</tbody>
+          </table>
+        </div>
+      </div>`;
+
+    // injeta e exporta
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    document.body.appendChild(container);
+
+    await html2pdf().set({
+      margin:[10,10,10,10],
+      filename:`relatorio_operacao_${opId || 'filtro'}.pdf`,
+      image:{ type:'jpeg', quality:0.98 },
+      html2canvas:{ scale:2, useCORS:true },
+      jsPDF:{ unit:'mm', format:'a4', orientation:'portrait' }
+    }).from(container.querySelector('#pdf-wrap')).save();
+
+    container.remove();
   }
 </script>
 
