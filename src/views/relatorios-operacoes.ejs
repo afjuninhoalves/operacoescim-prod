@@ -418,6 +418,7 @@
     qs('#t-lac').textContent  = fmt(sum('lacrados'));
   }
 
+ 
   function renderFiscCards(rows){
     const wrap = qs('#fiscCards');
     const empty = qs('#noFisc');
@@ -427,19 +428,21 @@
       return;
     }
     empty.style.display = 'none';
-    wrap.innerHTML = rows.map(r=>{
+
+    wrap.innerHTML = rows.map(r => {
       const flags = [
         r.multado ? '<span class="pill">Multado</span>' : '',
         r.fechado ? '<span class="pill">Fechado</span>' : '',
         r.lacrado ? '<span class="pill">Lacrado</span>' : '',
       ].join('');
-      const det   = Number(r.pessoas_detidas_qtd)||0;
-      const itens = Number(r.itens_apreendidos)||0;
-      const itensArr  = Array.isArray(r.itens) ? r.itens : [];
+
+      const det      = Number(r.pessoas_detidas_qtd) || 0;
+      const itens    = Number(r.itens_apreendidos)   || 0;
+      const itensArr = Array.isArray(r.itens) ? r.itens : [];
       const itensHtml = itensArr.length
         ? `<ul style="margin:6px 0 0 16px;padding:0">
-             ${itensArr.slice(0,5).map(it=>`
-               <li>${fmt(Number(it.quantidade||0))} ${esc(it.unidade||'')} ${esc(it.tipo||'')}</li>
+             ${itensArr.slice(0,5).map(it => `
+               <li>${fmt(Number(it.quantidade||0))} ${escapeHtml(it.unidade||'')} ${escapeHtml(it.tipo||'')}</li>
              `).join('')}
              ${itensArr.length>5 ? `<li>+${itensArr.length-5} itens</li>` : ''}
            </ul>`
@@ -448,24 +451,29 @@
       return `
         <div class="card">
           <div style="display:flex;justify-content:space-between;align-items:center">
-            <div><strong>#${r.evento_id}</strong> — ${esc(r.cidade || '-')}</div>
+            <div><strong>#${r.evento_id}</strong> — ${escapeHtml(r.cidade || '-')}</div>
             <div class="muted" style="font-size:12px">${new Date(r.ts).toLocaleString('pt-BR')}</div>
           </div>
+
           <div style="margin-top:6px">${flags}</div>
+
           <div class="kv" style="margin-top:8px">
-            <div class="k">Tipo do local</div><div>${esc(r.tipo_local || '-')}</div>
-            <div class="k">Nome</div><div>${esc(r.local_nome || '-')}</div>
-            <div class="k">Endereço</div><div>${esc(r.local_endereco || '-')}</div>
+            <div class="k">Cidade</div><div>${escapeHtml(r.cidade || '-')}</div>
+            <div class="k">Tipo do local</div><div>${escapeHtml(r.tipo_local || '-')}</div>
+            <div class="k">Nome</div><div>${escapeHtml(r.local_nome || '-')}</div>
+            <div class="k">Endereço</div><div>${escapeHtml(r.local_endereco || '-')}</div>
             <div class="k">Pessoas</div><div>${fmt(Number(r.pessoas_abordadas || 0))}</div>
             <div class="k">Veículos</div><div>${fmt(Number(r.veiculos_abordados || 0))}</div>
             <div class="k">Detidos</div><div>${fmt(det)}</div>
             <div class="k">Itens apreendidos</div><div>${fmt(itens)}</div>
             <div class="k">Itens (detalhe)</div><div>${itensHtml}</div>
-            <div class="k">Usuário</div><div>${esc(r.usuario || '-')}</div>
+            <div class="k">Usuário</div><div>${escapeHtml(r.usuario || '-')}</div>
           </div>
-        </div>`;
+        </div>
+      `;
     }).join('');
   }
+
 
   // ======= carregamento =======
   async function load(){
