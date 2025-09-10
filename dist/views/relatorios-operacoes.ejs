@@ -511,218 +511,209 @@
   // estado inicial
   enableExports(false);
 
-  // ======= PDF (cliente) — layout branco profissional =======
-  async function generatePdf(){
-    const btn = qs('#btnPdf');
-    if (!btn || btn.getAttribute('aria-disabled') === 'true') return;
+  
 
+  // ======= PDF (cliente) — versão “pro” =======
+  async function generatePdf(){
+    const btn = document.querySelector('#btnPdf');
+    if (!btn || btn.getAttribute('aria-disabled') === 'true') return;
     if (typeof html2pdf === 'undefined'){
       alert('PDF: biblioteca html2pdf não carregou.');
       return;
     }
-    if (!__relatorioData){
-      alert('Carregue os dados (Aplicar) antes de gerar o PDF.');
-      return;
-    }
 
-    const form   = qs('#filtros');
-    const opSel  = qs('#opId');
-    const cidSel = qs('#cidadeId');
-    const from   = form.querySelector('input[name="from"]').value || '-';
-    const to     = form.querySelector('input[name="to"]').value   || '-';
-    const opId   = opSel.value;
-    const opText = opSel.value ? opSel.options[opSel.selectedIndex].textContent.trim() : '-';
-    const cidadeText = cidSel.value ? cidSel.options[cidSel.selectedIndex].textContent.trim() : 'Todas';
+    try{
+      // infos do cabeçalho
+      const opSel = document.querySelector('#opId');
+      const cidSel = document.querySelector('#cidadeId');
+      const from = document.querySelector('input[name="from"]').value || '-';
+      const to   = document.querySelector('input[name="to"]').value   || '-';
+      const opId = opSel.value;
+      const opText = opSel.value ? opSel.options[opSel.selectedIndex].textContent : '-';
+      const cidadeText = cidSel.value ? cidSel.options[cidSel.selectedIndex].textContent : 'Todas';
 
-    const {cards={}, porCidade=[], topLocais=[], fiscList=[]} = __relatorioData;
+      // raiz do PDF
+      const root   = document.createElement('div');
+      root.style.padding   = '14px';
+      root.style.maxWidth  = '1200px'; // paisagem tem mais área útil
+      root.style.margin    = '0 auto';
+      root.style.background= '#fff';
 
-    // prepara blocos de HTML
-    const kpiHtml = [
-      ['Fiscalizações', cards.fiscalizacoes],
-      ['Pessoas',       cards.pessoas],
-      ['Veículos',      cards.veiculos],
-      ['Detidos',       cards.detidos],
-      ['Itens apreen.', cards.itensApreendidos],
-      ['Apreensões',    cards.apreensoes],
-      ['Multados',      cards.multados],
-      ['Fechados',      cards.fechados],
-      ['Lacrados',      cards.lacrados],
-    ].map(([l,v]) => `
-      <div class="kpi"><div class="lbl">${esc(l)}</div><div class="val">${fmt(v)}</div></div>
-    `).join('');
+      // CSS só do PDF
+      const style = document.createElement('style');
+      style.textContent = `
+        *{box-sizing:border-box}
+        body{margin:0}
+        .pdf-wrap{font:12px Arial, Helvetica, sans-serif; color:#111827}
+        h1{font-size:18px; margin:0 0 6px; font-weight:800}
+        h2{font-size:14px; margin:12px 0 6px; font-weight:700}
+        .meta{display:flex; gap:10px; flex-wrap:wrap; font-size:12px; color:#374151; margin-top:4px}
+        .meta b{color:#111827}
+        .header{display:flex; align-items:center; gap:12px; border-bottom:2px solid #e5e7eb; padding-bottom:10px; margin-bottom:12px}
+        .logo{height:56px; object-fit:contain}
+        .brand{line-height:1.1}
+        .brand .title{font-weight:800; font-size:13px}
+        .brand .subtitle{font-size:11px; color:#6b7280}
 
-    const totalF = porCidade.reduce((s,r)=>s+(Number(r.fiscalizacoes)||0),0);
-    const porCidadeRows = porCidade.map(r=>{
-      const f = Number(r.fiscalizacoes)||0;
-      const part = totalF ? (f/totalF*100).toFixed(1)+'%' : '—';
-      return `
-        <tr>
-          <td>${esc(r.cidade||'-')}</td>
-          <td class="num">${fmt(f)}</td>
-          <td class="num">${part}</td>
-          <td class="num">${fmt(r.pessoas)}</td>
-          <td class="num">${fmt(r.veiculos)}</td>
-          <td class="num">${fmt(r.detidos)}</td>
-          <td class="num">${fmt(r.itens_apreendidos)}</td>
-          <td class="num">${fmt(r.apreensoes)}</td>
-          <td class="num">${fmt(r.multados)}</td>
-          <td class="num">${fmt(r.fechados)}</td>
-          <td class="num">${fmt(r.lacrados)}</td>
-        </tr>`;
-    }).join('');
+        .kpi{display:grid; grid-template-columns:repeat(6,1fr); gap:10px; margin:10px 0}
+        .kpi .box{background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:8px}
+        .kpi .label{font-size:10px; color:#6b7280}
+        .kpi .value{font-size:18px; font-weight:800; margin-top:2px}
 
-    const topLocaisRows = topLocais.map(r =>
-      `<tr><td>${esc(r.local_nome||'-')}</td><td class="num">${fmt(r.qtd)}</td></tr>`
-    ).join('');
+        table{width:100%; border-collapse:collapse; table-layout:fixed}
+        th,td{border:1px solid #e5e7eb; padding:6px; font-size:10.5px}
+        th{background:#f3f4f6; font-weight:700; white-space:nowrap}
+        td.num{text-align:right}
+        .avoid-break{break-inside:avoid}
+        .page-break{page-break-before:always}
 
-    const fiscRows = fiscList.map(r=>{
-      const itensArr = Array.isArray(r.itens) ? r.itens : [];
-      const itensStr = itensArr.length
-        ? itensArr.map(it => `${fmt(it.quantidade)} ${esc(it.unidade||'')} ${esc(it.tipo||'')}`).join('; ')
-        : '—';
-      const check = (b)=> b ? '✓' : '';
-      return `
-        <tr>
-          <td>#${fmt(r.evento_id)}</td>
-          <td>${esc(new Date(r.ts).toLocaleString('pt-BR'))}</td>
-          <td>${esc(r.cidade||'-')}</td>
-          <td>${esc(r.tipo_local||'-')}</td>
-          <td>${esc(r.local_nome||'-')}</td>
-          <td>${esc(r.local_endereco||'-')}</td>
-          <td class="num">${fmt(r.pessoas_abordadas)}</td>
-          <td class="num">${fmt(r.veiculos_abordados)}</td>
-          <td class="num">${fmt(r.pessoas_detidas_qtd)}</td>
-          <td class="num">${fmt(r.itens_apreendidos)}</td>
-          <td class="num">${check(r.multado)}</td>
-          <td class="num">${check(r.fechado)}</td>
-          <td class="num">${check(r.lacrado)}</td>
-        </tr>
-        <tr><td colspan="13" class="small"><span class="muted">Itens (detalhe):</span> ${itensStr}</td></tr>
+        /* evita hifenização e cortes estranhos */
+        table, th, td, div, span { word-break:keep-all; hyphens:none; }
+
+        /* deixa cada bloco em largura total para não apertar colunas */
+        .grid-one-col > *{margin-bottom:10px}
+
+        /* cards de fiscalizações */
+        .cards{display:grid; grid-template-columns:repeat(2,1fr); gap:10px}
+        .card{border:1px solid #e5e7eb; border-radius:10px; padding:8px; background:#fff}
+        .topline{display:flex; justify-content:space-between; gap:8px; font-size:11px}
+        .muted{color:#6b7280}
+        .kv{display:grid; grid-template-columns:140px 1fr; gap:4px 8px; font-size:10.5px; margin-top:6px}
+        .badge{display:inline-block; border:1px solid #e5e7eb; border-radius:999px; padding:1px 6px; background:#f9fafb; font-size:10px; margin-right:4px}
       `;
-    }).join('');
+      root.appendChild(style);
 
-    const html = `
-      <div id="pdf-wrap">
-        <style>
-          *{box-sizing:border-box}
-          body{margin:0}
-          .wrap{padding:20px 22px; color:#111; font:12px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial; background:#fff}
-          .hdr{display:flex; align-items:center; gap:14px; border-bottom:2px solid #e5e7eb; padding-bottom:10px; margin-bottom:10px}
-          .hdr img{height:56px; object-fit:contain}
-          .title{font-size:20px; font-weight:800; margin:0}
-          .subtitle{color:#555; margin-top:2px}
-          .meta{display:grid; grid-template-columns:auto 1fr; gap:4px 10px; border:1px solid #e5e7eb; border-radius:10px; padding:10px; margin:12px 0}
-          .meta .k{color:#666}
-          .kpis{display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin:12px 0}
-          .kpi{border:1px solid #e5e7eb; border-radius:10px; padding:10px}
-          .kpi .lbl{font-size:11px; color:#666}
-          .kpi .val{font-size:18px; font-weight:800; margin-top:2px}
-          h3{font-size:14px; margin:16px 0 6px; border-left:3px solid #111; padding-left:8px}
-          table{width:100%; border-collapse:collapse; table-layout:fixed}
-          th,td{border:1px solid #e5e7eb; padding:6px 8px; vertical-align:top}
-          th{background:#f7f7f7; text-align:left; font-weight:700}
-          td.num, th.num{text-align:right}
-          .muted{color:#666}
-          .two-col{display:grid; grid-template-columns:1.2fr .8fr; gap:12px}
-          .page-break{page-break-before:always; margin-top:12px}
-          .nowrap{white-space:nowrap}
-          .w-120{width:120px}.w-160{width:160px}.w-220{width:220px}
-          .small{font-size:11px}
-        </style>
-
-        <div class="wrap">
-          <div class="hdr">
-            <img src="${esc(LOGO_URL)}" alt="Logo"/>
-            <div>
-              <h1 class="title">Relatório — Operação</h1>
-              <div class="subtitle">Centro de Inteligência Metropolitana</div>
-            </div>
-            <div style="margin-left:auto; text-align:right" class="small muted">
-              Emitido em ${esc(new Date().toLocaleString('pt-BR'))}
-            </div>
-          </div>
-
+      // cabeçalho
+      const header = document.createElement('div');
+      header.className = 'pdf-wrap header';
+      header.innerHTML = `
+        <img class="logo" src="${LOGO_URL}" alt="Logo"/>
+        <div class="brand">
+          <div class="title">C.I.M</div>
+          <div class="subtitle">Centro de Inteligência Metropolitana</div>
           <div class="meta">
-            <div class="k">Operação</div><div>${esc(opText)}</div>
-            <div class="k">Período</div><div>${esc(from)} — ${esc(to)}</div>
-            <div class="k">Cidade</div><div>${esc(cidadeText)}</div>
+            <div><b>Operação:</b> ${opText}</div>
+            <div><b>Período:</b> ${from} — ${to}</div>
+            <div><b>Cidade:</b> ${cidadeText}</div>
+            <div><b>Emitido em:</b> ${new Date().toLocaleString('pt-BR')}</div>
           </div>
-
-          <div class="kpis">${kpiHtml}</div>
-
-          <div class="two-col">
-            <div>
-              <h3>Distribuição por cidade</h3>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Cidade</th>
-                    <th class="num">Fiscalizações</th>
-                    <th class="num">% part.</th>
-                    <th class="num">Pessoas</th>
-                    <th class="num">Veículos</th>
-                    <th class="num">Detidos</th>
-                    <th class="num">Itens</th>
-                    <th class="num">Apreensões</th>
-                    <th class="num">Multados</th>
-                    <th class="num">Fechados</th>
-                    <th class="num">Lacrados</th>
-                  </tr>
-                </thead>
-                <tbody>${porCidadeRows}</tbody>
-              </table>
-            </div>
-
-            <div>
-              <h3>Top locais fiscalizados</h3>
-              <table>
-                <thead><tr><th>Local</th><th class="num">Qtd.</th></tr></thead>
-                <tbody>${topLocaisRows}</tbody>
-              </table>
-            </div>
-          </div>
-
-          <div class="page-break"></div>
-
-          <h3>Fiscalizações (detalhe)</h3>
-          <table>
-            <thead>
-              <tr>
-                <th class="w-120">Evento</th>
-                <th class="w-160">Data/Hora</th>
-                <th>Cidade</th>
-                <th>Tipo do local</th>
-                <th>Nome do local</th>
-                <th class="w-220">Endereço</th>
-                <th class="num">Pessoas</th>
-                <th class="num">Veículos</th>
-                <th class="num">Detidos</th>
-                <th class="num">Itens</th>
-                <th class="nowrap">Mult.</th>
-                <th class="nowrap">Fech.</th>
-                <th class="nowrap">Lacr.</th>
-              </tr>
-            </thead>
-            <tbody>${fiscRows}</tbody>
-          </table>
         </div>
-      </div>`;
+      `;
+      root.appendChild(header);
 
-    // injeta e exporta
-    const container = document.createElement('div');
-    container.innerHTML = html;
-    document.body.appendChild(container);
+      // KPIs (lê do DOM atual)
+      const kpi = document.createElement('div');
+      kpi.className = 'pdf-wrap kpi avoid-break';
+      const get = id => (document.querySelector(id)?.textContent || '0');
+      const box = (label, val) => `<div class="box"><div class="label">${label}</div><div class="value">${val}</div></div>`;
+      kpi.innerHTML = [
+        box('Fiscalizações',  get('#k-fisc')),
+        box('Pessoas',        get('#k-pes')),
+        box('Veículos',       get('#k-vei')),
+        box('Detidos',        get('#k-det')),
+        box('Itens apreendidos', get('#k-itens')),
+        box('Apreensões',     get('#k-apr')),
+        box('Multados',       get('#k-mul')),
+        box('Fechados',       get('#k-fec')),
+        box('Lacrados',       get('#k-lac')),
+      ].join('');
+      root.appendChild(kpi);
 
-    await html2pdf().set({
-      margin:[10,10,10,10],
-      filename:`relatorio_operacao_${opId || 'filtro'}.pdf`,
-      image:{ type:'jpeg', quality:0.98 },
-      html2canvas:{ scale:2, useCORS:true },
-      jsPDF:{ unit:'mm', format:'a4', orientation:'portrait' }
-    }).from(container.querySelector('#pdf-wrap')).save();
+      // grade 1 coluna (cada bloco ocupa a largura total)
+      const grid = document.createElement('div');
+      grid.className = 'pdf-wrap grid-one-col';
 
-    container.remove();
+      // Tabela: Distribuição por cidade (clona HTML e aplica classes)
+      const distWrap = document.createElement('div');
+      distWrap.className = 'avoid-break';
+      distWrap.innerHTML = `<h2>Distribuição por cidade</h2>`;
+      const tblCidade = document.querySelector('#tblCidade').cloneNode(true);
+      tblCidade.classList.add('table');
+      distWrap.appendChild(tblCidade);
+      grid.appendChild(distWrap);
+
+      // Tabela: Top locais (clona)
+      const topWrap = document.createElement('div');
+      topWrap.className = 'avoid-break';
+      topWrap.innerHTML = `<h2>Top locais fiscalizados</h2>`;
+      const tblTop = document.querySelector('#tblTop').cloneNode(true);
+      topWrap.appendChild(tblTop);
+      grid.appendChild(topWrap);
+
+      root.appendChild(grid);
+
+      // Page break e cards
+      const cardsWrap = document.createElement('div');
+      cardsWrap.className = 'pdf-wrap page-break';
+      cardsWrap.innerHTML = `<h2>Fiscalizações (detalhe)</h2>`;
+
+      // converte os cards visíveis para um layout leve
+      const srcCards = Array.from(document.querySelectorAll('#fiscCards .card'));
+      const cards = document.createElement('div');
+      cards.className = 'cards';
+
+      srcCards.forEach(c => {
+        const evento  = c.querySelector('.topline strong')?.textContent || '';
+        const cidade  = c.querySelector('.topline')?.textContent || '';
+        const when    = c.querySelector('.muted')?.textContent || '';
+        const tipo    = c.querySelector('.kv .k:nth-child(1) + div')?.textContent || '';
+        const nome    = c.querySelector('.kv .k:nth-child(3) + div')?.textContent || '';
+        const end     = c.querySelector('.kv .k:nth-child(5) + div')?.textContent || '';
+        const pessoas = c.querySelector('.kv .k:nth-child(7) + div')?.textContent || '0';
+        const veic    = c.querySelector('.kv .k:nth-child(9) + div')?.textContent || '0';
+        const det     = c.querySelector('.kv .k:nth-child(11)+ div')?.textContent || '0';
+        const itens   = c.querySelector('.kv .k:nth-child(13)+ div')?.textContent || '0';
+        const itensDet= c.querySelector('.kv .k:nth-child(15)+ div')?.innerHTML || '—';
+        const usuario = c.querySelector('.kv .k:nth-child(17)+ div')?.textContent || '—';
+        const flags   = c.querySelector('div[style*="margin-top:6px"]')?.innerHTML || '';
+
+        const card = document.createElement('div');
+        card.className = 'card avoid-break';
+        card.innerHTML = `
+          <div class="topline">
+            <div><b>${evento}</b> — ${cidade.replace(/\s+/, ' ').trim()}</div>
+            <div class="muted">${when}</div>
+          </div>
+          <div style="margin:4px 0">${flags.replace(/class="pill"/g,'class="badge"')}</div>
+          <div class="kv">
+            <div>Tipo do local</div><div>${tipo}</div>
+            <div>Nome</div><div>${nome}</div>
+            <div>Endereço</div><div>${end}</div>
+            <div>Pessoas</div><div>${pessoas}</div>
+            <div>Veículos</div><div>${veic}</div>
+            <div>Detidos</div><div>${det}</div>
+            <div>Itens apreendidos</div><div>${itens}</div>
+            <div>Itens (detalhe)</div><div>${itensDet}</div>
+            <div>Usuário</div><div>${usuario}</div>
+          </div>
+        `;
+        cards.appendChild(card);
+      });
+
+      cardsWrap.appendChild(cards);
+      root.appendChild(cardsWrap);
+
+      // gera
+      await html2pdf()
+        .set({
+          margin:       [8,8,10,8],
+          filename:     `relatorio_operacao_${opId || 'filtro'}.pdf`,
+          image:        { type: 'jpeg', quality: 0.98 },
+          html2canvas:  { scale: 3, useCORS: true },
+          jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' }, // <- paisagem
+          pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
+        })
+        .from(root)
+        .save();
+
+      root.remove();
+    }catch(err){
+      console.error('[pdf] erro ao gerar', err);
+      alert('Não consegui gerar o PDF. Veja o console (F12) para detalhes.');
+    }
   }
+
+
 </script>
 
 
